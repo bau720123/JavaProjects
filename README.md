@@ -19,7 +19,7 @@
 
 ## 安裝與執行
 ### 1. 克隆專案
-git clone https://github.com/your-username/stock-health-system.git
+git clone [https://github.com/your-username/stock-health-system.git](https://github.com/bau720123/JavaProjects.git)
 cd stock-health-system
 
 ### 2. 編譯依賴
