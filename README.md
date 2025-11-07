@@ -15,13 +15,17 @@
 - Java 21 LTS (Temurin 或 Oracle JDK)。
   https://adoptium.net/zh-CN/temurin/releases?version=21
 - Maven 3.9.11+。
-- Fugle API Key (免費註冊：https://developer.fugle.tw/)。
+  https://dlcdn.apache.org/maven/maven-3/3.9.11/binaries/apache-maven-3.9.11-bin.zip
+- Fugle API Key
+  https://developer.fugle.tw/docs/key/
+  https://developer.fugle.tw/docs/data/intro
+  https://github.com/fugle-dev/fugle-marketdata-python
 - Windows (支援 .exe 打包)。
 
 ## 安裝與執行
 ### 1. 克隆專案
-git clone [https://github.com/your-username/stock-health-system.git](https://github.com/bau720123/JavaProjects.git)
-cd stock-health-system
+git clone https://github.com/bau720123/JavaProjects.git
+cd JavaProjects
 
 ### 2. 編譯依賴
 - 自動下載 OkHttp (API 請求)、Jackson (JSON 解析)、JavaFX (GUI)、Jsoup (爬蟲備援)。
