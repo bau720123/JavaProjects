@@ -51,7 +51,6 @@ mvn javafx:run
 - │   ├── Candle.java         # K 線模型
 - │   └── FugleService.java   # API 服務 (OkHttp + Jackson)
 - └── README.md               # 此檔
-MIT License – 見 [LICENSE](LICENSE)。
 
 ## 技術棧
 - **語言**：Java 21 (records, virtual threads)。
