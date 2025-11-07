@@ -13,7 +13,7 @@
 
 ## 系統需求
 - Java 21 LTS (Temurin 或 Oracle JDK)。
-  [https://adoptium.net/zh-CN/temurin/releases?version=21]
+  https://adoptium.net/zh-CN/temurin/releases?version=21
 - Maven 3.9.11+。
 - Fugle API Key (免費註冊：https://developer.fugle.tw/)。
 - Windows (支援 .exe 打包)。
