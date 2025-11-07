@@ -24,8 +24,8 @@
 
 ## 安裝與執行
 ### 1. 克隆專案
-git clone https://github.com/bau720123/JavaProjects.git
-cd JavaProjects
+- git clone https://github.com/bau720123/JavaProjects.git
+- cd JavaProjects
 
 ### 2. 編譯依賴
 - 自動下載 OkHttp (API 請求)、Jackson (JSON 解析)、JavaFX (GUI)。
@@ -43,14 +43,14 @@ mvn javafx:run
 4. 若 API 失效，自動顯示 "系統異常，請稍後再試"（可手動切爬蟲）。
 
 ## 專案結構
-stock-health-system/
-├── pom.xml                 # Maven 配置 (依賴/插件)
-├── src/main/java/com/example/
-│   ├── MainApp.java        # GUI 主入口 (JavaFX)
-│   ├── Quote.java          # 報價模型 (record)
-│   ├── Candle.java         # K 線模型
-│   └── FugleService.java   # API 服務 (OkHttp + Jackson)
-└── README.md               # 此檔
+- stock-health-system/
+- ├── pom.xml                 # Maven 配置 (依賴/插件)
+- ├── src/main/java/com/example/
+- │   ├── MainApp.java        # GUI 主入口 (JavaFX)
+- │   ├── Quote.java          # 報價模型 (record)
+- │   ├── Candle.java         # K 線模型
+- │   └── FugleService.java   # API 服務 (OkHttp + Jackson)
+- └── README.md               # 此檔
 
 ## 技術棧
 - **語言**：Java 21 (records, virtual threads)。
