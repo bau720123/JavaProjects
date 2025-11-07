@@ -15,11 +15,11 @@
 - Java 21 LTS (Temurin 或 Oracle JDK)。
 - https://adoptium.net/zh-CN/temurin/releases?version=21
 - Maven 3.9.11+。
-  https://dlcdn.apache.org/maven/maven-3/3.9.11/binaries/apache-maven-3.9.11-bin.zip
+- https://dlcdn.apache.org/maven/maven-3/3.9.11/binaries/apache-maven-3.9.11-bin.zip
 - Fugle API Key
-  https://developer.fugle.tw/docs/key/
-  https://developer.fugle.tw/docs/data/intro
-  https://github.com/fugle-dev/fugle-marketdata-python
+- https://developer.fugle.tw/docs/key/
+- https://developer.fugle.tw/docs/data/intro
+- https://github.com/fugle-dev/fugle-marketdata-python
 - Windows (支援 .exe 打包)。
 
 ## 安裝與執行
@@ -28,7 +28,7 @@ git clone https://github.com/bau720123/JavaProjects.git
 cd JavaProjects
 
 ### 2. 編譯依賴
-- 自動下載 OkHttp (API 請求)、Jackson (JSON 解析)、JavaFX (GUI)、Jsoup (爬蟲備援)。
+- 自動下載 OkHttp (API 請求)、Jackson (JSON 解析)、JavaFX (GUI)。
 
 ### 3. 執行應用
 mvn javafx:run
