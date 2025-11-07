@@ -2,7 +2,7 @@
 
 [![Java](https://img.shields.io/badge/Java-21-blue.svg)](https://www.oracle.com/java/) [![Maven](https://img.shields.io/badge/Maven-3.9.11-orange.svg)](https://maven.apache.org/) [![JavaFX](https://img.shields.io/badge/JavaFX-21-green.svg)](https://openjfx.io/) [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-這是一個基於 Java 的桌面應用，專為台股投資者設計的股票健診系統。透過 Fugle API 獲取即時報價、歷史 K 線和技術指標（如 RSI、MACD），若 API 無法存取時自動切換 Jsoup 爬蟲備援（從 Yahoo 財經抓資料）。支援輸入股票代號和 API Key，顯示報價、折線圖和分析建議。適合個人投資者快速診斷持股狀況。
+這是一個基於 Java 的桌面應用，專為台股投資者設計的股票健診系統。透過 Fugle API 獲取即時報價、歷史 K 線和技術指標（如 RSI、MACD）。支援輸入股票代號和 API Key，顯示報價、折線圖和分析建議。適合個人投資者快速診斷持股狀況。
 
 ## 功能特色
 - **即時報價**：開盤價、最高/最低價、成交量（Fugle API 優先，爬蟲備援）。
@@ -13,6 +13,7 @@
 
 ## 系統需求
 - Java 21 LTS (Temurin 或 Oracle JDK)。
+  [https://adoptium.net/zh-CN/temurin/releases?version=21]
 - Maven 3.9.11+。
 - Fugle API Key (免費註冊：https://developer.fugle.tw/)。
 - Windows (支援 .exe 打包)。
