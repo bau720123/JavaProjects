@@ -14,6 +14,11 @@
 ## 系統需求
 - Java 21 LTS (Temurin 或 Oracle JDK)。
 - https://adoptium.net/zh-CN/temurin/releases?version=21
+#PS C:\project\JavaProjects\stock-health-system> java -version
+openjdk version "21.0.9" 2025-10-21 LTS
+OpenJDK Runtime Environment Temurin-21.0.9+10 (build 21.0.9+10-LTS)
+OpenJDK 64-Bit Server VM Temurin-21.0.9+10 (build 21.0.9+10-LTS, mixed mode, sharing)
+
 - Maven 3.9.11+。
 - https://dlcdn.apache.org/maven/maven-3/3.9.11/binaries/apache-maven-3.9.11-bin.zip
 - Fugle API Key
