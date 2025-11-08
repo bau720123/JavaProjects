@@ -24,15 +24,20 @@
 - Maven 3.9.11+  
   下載連結：https://dlcdn.apache.org/maven/maven-3/3.9.11/binaries/apache-maven-3.9.11-bin.zip
 
-  [命令提示字元]  
-  PS C:\project\JavaProjects\stock-health-system> mvn -version
-  Apache Maven 3.9.11 (3e54c93a704957b63ee3494413a2b544fd3d825b)
-  Maven home: C:\project\JavaProjects\apache-maven-3.9.11
-  Java version: 21.0.9, vendor: Eclipse Adoptium, runtime: C:\Program Files\Eclipse Adoptium\jdk-21.0.9.10-hotspot
-  Default locale: zh_TW, platform encoding: UTF-8
-  OS name: "windows 11", version: "10.0", arch: "amd64", family: "windows"
+  [編輯系統變數]  
+  手動加 PATH（搜 "編輯系統環境變數" → 環境變數 > 系統變數 > Path > 新增  
 
-- Fugle API Key
+  <img width="1284" height="458" alt="2025-11-08_112015" src="https://github.com/user-attachments/assets/473c9a45-a2d4-44f6-9a43-435149b9e1da" />  
+
+  [命令提示字元]  
+  PS C:\project\JavaProjects\stock-health-system> mvn -version  
+  Apache Maven 3.9.11 (3e54c93a704957b63ee3494413a2b544fd3d825b)  
+  Maven home: C:\project\JavaProjects\apache-maven-3.9.11  
+  Java version: 21.0.9, vendor: Eclipse Adoptium, runtime: C:\Program Files\Eclipse Adoptium\jdk-21.0.9.10-hotspot  
+  Default locale: zh_TW, platform encoding: UTF-8  
+  OS name: "windows 11", version: "10.0", arch: "amd64", family: "windows"  
+
+- Fugle API Key  
   [教學文件與TOKEN申請]  
   https://developer.fugle.tw/docs/key/  
   https://developer.fugle.tw/docs/data/intro  
@@ -40,7 +45,7 @@
 
 ## 安裝與執行
 ### 1. 克隆專案  
-  git clone https://github.com/bau720123/JavaProjects.git  
+- git clone https://github.com/bau720123/JavaProjects.git  
 
 ### 2. 編譯依賴
 - 自動下載 OkHttp (API 請求)、Jackson (JSON 解析)、JavaFX (GUI)。
