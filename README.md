@@ -101,6 +101,9 @@
   [INFO]  
   [INFO]  
   [INFO] --- javafx:0.0.8:run (default-cli) @ stock-health ---  
+
+  <img width="314" height="219" alt="2025-11-08_114217" src="https://github.com/user-attachments/assets/8e8e8924-1fd2-46c4-9663-9ab2a292e9f9" />  
+
 - 或打包 .exe：
 - mvn jpackage:jpackage
 - 生成 dist/stock-health.exe，雙擊執行。
