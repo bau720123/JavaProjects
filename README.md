@@ -12,31 +12,90 @@
 - **桌面 GUI**：JavaFX 介面，簡單易用，一鍵查詢/刷新。
 
 ## 系統需求
-- Java 21 LTS (Temurin 或 Oracle JDK)。
-- https://adoptium.net/zh-CN/temurin/releases?version=21
-#PS C:\project\JavaProjects\stock-health-system> java -version
-openjdk version "21.0.9" 2025-10-21 LTS
-OpenJDK Runtime Environment Temurin-21.0.9+10 (build 21.0.9+10-LTS)
-OpenJDK 64-Bit Server VM Temurin-21.0.9+10 (build 21.0.9+10-LTS, mixed mode, sharing)
+- Java 21 LTS (Temurin 或 Oracle JDK)。  
+  下載連結：https://adoptium.net/zh-CN/temurin/releases?version=21
 
-- Maven 3.9.11+。
-- https://dlcdn.apache.org/maven/maven-3/3.9.11/binaries/apache-maven-3.9.11-bin.zip
+  [命令提示字元]  
+  PS C:\project\JavaProjects\stock-health-system> java -version  
+  openjdk version "21.0.9" 2025-10-21 LTS  
+  OpenJDK Runtime Environment Temurin-21.0.9+10 (build 21.0.9+10-LTS)  
+  OpenJDK 64-Bit Server VM Temurin-21.0.9+10 (build 21.0.9+10-LTS, mixed mode, sharing)  
+
+- Maven 3.9.11+  
+  下載連結：https://dlcdn.apache.org/maven/maven-3/3.9.11/binaries/apache-maven-3.9.11-bin.zip
+
+  [命令提示字元]  
+  PS C:\project\JavaProjects\stock-health-system> mvn -version
+  Apache Maven 3.9.11 (3e54c93a704957b63ee3494413a2b544fd3d825b)
+  Maven home: C:\project\JavaProjects\apache-maven-3.9.11
+  Java version: 21.0.9, vendor: Eclipse Adoptium, runtime: C:\Program Files\Eclipse Adoptium\jdk-21.0.9.10-hotspot
+  Default locale: zh_TW, platform encoding: UTF-8
+  OS name: "windows 11", version: "10.0", arch: "amd64", family: "windows"
+
 - Fugle API Key
-- https://developer.fugle.tw/docs/key/
-- https://developer.fugle.tw/docs/data/intro
-- https://github.com/fugle-dev/fugle-marketdata-python
-- Windows (支援 .exe 打包)。
+  [教學文件與TOKEN申請]  
+  https://developer.fugle.tw/docs/key/  
+  https://developer.fugle.tw/docs/data/intro  
+  https://github.com/fugle-dev/fugle-marketdata-python  
 
 ## 安裝與執行
-### 1. 克隆專案
-- git clone https://github.com/bau720123/JavaProjects.git
-- cd JavaProjects
+### 1. 克隆專案  
+  git clone https://github.com/bau720123/JavaProjects.git  
 
 ### 2. 編譯依賴
 - 自動下載 OkHttp (API 請求)、Jackson (JSON 解析)、JavaFX (GUI)。
 
-### 3. 執行應用
-mvn javafx:run
+  [命令提示字元]  
+  PS C:\project\JavaProjects\stock-health-system> mvn clean compile  
+  [INFO] Scanning for projects...  
+  [INFO]  
+  [INFO] ----------------------< com.example:stock-health >----------------------  
+  [INFO] Building stock-health 1.0-SNAPSHOT  
+  [INFO]   from pom.xml  
+  [INFO] --------------------------------[ jar ]---------------------------------
+  [WARNING] 6 problems were encountered while building the effective model for org.openjfx:javafx-controls:jar:21 during dependency collection step for project (use -X to see details)  
+  [INFO]  
+  [INFO] --- clean:3.2.0:clean (default-clean) @ stock-health ---  
+  [INFO] Deleting C:\project\JavaProjects\stock-health-system\target  
+  [INFO]  
+  [INFO] --- resources:3.3.1:resources (default-resources) @ stock-health ---  
+  [INFO] skip non existing resourceDirectory C:\project\JavaProjects\stock-health-system\src\main\resources  
+  [INFO]  
+  [INFO] --- compiler:3.13.0:compile (default-compile) @ stock-health ---  
+  [INFO] Recompiling the module because of changed source code.  
+  [INFO] Compiling 2 source files with javac [debug target 21] to target\classes  
+  [INFO] ------------------------------------------------------------------------  
+  [INFO] BUILD SUCCESS  
+  [INFO] ------------------------------------------------------------------------  
+  [INFO] Total time:  1.629 s  
+  [INFO] Finished at: 2025-11-08T11:01:48+08:00  
+  [INFO] ------------------------------------------------------------------------  
+
+### 3. 執行應用  
+- 生成視窗軟體，並且進行後續的打包
+
+  [命令提示字元]  
+  PS C:\project\JavaProjects\stock-health-system> mvn javafx:run  
+  [INFO] Scanning for projects...  
+  [INFO]  
+  [INFO] ----------------------< com.example:stock-health >----------------------  
+  [INFO] Building stock-health 1.0-SNAPSHOT  
+  [INFO]   from pom.xml  
+  [INFO] --------------------------------[ jar ]---------------------------------  
+  [INFO]  
+  [INFO] >>> javafx:0.0.8:run (default-cli) > process-classes @ stock-health >>>  
+  [WARNING] 6 problems were encountered while building the effective model for org.openjfx:javafx-controls:jar:21 during dependency collection step for project (use -X to see details)  
+  [INFO]  
+  [INFO] --- resources:3.3.1:resources (default-resources) @ stock-health ---  
+  [INFO] skip non existing resourceDirectory C:\project\JavaProjects\stock-health-system\src\main\resources  
+  [INFO]  
+  [INFO] --- compiler:3.13.0:compile (default-compile) @ stock-health ---  
+  [INFO] Nothing to compile - all classes are up to date.  
+  [INFO]  
+  [INFO] <<< javafx:0.0.8:run (default-cli) < process-classes @ stock-health <<<  
+  [INFO]  
+  [INFO]  
+  [INFO] --- javafx:0.0.8:run (default-cli) @ stock-health ---  
 - 或打包 .exe：
 - mvn jpackage:jpackage
 - 生成 dist/stock-health.exe，雙擊執行。
@@ -47,15 +106,15 @@ mvn javafx:run
 3. 點 "查詢" → 顯示報價/圖表/指標。
 4. 若 API 失效，自動顯示 "系統異常，請稍後再試"（可手動切爬蟲）。
 
-## 專案結構
-- stock-health-system/
-- ├── pom.xml                 # Maven 配置 (依賴/插件)
-- ├── src/main/java/com/example/
-- │   ├── MainApp.java        # GUI 主入口 (JavaFX)
-- │   ├── Quote.java          # 報價模型 (record)
-- │   ├── Candle.java         # K 線模型
-- │   └── FugleService.java   # API 服務 (OkHttp + Jackson)
-- └── README.md               # 此檔
+## 專案結構  
+  stock-health-system/  
+  ├── pom.xml                 # Maven 配置 (依賴/插件)  
+  ├── src/main/java/com/example/  
+  │   ├── MainApp.java        # GUI 主入口 (JavaFX)  
+  │   ├── Quote.java          # 報價模型 (record)  
+  │   ├── Candle.java         # K 線模型  
+  │   └── FugleService.java   # API 服務 (OkHttp + Jackson)  
+  └── README.md               # 此檔  
 
 ## 技術棧
 - **語言**：Java 21 (records, virtual threads)。
