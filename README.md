@@ -12,20 +12,20 @@
 - **桌面 GUI**：JavaFX 介面，簡單易用，一鍵查詢/刷新。
 
 ## 系統需求
-- Java 21 LTS (Temurin 或 Oracle JDK)。  
-  下載連結：https://adoptium.net/zh-CN/temurin/releases?version=21
+- Java 25 LTS (Temurin 或 Oracle JDK)。  
+  下載連結：https://adoptium.net/zh-CN/temurin/releases?version=25
 
   [命令提示字元]  
   PS C:\project\JavaProjects\stock-health-system> java -version  
-  openjdk version "21.0.9" 2025-10-21 LTS  
-  OpenJDK Runtime Environment Temurin-21.0.9+10 (build 21.0.9+10-LTS)  
-  OpenJDK 64-Bit Server VM Temurin-21.0.9+10 (build 21.0.9+10-LTS, mixed mode, sharing)  
+  openjdk version "25.0.1" 2025-10-21 LTS
+  OpenJDK Runtime Environment Temurin-25.0.1+8 (build 25.0.1+8-LTS)
+  OpenJDK 64-Bit Server VM Temurin-25.0.1+8 (build 25.0.1+8-LTS, mixed mode, sharing)
 
 - Maven 3.9.11+  
   下載連結：https://dlcdn.apache.org/maven/maven-3/3.9.11/binaries/apache-maven-3.9.11-bin.zip
 
   [編輯系統變數]  
-  手動加 PATH（搜 "編輯系統環境變數" → 環境變數 > 系統變數 > Path > 新增  
+  手動加 PATH（搜 "編輯系統環境變數" → 環境變數 > 系統變數 > Path > 編輯 > 新增  
 
   <img width="1284" height="458" alt="2025-11-08_112015" src="https://github.com/user-attachments/assets/473c9a45-a2d4-44f6-9a43-435149b9e1da" />  
 
