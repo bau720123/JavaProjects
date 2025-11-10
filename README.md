@@ -33,7 +33,7 @@
   PS C:\project\JavaProjects\stock-health-system> mvn -version  
   Apache Maven 3.9.11 (3e54c93a704957b63ee3494413a2b544fd3d825b)  
   Maven home: C:\project\JavaProjects\apache-maven-3.9.11  
-  Java version: 21.0.9, vendor: Eclipse Adoptium, runtime: C:\Program Files\Eclipse Adoptium\jdk-21.0.9.10-hotspot  
+  Java version: 25.0.1, vendor: Eclipse Adoptium, runtime: C:\Program Files\Eclipse Adoptium\jdk-25.0.1.8-hotspot  
   Default locale: zh_TW, platform encoding: UTF-8  
   OS name: "windows 11", version: "10.0", arch: "amd64", family: "windows"  
 

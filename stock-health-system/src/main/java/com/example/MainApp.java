@@ -2,29 +2,32 @@ package com.example;
 
 import javafx.application.Application;
 import javafx.application.Platform;
+import javafx.embed.swing.SwingNode;
 import javafx.geometry.Insets;
+import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.Response;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import javax.swing.SwingUtilities;  // 修正：SwingUtilities 來自 javax.swing
+import org.jfree.chart.ChartFactory;
+import org.jfree.chart.ChartPanel;
+import org.jfree.chart.JFreeChart;
+import org.jfree.chart.plot.PlotOrientation;
+import org.jfree.data.xy.XYSeries;
+import org.jfree.data.xy.XYSeriesCollection;
 
-import java.io.IOException;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 public class MainApp extends Application {
-    private final OkHttpClient client = new OkHttpClient();
-    private final ObjectMapper mapper = new ObjectMapper();
-    private final String BASE_URL = "https://api.fugle.tw/marketdata/v1.0/stock";
-
+    private final FugleService service = new FugleService();
     private TextField symbolField;
     private PasswordField keyField;
     private Button queryBtn;
+    private Button historyBtn;
     private Label resultLabel;
+    private ScrollPane chartPane;
 
     @Override
     public void start(Stage stage) {
@@ -34,24 +37,29 @@ public class MainApp extends Application {
         keyField = new PasswordField();
         keyField.setPromptText("輸入 Fugle API Key (隱私輸入)");
 
-        queryBtn = new Button("查詢");
-        queryBtn.setOnAction(e -> queryData());
+        queryBtn = new Button("查即時報價");
+        queryBtn.setOnAction(e -> queryQuote());
 
-        resultLabel = new Label("歡迎使用台股健診系統，請輸入股票代號與 API Key 並點查詢。");
+        historyBtn = new Button("查歷史 K 線");
+        historyBtn.setOnAction(e -> queryHistory());
+
+        resultLabel = new Label("歡迎使用台股健診系統，請輸入股票代號與 API Key。");
+
+        chartPane = new ScrollPane(createEmptyChartPanel());
 
         VBox root = new VBox(10, 
                              new Label("股票代號:"), symbolField,
                              new Label("Fugle API Key:"), keyField,
-                             queryBtn, resultLabel);
+                             queryBtn, historyBtn, resultLabel, chartPane);
         root.setPadding(new Insets(10));
 
-        Scene scene = new Scene(root, 400, 250);
+        Scene scene = new Scene(root, 600, 400);
         stage.setScene(scene);
         stage.setTitle("台股股票健診系統");
         stage.show();
     }
 
-    private void queryData() {
+    private void queryQuote() {
         String symbol = symbolField.getText().trim();
         String apiKey = keyField.getText().trim();
         if (symbol.isEmpty() || apiKey.isEmpty()) {
@@ -59,8 +67,7 @@ public class MainApp extends Application {
             return;
         }
 
-        // 非同步請求，避免 UI 卡
-        CompletableFuture.supplyAsync(() -> fetchQuote(symbol, apiKey))
+        CompletableFuture.supplyAsync(() -> service.fetchQuote(symbol, apiKey))
                 .thenAccept(quote -> Platform.runLater(() -> {
                     if (quote != null) {
                         resultLabel.setText(String.format("股票: %s (%s)\n開盤: %.0f | 最高: %.0f | 最低: %.0f | 收盤: %.0f\n均價: %.2f | 成交量: %d 股",
@@ -71,43 +78,57 @@ public class MainApp extends Application {
                     }
                 }))
                 .exceptionally(ex -> {
-                    Platform.runLater(() -> {
-                        showAlert("系統異常，請稍後再試: " + ex.getMessage());
-                        resultLabel.setText("查詢失敗，請稍後再試。");
-                    });
+                    Platform.runLater(() -> showAlert("系統異常，請稍後再試: " + ex.getMessage()));
                     return null;
                 });
     }
 
-    private Quote fetchQuote(String symbol, String apiKey) {
-        try {
-            String url = BASE_URL + "/intraday/quote/" + symbol;
-            Request request = new Request.Builder()
-                    .url(url)
-                    .header("X-API-KEY", apiKey)  // 用輸入的 key
-                    .build();
-            try (Response response = client.newCall(request).execute()) {
-                if (response.isSuccessful()) {
-                    JsonNode root = mapper.readTree(response.body().string());
-                    JsonNode data = root; // 根據 Fugle 文件，response 是平坦結構
-                    return new Quote(
-                        data.path("symbol").asText(),
-                        data.path("name").asText(),
-                        data.path("openPrice").asDouble(),
-                        data.path("highPrice").asDouble(),
-                        data.path("lowPrice").asDouble(),
-                        data.path("closePrice").asDouble(),
-                        data.path("avgPrice").asDouble(),
-                        data.path("total").path("tradeVolume").asLong(0L)
-                    );
-                } else if (response.code() == 401 || response.code() == 404) {
-                    throw new IOException("API 錯誤: " + response.code());
-                }
-            }
-        } catch (IOException e) {
-            throw new RuntimeException(e);
+    private void queryHistory() {
+        String symbol = symbolField.getText().trim();
+        String apiKey = keyField.getText().trim();
+        if (symbol.isEmpty() || apiKey.isEmpty()) {
+            showAlert("請輸入股票代號與 API Key");
+            return;
         }
-        return null;
+
+        CompletableFuture.supplyAsync(() -> service.fetchHistory(symbol, 10, apiKey))
+                .thenAccept(candles -> Platform.runLater(() -> {
+                    if (!candles.isEmpty()) {
+                        chartPane.setContent(createLineChart(candles));
+                        resultLabel.setText("歷史 K 線圖已載入 (近 10 日收盤價走勢)。");
+                    } else {
+                        resultLabel.setText("歷史資料載入失敗，請稍後再試。");
+                    }
+                }))
+                .exceptionally(ex -> {
+                    Platform.runLater(() -> showAlert("系統異常，請稍後再試: " + ex.getMessage()));
+                    return null;
+                });
+    }
+
+    private Node createLineChart(List<Candle> candles) {
+        SwingNode swingNode = new SwingNode();
+        SwingUtilities.invokeLater(() -> {
+            XYSeries series = new XYSeries("收盤價走勢");
+            for (int i = 0; i < candles.size(); i++) {
+                Candle c = candles.get(i);
+                series.add(i, c.close());
+            }
+            XYSeriesCollection dataset = new XYSeriesCollection(series);
+            JFreeChart chart = ChartFactory.createXYLineChart("近 10 日 K 線 (收盤價)", "日期", "價格 (元)", dataset, PlotOrientation.VERTICAL, true, true, false);
+            swingNode.setContent(new ChartPanel(chart));
+        });
+        return swingNode;
+    }
+
+    private Node createEmptyChartPanel() {
+        SwingNode swingNode = new SwingNode();
+        SwingUtilities.invokeLater(() -> {
+            XYSeriesCollection emptyDataset = new XYSeriesCollection();
+            JFreeChart emptyChart = ChartFactory.createXYLineChart(" ", " ", " ", emptyDataset);
+            swingNode.setContent(new ChartPanel(emptyChart));
+        });
+        return swingNode;
     }
 
     private void showAlert(String msg) {
