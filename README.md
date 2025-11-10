@@ -25,7 +25,7 @@
   下載連結：https://dlcdn.apache.org/maven/maven-3/3.9.11/binaries/apache-maven-3.9.11-bin.zip
 
   [編輯系統變數]  
-  手動加 PATH（搜 "編輯系統環境變數" → 環境變數 > 系統變數 > Path > 編輯 > 新增  
+  手動加 PATH（搜 "編輯系統環境變數" → 環境變數 > 系統變數 > Path > 編輯 > 新增 > C:\project\JavaProjects\apache-maven-3.9.11\bin  
 
   <img width="1284" height="458" alt="2025-11-08_112015" src="https://github.com/user-attachments/assets/473c9a45-a2d4-44f6-9a43-435149b9e1da" />  
 
