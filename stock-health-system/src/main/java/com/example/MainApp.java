@@ -23,6 +23,9 @@ import org.jfree.data.xy.XYSeriesCollection;
 import java.awt.Font;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import javafx.animation.PauseTransition;  // 保持：用於 JavaFX 延遲布局
+import java.util.concurrent.TimeUnit;   // 保持：若需
+import javax.swing.Timer;  // [新增這 1 行]：用於 Swing 線程延遲 repaint，解決初始不渲染（社區 fix）
 
 public class MainApp extends Application {
     private final FugleService service = new FugleService(); // 假設 FugleService 已定義，使用 Fugle API 做資料存取
@@ -32,11 +35,14 @@ public class MainApp extends Application {
     private Button historyBtn;
     private TextArea resultArea;
     private ScrollPane chartPane;
+    private BorderPane root;  // [新增這 1 行]：將 root 升級為類別成員變數，讓 queryHistory() 可存取
+    private ChartPanel currentChartPanel;  // [新增這 1 行]：存取 ChartPanel 成員，允許多次 repaint（解決 SwingNode 延遲）
+    private Stage primaryStage;  // [新增這 1 行]：將 stage 升級為類別成員變數，讓 createLineChart 可存取（修 stage cannot find symbol）
 
     @Override
     public void start(Stage stage) {
         // 使用 BorderPane 作為根布局，以實現左中右三欄結構
-        BorderPane root = new BorderPane();
+        this.root = new BorderPane();  // [修改這 1 行]：用 this.root 初始化成員變數（非局部）
         root.setPadding(new Insets(10));
 
         // 上方：輸入區（股票代號 + API Key），使用 HBox 水平排列
@@ -108,6 +114,7 @@ public class MainApp extends Application {
         stage.setTitle("台股股票健診系統");
         stage.setMaximized(false);
         stage.setResizable(false); // 允許調整大小
+        this.primaryStage = stage;  // [新增這 1 行]：初始化成員變數
         stage.show();
     }
 
@@ -143,8 +150,8 @@ public class MainApp extends Application {
     }
 
     // 查詢歷史 K 線邏輯（使用 Fugle API；若 API 取不到資料，可在 FugleService 中擴展爬蟲備案，如使用 Jsoup 解析 https://www.fugle.tw/history/{symbol}）
-    private void queryHistory() {
-        String symbol = symbolField.getText().trim();
+private void queryHistory() {
+        String symbol = symbolField.getText().trim();  // 保持原版：方法開頭定義 symbol（用於 API 呼叫）
         String apiKey = keyField.getText().trim();
 
         if (symbol.isEmpty()) {
@@ -159,12 +166,29 @@ public class MainApp extends Application {
 
         CompletableFuture.supplyAsync(() -> service.fetchHistory(symbol, 10, apiKey))
                 .thenAccept(candles -> Platform.runLater(() -> {
+                    System.out.println("thenAccept：收到 candles，數量: " + candles.size());  // 保持除錯：確認 API 回傳（預期 >0，若 0 則 API key 問題）
                     if (!candles.isEmpty()) {
-                        chartPane.setContent(createLineChart(candles));
-                        chartPane.setVisible(true);
-                        resultArea.setText("歷史 K 線圖已載入（近 10 日收盤價走勢）。");
+                        chartPane.setContent(createLineChart(candles));  // 保持原版
+                        // [新增]：延遲 setVisible，給 Swing 初始化時間
+                        PauseTransition delayVisible = new PauseTransition(javafx.util.Duration.millis(400));
+                        delayVisible.setOnFinished(e -> {
+                            chartPane.setVisible(true);
+                            System.out.println("queryHistory：setVisible(true) 完成");  // 保持除錯
+                            // [修改]：Alert 優化為 INFO 型 + 提示檢查 log（除錯用，測試後可移除）
+                            Platform.runLater(() -> showInfoAlert("圖表設定完成！檢查 console log（預期 '布局請求 + resize hack 完成'）。若仍空，確認 Fugle API key 或試 resize 視窗。"));
+                        });
+                        delayVisible.play();
+                        resultArea.setText("歷史 K 線圖已載入（近 10 日收盤價走勢）。");  // 保持原版
                     } else {
-                        resultArea.setText("歷史資料載入失敗，請稍後再試\n若 API 不可用，請確認 FugleService 已加入爬蟲備案。");
+                        resultArea.setText("歷史資料載入失敗，請稍後再試\n若 API 不可用，請確認 API key 有效。");  // 保持原版，簡化提示
+                        // [註解]：暫不加爬蟲 fallback（統一使用 Fugle API 做資料存取；若需，後續在 FugleService 加 crawlHistoryFallback 方法）
+                        // String symbol = symbolField.getText().trim();  // 取 symbol（已本地變數）
+                        // List<Candle> fallbackCandles = service.crawlHistoryFallback(symbol, 10);  // 在 FugleService 加方法，解析 https://www.fugle.tw/history/{symbol}
+                        // if (!fallbackCandles.isEmpty()) { 
+                        //     chartPane.setContent(createLineChart(fallbackCandles)); 
+                        //     chartPane.setVisible(true); 
+                        //     resultArea.setText("使用爬蟲 fallback 載入圖表（" + fallbackCandles.size() + " 筆）。"); 
+                        // }
                     }
                 }))
                 .exceptionally(ex -> {
@@ -177,6 +201,7 @@ public class MainApp extends Application {
     private Node createLineChart(List<Candle> candles) {
         SwingNode swingNode = new SwingNode();
         SwingUtilities.invokeLater(() -> {
+            System.out.println("Swing 線程：開始建圖，candles 數量: " + candles.size());  // [新增除錯]：確認資料載入
             XYSeries series = new XYSeries("收盤價走勢");
             for (int i = 0; i < candles.size(); i++) {
                 Candle c = candles.get(i);
@@ -191,8 +216,41 @@ public class MainApp extends Application {
             chart.getXYPlot().getDomainAxis().setLabelFont(font);
             chart.getXYPlot().getRangeAxis().setLabelFont(font);
             
-            swingNode.setContent(new ChartPanel(chart));
+            currentChartPanel = new ChartPanel(chart);  // [修改]：存到類別成員
+            swingNode.setContent(currentChartPanel);    // [修改]：設定內容
+            
+            // [新增]：立即 revalidate/repaint
+            currentChartPanel.revalidate();
+            currentChartPanel.repaint();
+            
+            // [新增]：雙重 invokeLater + Timer 延遲 200ms 再 repaint（社區 fix SwingNode 初始不渲染）
+            SwingUtilities.invokeLater(() -> {
+                currentChartPanel.revalidate();
+                currentChartPanel.repaint();
+            });
+            Timer timer = new Timer(200, e -> {  // Swing Timer 延遲
+                currentChartPanel.revalidate();
+                currentChartPanel.repaint();
+                System.out.println("Swing Timer：延遲 repaint 完成");  // [新增除錯]：確認重繪觸發
+                ((Timer) e.getSource()).stop();  // 單次執行
+            });
+            timer.setRepeats(false);
+            timer.start();
         });
+        
+        // [修改]：JavaFX 側延遲改 300ms，並針對 chartPane.requestLayout()（修編譯錯誤）
+        PauseTransition pause = new PauseTransition(javafx.util.Duration.millis(300));
+        pause.setOnFinished(e -> {
+            chartPane.requestLayout();  // 保持：強制 ScrollPane 布局
+            root.requestLayout();       // 保持：頂層更新
+            // [新增]：輕微 stage resize hack（模擬拖曳，觸發 SwingNode 重繪，無視覺影響）
+            double currentWidth = primaryStage.getWidth();  // [修改]：用成員變數 primaryStage
+            primaryStage.setWidth(currentWidth + 1);        // [修改]：用 primaryStage
+            primaryStage.setWidth(currentWidth);            // [修改]：用 primaryStage
+            System.out.println("JavaFX Pause：布局請求 + resize hack 完成");  // 保持除錯
+        });
+        pause.play();
+        
         return swingNode;
     }
 
@@ -207,9 +265,15 @@ public class MainApp extends Application {
         return swingNode;
     }
 
-    // 顯示警示
+    // 顯示警示（ERROR 型）
     private void showAlert(String msg) {
         Alert alert = new Alert(AlertType.ERROR, msg);
+        alert.showAndWait();
+    }
+
+    // [新增]：顯示資訊（INFO 型，用於除錯 Alert）
+    private void showInfoAlert(String msg) {
+        Alert alert = new Alert(AlertType.INFORMATION, msg);
         alert.showAndWait();
     }
 
