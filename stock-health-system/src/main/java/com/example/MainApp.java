@@ -14,9 +14,11 @@ import org.jfree.chart.ChartFactory;
 import org.jfree.chart.ChartPanel;
 import org.jfree.chart.JFreeChart;
 import org.jfree.chart.plot.PlotOrientation;
+import org.jfree.chart.title.TextTitle;
 import org.jfree.data.xy.XYSeries;
 import org.jfree.data.xy.XYSeriesCollection;
 
+import java.awt.Font;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
@@ -26,7 +28,7 @@ public class MainApp extends Application {
     private PasswordField keyField;
     private Button queryBtn;
     private Button historyBtn;
-    private Label resultLabel;
+    private TextArea resultArea;
     private ScrollPane chartPane;
 
     @Override
@@ -43,19 +45,25 @@ public class MainApp extends Application {
         historyBtn = new Button("查歷史 K 線");
         historyBtn.setOnAction(e -> queryHistory());
 
-        resultLabel = new Label("歡迎使用台股健診系統，請輸入股票代號與 API Key。");
+        resultArea = new TextArea("歡迎使用台股健診系統，請輸入股票代號與 API Key。");
+        resultArea.setWrapText(true);
+        resultArea.setPrefRowCount(5);
+        resultArea.setEditable(false);
 
         chartPane = new ScrollPane(createEmptyChartPanel());
+        chartPane.setVisible(false);
 
         VBox root = new VBox(10, 
                              new Label("股票代號:"), symbolField,
                              new Label("Fugle API Key:"), keyField,
-                             queryBtn, historyBtn, resultLabel, chartPane);
+                             queryBtn, historyBtn, resultArea, chartPane);
         root.setPadding(new Insets(10));
 
-        Scene scene = new Scene(root, 600, 400);
+        Scene scene = new Scene(root, 800, 600);
         stage.setScene(scene);
         stage.setTitle("台股股票健診系統");
+        stage.setMaximized(true);
+        stage.setResizable(false);
         stage.show();
     }
 
@@ -70,11 +78,11 @@ public class MainApp extends Application {
         CompletableFuture.supplyAsync(() -> service.fetchQuote(symbol, apiKey))
                 .thenAccept(quote -> Platform.runLater(() -> {
                     if (quote != null) {
-                        resultLabel.setText(String.format("股票: %s (%s)\n開盤: %.0f | 最高: %.0f | 最低: %.0f | 收盤: %.0f\n均價: %.2f | 成交量: %d 股",
+                        resultArea.setText(String.format("股票: %s (%s)\n開盤: %.0f | 最高: %.0f | 最低: %.0f | 收盤: %.0f\n均價: %.2f | 成交量: %d 股",
                                 quote.symbol(), quote.name(), quote.openPrice(), quote.highPrice(), quote.lowPrice(), quote.closePrice(),
                                 quote.avgPrice(), quote.tradeVolume()));
                     } else {
-                        resultLabel.setText("查詢失敗，請稍後再試。");
+                        resultArea.setText("查詢失敗，請稍後再試。");
                     }
                 }))
                 .exceptionally(ex -> {
@@ -95,9 +103,10 @@ public class MainApp extends Application {
                 .thenAccept(candles -> Platform.runLater(() -> {
                     if (!candles.isEmpty()) {
                         chartPane.setContent(createLineChart(candles));
-                        resultLabel.setText("歷史 K 線圖已載入 (近 10 日收盤價走勢)。");
+                        chartPane.setVisible(true);
+                        resultArea.setText("歷史 K 線圖已載入 (近 10 日收盤價走勢)。");
                     } else {
-                        resultLabel.setText("歷史資料載入失敗，請稍後再試。");
+                        resultArea.setText("歷史資料載入失敗，請稍後再試。");
                     }
                 }))
                 .exceptionally(ex -> {
@@ -116,6 +125,13 @@ public class MainApp extends Application {
             }
             XYSeriesCollection dataset = new XYSeriesCollection(series);
             JFreeChart chart = ChartFactory.createXYLineChart("近 10 日 K 線 (收盤價)", "日期", "價格 (元)", dataset, PlotOrientation.VERTICAL, true, true, false);
+            
+            Font font = new Font("Microsoft YaHei", Font.BOLD, 14);
+            TextTitle title = chart.getTitle();
+            title.setFont(font);
+            chart.getXYPlot().getDomainAxis().setLabelFont(font);
+            chart.getXYPlot().getRangeAxis().setLabelFont(font);
+            
             swingNode.setContent(new ChartPanel(chart));
         });
         return swingNode;
