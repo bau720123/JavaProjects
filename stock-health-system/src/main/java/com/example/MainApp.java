@@ -142,9 +142,24 @@ public class MainApp extends Application {
         CompletableFuture.supplyAsync(() -> service.fetchQuote(symbol, apiKey))
                 .thenAccept(quote -> Platform.runLater(() -> {
                     if (quote != null) {
-                        resultArea.setText(String.format("股票：%s（%s）\n昨日收盤價：%.0f\n開盤價：%.0f\n最高價：%.0f\n最低價：%.0f\n收盤價：%.0f\n均價：%.2f\n總量：%d 股\n漲跌：%.0f\n幅度：%.2f\n",
+                        StringBuilder sb = new StringBuilder();
+                        sb.append(String.format("股票：%s（%s）\n昨日收盤價：%.0f\n開盤價：%.0f\n最高價：%.0f\n最低價：%.0f\n收盤價或現價：%.0f\n均價：%.2f\n總量：%d 股\n漲跌：%.0f\n幅度：%.2f\n",
                                 quote.symbol(), quote.name(), quote.previousClose(), quote.openPrice(), quote.highPrice(), quote.lowPrice(), quote.closePrice(),
                                 quote.avgPrice(), quote.tradeVolume(), quote.change(), quote.changePercent()));
+
+                        // 新增：[委買價] 區段
+                        sb.append("\n[委買價]\n\n");
+                        for (BidAsk ba : quote.bids()) {
+                            sb.append(String.format("    價格：%.0f\n    張數：%d\n\n", ba.price(), ba.size()));
+                        }
+
+                        // 新增：[委賣價] 區段
+                        sb.append("[委賣價]\n\n");
+                        for (BidAsk ba : quote.asks()) {
+                            sb.append(String.format("    價格：%.0f\n    張數：%d\n\n", ba.price(), ba.size()));
+                        }
+
+                        resultArea.setText(sb.toString());
                     } else {
                         resultArea.setText("查詢失敗，請稍後再試\n若 API 不可用，請確認 FugleService 已加入爬蟲備案。");
                     }

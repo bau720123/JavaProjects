@@ -29,6 +29,21 @@ public class FugleService {
                 if (response.isSuccessful()) {
                     JsonNode root = mapper.readTree(response.body().string());
                     JsonNode data = root;  // 文件平坦結構
+
+                    // 新增：解析 bids
+                    JsonNode bidsNode = data.path("bids");
+                    List<BidAsk> bids = new ArrayList<>();
+                    for (JsonNode node : bidsNode) {
+                        bids.add(new BidAsk(node.path("price").asDouble(), node.path("size").asLong()));
+                    }
+
+                    // 新增：解析 asks
+                    JsonNode asksNode = data.path("asks");
+                    List<BidAsk> asks = new ArrayList<>();
+                    for (JsonNode node : asksNode) {
+                        asks.add(new BidAsk(node.path("price").asDouble(), node.path("size").asLong()));
+                    }
+
                     return new Quote(
                         data.path("symbol").asText(), // 股票代碼
                         data.path("name").asText(), // 股票簡稱
@@ -40,7 +55,9 @@ public class FugleService {
                         data.path("avgPrice").asDouble(), // 均價
                         data.path("total").path("tradeVolume").asLong(0L), // 總量
                         data.path("change").asDouble(), // 漲跌
-                        data.path("changePercent").asDouble() // 幅度
+                        data.path("changePercent").asDouble(), // 幅度
+                        bids, // 新增：委買價
+                        asks  // 新增：委賣價
                     );
                 } else if (response.code() == 401 || response.code() == 404) {
                     throw new IOException("API Error: " + response.code());
