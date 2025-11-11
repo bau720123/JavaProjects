@@ -2,13 +2,10 @@ package com.example;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
-import org.jsoup.Jsoup;
-import org.jsoup.nodes.Document;
-import org.jsoup.nodes.Element;
-import org.jsoup.select.Elements;
 
 import java.io.IOException;
 import java.time.LocalDate;
@@ -33,14 +30,17 @@ public class FugleService {
                     JsonNode root = mapper.readTree(response.body().string());
                     JsonNode data = root;  // 文件平坦結構
                     return new Quote(
-                        data.path("symbol").asText(),
-                        data.path("name").asText(),
-                        data.path("openPrice").asDouble(),
-                        data.path("highPrice").asDouble(),
-                        data.path("lowPrice").asDouble(),
-                        data.path("closePrice").asDouble(),
-                        data.path("avgPrice").asDouble(),
-                        data.path("total").path("tradeVolume").asLong(0L)
+                        data.path("symbol").asText(), // 股票代碼
+                        data.path("name").asText(), // 股票簡稱
+                        data.path("previousClose").asDouble(), // 昨日收盤價
+                        data.path("openPrice").asDouble(), // 開盤價
+                        data.path("highPrice").asDouble(), // 最高價
+                        data.path("lowPrice").asDouble(), // 最低價
+                        data.path("closePrice").asDouble(), // 收盤價
+                        data.path("avgPrice").asDouble(), // 均價
+                        data.path("total").path("tradeVolume").asLong(0L), // 總量
+                        data.path("change").asDouble(), // 漲跌
+                        data.path("changePercent").asDouble() // 幅度
                     );
                 } else if (response.code() == 401 || response.code() == 404) {
                     throw new IOException("API Error: " + response.code());
@@ -72,21 +72,21 @@ public class FugleService {
                     for (JsonNode node : dataArray) {
                         candles.add(new Candle(
                                 LocalDate.parse(node.path("date").asText(), formatter),
-                                node.path("open").asDouble(),
-                                node.path("high").asDouble(),
-                                node.path("low").asDouble(),
-                                node.path("close").asDouble(),
-                                node.path("volume").asLong(0L),
-                                node.path("change").asDouble()  // [新增]：解析 change 漲跌額欄位 (若無值，預設 0.0)
+                                node.path("open").asDouble(), // 開盤價
+                                node.path("high").asDouble(), // 最高價
+                                node.path("low").asDouble(), // 最低價
+                                node.path("close").asDouble(), // 收盤價
+                                node.path("volume").asLong(0L), // 成交量
+                                node.path("change").asDouble()  // 漲跌
                         ));
                     }
                     return candles;
                 } else if (response.code() == 401 || response.code() == 404) {
-                    return List.of();  // [修改]：API 失效時返回空 list，讓 UI 顯示錯誤提示
+                    return List.of();  // API 失效時返回空 list，讓 UI 顯示錯誤提示
                 }
             }
         } catch (IOException e) {
-            return List.of();  // [修改]：API 失效時返回空 list，讓 UI 顯示錯誤提示
+            return List.of();  // API 失效時返回空 list，讓 UI 顯示錯誤提示
         }
         return List.of();
     }

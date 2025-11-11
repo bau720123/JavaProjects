@@ -15,17 +15,13 @@ import javax.swing.SwingUtilities;
 import org.jfree.chart.ChartFactory;
 import org.jfree.chart.ChartPanel;
 import org.jfree.chart.JFreeChart;
-import org.jfree.chart.axis.DateAxis;
-import org.jfree.chart.axis.DateTickUnit;
+import org.jfree.chart.axis.CategoryAxis;
+import org.jfree.chart.axis.CategoryLabelPositions;
+import org.jfree.chart.plot.CategoryPlot;
 import org.jfree.chart.plot.PlotOrientation;
 import org.jfree.chart.title.TextTitle;
-import org.jfree.data.time.TimeSeries;
-import org.jfree.data.time.TimeSeriesCollection;
-import org.jfree.data.time.TimeSeriesDataItem;
-import org.jfree.data.xy.XYSeriesCollection;
-import org.jfree.data.time.Day;
-import org.jfree.chart.renderer.xy.XYItemRenderer;
-
+import org.jfree.data.category.DefaultCategoryDataset;
+import org.jfree.chart.renderer.category.LineAndShapeRenderer;
 import java.awt.Font;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -36,8 +32,6 @@ import java.util.concurrent.CompletableFuture;
 import javafx.animation.PauseTransition;  // 保持：用於 JavaFX 延遲布局
 import javafx.util.Duration;  // 保持：用於 PauseTransition.millis
 import javax.swing.Timer;  // 保持：用於 Swing 線程延遲 repaint，解決初始不渲染（社區 fix）
-
-import org.jfree.chart.axis.DateTickUnitType;  // [新增]：DateTickUnitType 枚舉
 
 public class MainApp extends Application {
     private final FugleService service = new FugleService(); // 假設 FugleService 已定義，使用 Fugle API 做資料存取
@@ -148,9 +142,9 @@ public class MainApp extends Application {
         CompletableFuture.supplyAsync(() -> service.fetchQuote(symbol, apiKey))
                 .thenAccept(quote -> Platform.runLater(() -> {
                     if (quote != null) {
-                        resultArea.setText(String.format("股票：%s（%s）\n開盤：%.0f\n最高：%.0f\n最低：%.0f\n收盤：%.0f\n均價：%.2f\n成交量：%d 股",
-                                quote.symbol(), quote.name(), quote.openPrice(), quote.highPrice(), quote.lowPrice(), quote.closePrice(),
-                                quote.avgPrice(), quote.tradeVolume()));
+                        resultArea.setText(String.format("股票：%s（%s）\n昨日收盤價：%.0f\n開盤價：%.0f\n最高價：%.0f\n最低價：%.0f\n收盤價：%.0f\n均價：%.2f\n總量：%d 股\n漲跌：%.0f\n幅度：%.2f\n",
+                                quote.symbol(), quote.name(), quote.previousClose(), quote.openPrice(), quote.highPrice(), quote.lowPrice(), quote.closePrice(),
+                                quote.avgPrice(), quote.tradeVolume(), quote.change(), quote.changePercent()));
                     } else {
                         resultArea.setText("查詢失敗，請稍後再試\n若 API 不可用，請確認 FugleService 已加入爬蟲備案。");
                     }
@@ -196,7 +190,7 @@ public class MainApp extends Application {
                         // [修改]：原文字 + 歷史股價列表
                         StringBuilder sb = new StringBuilder("歷史 K 線圖已載入（近 10 日收盤價走勢）。\n\n歷史股價如下：\n\n");
                         for (Candle c : candles) {
-                            sb.append(String.format("日期：%s\n開盤：%.1f\n最高：%.1f\n最低：%.1f\n收盤：%.1f\n成交量：%d\n漲跌：%.1f\n\n",
+                            sb.append(String.format("日期：%s\n開盤價：%.1f\n最高價：%.1f\n最低價：%.1f\n收盤價：%.1f\n成交量：%d\n漲跌：%.1f\n\n",
                                 c.date(), c.open(), c.high(), c.low(), c.close(), c.volume(), c.change()));
                         }
                         resultArea.setText(sb.toString());  // 設定完整文字
@@ -218,47 +212,51 @@ public class MainApp extends Application {
         SwingNode swingNode = new SwingNode();
         SwingUtilities.invokeLater(() -> {
             // System.out.println("Swing 線程：開始建圖，candles 數量: " + candles.size());  // [註解]：除錯 log，DEMO 時移除
-            TimeSeries series = new TimeSeries("收盤價走勢");
+            // [修改]：改用 CategoryDataset，只用有資料的日期作為類別（砍掉非營業日空白），避免 DateAxis 自動補日期
+            DefaultCategoryDataset dataset = new DefaultCategoryDataset();
             SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
             for (int i = 0; i < candles.size(); i++) {
                 Candle c = candles.get(i);
                 LocalDate localDate = c.date();  // Candle date() 返回 LocalDate (從 println 確認)
-                Date date = Date.from(localDate.atStartOfDay(ZoneId.systemDefault()).toInstant());  // LocalDate 轉 Date
-                series.add(new Day(date), c.close());  // 用 Day(date) 作為 X 值（日期）
+                String dateStr = sdf.format(Date.from(localDate.atStartOfDay(ZoneId.systemDefault()).toInstant()));  // LocalDate 轉日期字符串
+                dataset.addValue(c.close(), "收盤價走勢", dateStr);  // 用日期字符串作為類別（X 軸標籤），Y 為 close
             }
-            TimeSeriesCollection dataset = new TimeSeriesCollection(series);
-            JFreeChart chart = ChartFactory.createTimeSeriesChart("近 10 日 K 線 (收盤價)", "日期", "價格 (元)", dataset, true, true, false);  // 自動用 DateAxis，X 軸日期
+            JFreeChart chart = ChartFactory.createLineChart("近 10 日 K 線 (收盤價)", "日期", "價格 (元)", dataset, PlotOrientation.VERTICAL, true, true, false);  // [修改]：改用 createLineChart (CategoryPlot)，自動用 CategoryAxis，X 軸只顯示有資料日期
             
             Font font = new Font("Microsoft YaHei", Font.BOLD, 14);
             TextTitle title = chart.getTitle();
             title.setFont(font);
-            chart.getXYPlot().getDomainAxis().setLabelFont(font);  // X 軸字體
-            chart.getXYPlot().getRangeAxis().setLabelFont(font);   // Y 軸字體
+            
+            CategoryPlot plot = (CategoryPlot) chart.getPlot();  // [新增]：取得 CategoryPlot
+            plot.getDomainAxis().setLabelFont(font);  // X 軸字體
+            plot.getRangeAxis().setLabelFont(font);   // Y 軸字體
+            
+            // [新增]：Y 軸範圍動態調整（根據資料 min/max，類似 before 的行為，避免從 0 開始）
+            double minClose = candles.stream().mapToDouble(Candle::close).min().orElse(0.0);
+            double maxClose = candles.stream().mapToDouble(Candle::close).max().orElse(0.0);
+            double padding = (maxClose - minClose) * 0.05;  // 5% 緩衝空間
+            plot.getRangeAxis().setLowerBound(Math.max(0, minClose - padding));  // 下限：min - padding，但不低於 0
+            plot.getRangeAxis().setUpperBound(maxClose + padding);  // 上限：max + padding
             
             // [新增]：系列名稱字體防亂碼（Renderer 套用中文字體）
-            XYItemRenderer renderer = chart.getXYPlot().getRenderer();
+            LineAndShapeRenderer renderer = (LineAndShapeRenderer) plot.getRenderer();
             renderer.setSeriesItemLabelFont(0, font);  // 系列 0 用中文字體
-            renderer.setSeriesToolTipGenerator(0, (dataset1, series1, item) -> {  // [選加]：tooltip 顯示日期/價格
-                TimeSeries ts = ((TimeSeriesCollection) dataset1).getSeries(series1);  // [修正]：強轉 dataset1 為 TimeSeriesCollection 後取 TimeSeries
-                TimeSeriesDataItem dataItem = ts.getDataItem(item);  // 用 ts.getDataItem(int item) 取 TimeSeriesDataItem
-                Day day = (Day) dataItem.getPeriod();  // 從 dataItem.getPeriod() 取 Day (TimePeriod)
-                Date d = new Date(day.getFirstMillisecond());  // 從 Day 提取 Date
-                double y = dataItem.getValue().doubleValue();  // 從 dataItem.getValue() 取 double (Number)
-                return sdf.format(d) + ": " + y;  // 格式化 tooltip "2025-11-03: 1510.0"
+            renderer.setSeriesToolTipGenerator(0, (dataset1, row, column) -> {  // [修改]：tooltip 顯示日期/價格（CategoryDataset 版本）
+                String category = (String) dataset1.getColumnKey(column);  // 從 dataset1.getColumnKey(int column) 取日期字符串
+                double y = dataset1.getValue(row, column).doubleValue();  // 從 dataset1.getValue(row, column) 取 double
+                return category + ": " + y;  // 格式化 tooltip "2025-11-03: 1510.0"
             });
             
             // [新增]：圖例 (legend) 系列名稱 "收盤價走勢" 字體防亂碼（JFreeChart 系列名稱在圖例顯示）
             chart.getLegend().setItemFont(font);  // [新增]：將中文字體套用到圖例所有項目，解決系列名稱亂碼
             
-            // [新增]：X 軸日期格式化為 "yyyy-MM-dd"（解決 "3-11" 等簡寫）
-            DateAxis domainAxis = (DateAxis) chart.getXYPlot().getDomainAxis();
-            domainAxis.setDateFormatOverride(sdf);  // 用 sdf ("yyyy-MM-dd") 覆蓋預設 Month-Day 格式
-            domainAxis.setTickUnit(new DateTickUnit(DateTickUnitType.DAY, 1));  // [修正]：用 DateTickUnitType.DAY + 1 天間隔，強制每 1 天顯示標籤（解決跳過單號日期）
-            domainAxis.setVerticalTickLabels(false);  // [新增]：確保標籤水平顯示，避免擁擠
+            // [新增]：X 軸日期標籤調整（CategoryAxis 版本）
+            CategoryAxis domainAxis = (CategoryAxis) plot.getDomainAxis();
+            domainAxis.setCategoryLabelPositions(CategoryLabelPositions.STANDARD);  // [新增]：日期標籤垂直顯示（UP_90），避免擁擠（依需調整為 STANDARD 或 DOWN_90）
             
             currentChartPanel = new ChartPanel(chart);  // 保持
-            int dynamicWidth = Math.max(800, candles.size() * 190);  // [修改]：加大倍率到 160 px/點（你的測試 160 勉強OK），10 日 ~1600px、20 日 ~3200px 自適應（確保最後日期全顯示，無切斷）
-            currentChartPanel.setPreferredSize(new java.awt.Dimension(dynamicWidth, 400));  // [修改]：寬動態，高固定 400px
+            int dynamicWidth = Math.max(800, candles.size() * 160);  // [修改]：加大倍率到 160 px/點（你的測試 160 勉強OK），10 日 ~1600px、20 日 ~3200px 自適應（確保最後日期全顯示，無切斷）
+            currentChartPanel.setPreferredSize(new java.awt.Dimension(695, 400));  // [修改]：寬動態，高固定 400px
             swingNode.setContent(currentChartPanel);    // 保持
             
             // [新增]：立即 revalidate/repaint
@@ -300,8 +298,8 @@ public class MainApp extends Application {
     private Node createEmptyChartPanel() {
         SwingNode swingNode = new SwingNode();
         SwingUtilities.invokeLater(() -> {
-            XYSeriesCollection emptyDataset = new XYSeriesCollection();
-            JFreeChart emptyChart = ChartFactory.createXYLineChart(" ", " ", " ", emptyDataset);
+            DefaultCategoryDataset emptyDataset = new DefaultCategoryDataset();
+            JFreeChart emptyChart = ChartFactory.createLineChart(" ", " ", " ", emptyDataset);
             swingNode.setContent(new ChartPanel(emptyChart));
         });
         return swingNode;
