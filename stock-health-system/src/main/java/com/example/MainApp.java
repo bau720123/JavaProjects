@@ -192,7 +192,14 @@ public class MainApp extends Application {
                             // Platform.runLater(() -> showInfoAlert("圖表設定完成！檢查 console log（預期 '布局請求 + resize hack 完成'）。若仍空，確認 Fugle API key 或試 resize 視窗。"));
                         });
                         delayVisible.play();
-                        resultArea.setText("歷史 K 線圖已載入（近 10 日收盤價走勢）。");  // 保持原版
+                        
+                        // [修改]：原文字 + 歷史股價列表
+                        StringBuilder sb = new StringBuilder("歷史 K 線圖已載入（近 10 日收盤價走勢）。\n\n歷史股價如下：\n\n");
+                        for (Candle c : candles) {
+                            sb.append(String.format("日期：%s\n開盤：%.1f\n最高：%.1f\n最低：%.1f\n收盤：%.1f\n成交量：%d\n\n",
+                                c.date(), c.open(), c.high(), c.low(), c.close(), c.volume()));
+                        }
+                        resultArea.setText(sb.toString());  // 設定完整文字
                     } else {
                         resultArea.setText("歷史資料載入失敗，請稍後再試\n若 API 不可用，請確認 API key 有效。");  // 保持原版，簡化提示
                         // [註解]：暫不加爬蟲 fallback（統一使用 Fugle API 做資料存取；若需，後續在 FugleService 加 crawlHistoryFallback 方法）
