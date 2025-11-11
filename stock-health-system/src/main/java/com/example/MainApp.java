@@ -228,7 +228,7 @@ public class MainApp extends Application {
             chart.getXYPlot().getDomainAxis().setLabelFont(font);  // X 軸字體
             chart.getXYPlot().getRangeAxis().setLabelFont(font);   // Y 軸字體
             
-            // 系列名稱防亂碼 + tooltip
+            // [新增]：系列名稱字體防亂碼（Renderer 套用中文字體）
             XYItemRenderer renderer = chart.getXYPlot().getRenderer();
             renderer.setSeriesItemLabelFont(0, font);  // 系列 0 用中文字體
             renderer.setSeriesToolTipGenerator(0, (dataset1, series1, item) -> {  // [選加]：tooltip 顯示日期/價格
@@ -239,6 +239,9 @@ public class MainApp extends Application {
                 double y = dataItem.getValue().doubleValue();  // 從 dataItem.getValue() 取 double (Number)
                 return sdf.format(d) + ": " + y;  // 格式化 tooltip "2025-11-03: 1510.0"
             });
+            
+            // [新增]：圖例 (legend) 系列名稱 "收盤價走勢" 字體防亂碼（JFreeChart 系列名稱在圖例顯示）
+            chart.getLegend().setItemFont(font);  // [新增]：將中文字體套用到圖例所有項目，解決系列名稱亂碼
             
             // [新增]：X 軸日期格式化為 "yyyy-MM-dd"（解決 "3-11" 等簡寫）
             DateAxis domainAxis = (DateAxis) chart.getXYPlot().getDomainAxis();
