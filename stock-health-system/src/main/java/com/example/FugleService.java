@@ -56,7 +56,7 @@ public class FugleService {
         try {
             LocalDate to = LocalDate.now();
             LocalDate from = to.minusDays(days);
-            String params = String.format("?from=%s&to=%s&timeframe=D&fields=open,high,low,close,volume&sort=asc",
+            String params = String.format("?from=%s&to=%s&timeframe=D&fields=open,high,low,close,volume,change&sort=asc",
                     from.format(formatter), to.format(formatter));
             String url = "https://api.fugle.tw/marketdata/v1.0/stock/historical/candles/" + symbol + params;
 
@@ -76,43 +76,18 @@ public class FugleService {
                                 node.path("high").asDouble(),
                                 node.path("low").asDouble(),
                                 node.path("close").asDouble(),
-                                node.path("volume").asLong(0L)
+                                node.path("volume").asLong(0L),
+                                node.path("change").asDouble()  // [新增]：解析 change 漲跌額欄位 (若無值，預設 0.0)
                         ));
                     }
                     return candles;
                 } else if (response.code() == 401 || response.code() == 404) {
-                    return crawlYahooHistory(symbol, days);
+                    return List.of();  // [修改]：API 失效時返回空 list，讓 UI 顯示錯誤提示
                 }
             }
         } catch (IOException e) {
-            return crawlYahooHistory(symbol, days);
+            return List.of();  // [修改]：API 失效時返回空 list，讓 UI 顯示錯誤提示
         }
         return List.of();
-    }
-
-    private List<Candle> crawlYahooHistory(String symbol, int days) {
-        try {
-            String url = "https://tw.stock.yahoo.com/quote/" + symbol + "/history?period1=" + (LocalDate.now().minusDays(days).toEpochDay() * 86400) + "&period2=" + (LocalDate.now().toEpochDay() * 86400) + "&interval=1d";
-            Document doc = Jsoup.connect(url).get();
-            Elements rows = doc.select("table tr");
-            List<Candle> candles = new ArrayList<>();
-            for (Element row : rows.subList(1, Math.min(rows.size(), days + 1))) {
-                Elements cells = row.select("td");
-                if (cells.size() >= 5) {
-                    LocalDate date = LocalDate.parse(cells.get(0).text().trim(), DateTimeFormatter.ofPattern("yyyy/MM/dd"));
-                    candles.add(new Candle(
-                            date,
-                            Double.parseDouble(cells.get(1).text().replace(",", "")),
-                            Double.parseDouble(cells.get(2).text().replace(",", "")),
-                            Double.parseDouble(cells.get(3).text().replace(",", "")),
-                            Double.parseDouble(cells.get(4).text().replace(",", "")),
-                            0L  // Yahoo 無 volume，設 0
-                    ));
-                }
-            }
-            return candles;
-        } catch (Exception e) {
-            return List.of();
-        }
     }
 }

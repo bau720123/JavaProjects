@@ -196,8 +196,8 @@ public class MainApp extends Application {
                         // [修改]：原文字 + 歷史股價列表
                         StringBuilder sb = new StringBuilder("歷史 K 線圖已載入（近 10 日收盤價走勢）。\n\n歷史股價如下：\n\n");
                         for (Candle c : candles) {
-                            sb.append(String.format("日期：%s\n開盤：%.1f\n最高：%.1f\n最低：%.1f\n收盤：%.1f\n成交量：%d\n\n",
-                                c.date(), c.open(), c.high(), c.low(), c.close(), c.volume()));
+                            sb.append(String.format("日期：%s\n開盤：%.1f\n最高：%.1f\n最低：%.1f\n收盤：%.1f\n成交量：%d\n漲跌：%.1f\n\n",
+                                c.date(), c.open(), c.high(), c.low(), c.close(), c.volume(), c.change()));
                         }
                         resultArea.setText(sb.toString());  // 設定完整文字
                     } else {
