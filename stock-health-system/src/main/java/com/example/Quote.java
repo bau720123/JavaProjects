@@ -3,8 +3,8 @@ package com.example;
 import java.util.List;
 
 public record Quote(
-    String symbol,
-    String name,
+    String symbol, // 股票代號
+    String name, // 股票名稱
     double previousClose, // 開盤價
     double openPrice, // 開盤價
     double highPrice, // 最高價

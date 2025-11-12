@@ -1,6 +1,6 @@
 package com.example;
 
 public record BidAsk(
-    double price,
-    long size
+    double price, // 委託價
+    long size // 張數
 ) {}
