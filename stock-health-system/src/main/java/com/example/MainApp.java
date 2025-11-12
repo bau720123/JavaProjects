@@ -62,7 +62,7 @@ public class MainApp extends Application {
         // 股票代號輸入（左側）
         VBox symbolVBox = new VBox(5);
         Label symbolLabel = new Label("股票代號：");
-        symbolField = new TextField("2330");
+        symbolField = new TextField("");
         symbolField.setPromptText("請輸入股票代號");
         symbolField.setPrefWidth(155);  // 設定偏好寬度為
         symbolVBox.getChildren().addAll(symbolLabel, symbolField);
@@ -71,7 +71,7 @@ public class MainApp extends Application {
         VBox keyVBox = new VBox(5);
         Label keyLabel = new Label("Fugle API Key：");
         keyField = new PasswordField();
-        keyField.setText("OWQxZGI5YWItOTNmZS00ZmVmLWFkNDEtZDFlNzUxMmRmOTNlIDk1OTVjNjU1LTRhN2ItNGUzZi05MTEwLTA3YjMzOTZmNzhhMw==");
+        keyField.setText("");
         keyField.setPromptText("請輸入 Fugle API Key");
         keyField.setPrefWidth(200);  // 設定偏好寬度為
         keyVBox.getChildren().addAll(keyLabel, keyField);
@@ -227,88 +227,129 @@ public class MainApp extends Application {
                 });
     }
 
-    // 創建線圖（使用 JFreeChart API）
+    // 創建線圖（使用 JFreeChart API）：這是個私有方法，返回一個 Node（JavaFX 的 UI 節點），用來嵌入 SwingNode 組件到 ScrollPane 中顯示 K 線圖。
+    // 輸入：List<Candle> candles - 從 FugleService.fetchHistory() 取得的歷史 K 線資料（每個 Candle 含日期、開高低收等）。
+    // 輸出：SwingNode - 包裝 JFreeChart 的 ChartPanel，讓圖表在 JavaFX 場景中渲染。
+    // 目的：根據 candles 資料動態生成線圖（X 軸：日期，Y 軸：收盤價），支援滾動和 tooltip。
     private Node createLineChart(List<Candle> candles) {
+        // 創建 SwingNode：JavaFX-Swing 橋接器，用來將 Swing 組件（如 JFreeChart 的 ChartPanel）嵌入 JavaFX 場景圖中。
+        // JFreeChart 是基於 Swing 的圖表庫，需嵌入到 JavaFX 的 ScrollPane 中渲染。
         SwingNode swingNode = new SwingNode();
+
+        // SwingUtilities.invokeLater(Runnable)：Swing 框架的執行緒工具，確保以下代碼在 Swing 的 EDT (Event Dispatch Thread) 中運行。
+        // 目的：JFreeChart 的 chart 建構和 repaint 必須在 EDT，避免 "IllegalComponentStateException" 或渲染錯誤。
+        // 這是混合 UI (JavaFX + Swing) 的標準實務，類似 JavaFX 的 Platform.runLater() 但針對 Swing。
         SwingUtilities.invokeLater(() -> {
-            // 改用 CategoryDataset，只用有資料的日期作為類別（砍掉非營業日空白），避免 DateAxis 自動補日期
+            // DefaultCategoryDataset：JFreeChart 的資料集類別，用於類別型資料（如 X=日期字符串，Y=數值），支援多系列。
+            // 日期是離散類別（非連續時間），CategoryAxis 只顯示有資料的點，解決假日空白問題。
             DefaultCategoryDataset dataset = new DefaultCategoryDataset();
+
+            // SimpleDateFormat：Java 文字處理 API，用來格式化 LocalDate 為字符串（X 軸標籤）。
             SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+
+            // 迴圈填充 dataset：從 candles List 迭代，每個 Candle 轉日期字符串 + 收盤價。
+            // 目的：建 X=日期類別，Y=close 數值系列 "收盤價走勢"。
             for (int i = 0; i < candles.size(); i++) {
-                Candle c = candles.get(i);
-                LocalDate localDate = c.date();  // Candle date() 返回 LocalDate (從 println 確認)
-                String dateStr = sdf.format(Date.from(localDate.atStartOfDay(ZoneId.systemDefault()).toInstant()));  // LocalDate 轉日期字符串
-                dataset.addValue(c.close(), "收盤價走勢", dateStr);  // 用日期字符串作為類別（X 軸標籤），Y 為 close
+                Candle c = candles.get(i);  // 取得單日 Candle 記錄（從 Fugle API 解析）
+                LocalDate localDate = c.date();  // Candle date() 返回 LocalDate - Java 時間 API，不可變日期
+
+                // Date.from(Instant)：橋接 LocalDate 到舊 Date API（JFreeChart 需 Date 格式化）。
+                // atStartOfDay(ZoneId.systemDefault())：加時區轉 Instant（台灣時間）。
+                String dateStr = sdf.format(Date.from(localDate.atStartOfDay(ZoneId.systemDefault()).toInstant()));
+
+                dataset.addValue(c.close(), "收盤價走勢", dateStr);  // 用日期字符串作為類別（X 軸標籤），Y 為 close 收盤價
             }
-            JFreeChart chart = ChartFactory.createLineChart("近 10 日 K 線 (收盤價)", "日期", "價格 (元)", dataset, PlotOrientation.VERTICAL, true, true, false);  // [修改]：改用 createLineChart (CategoryPlot)，自動用 CategoryAxis，X 軸只顯示有資料日期
+
+            // JFreeChart 核心工廠，生成線圖（CategoryPlot 類型）。
+            JFreeChart chart = ChartFactory.createLineChart("近 10 日 K 線 (收盤價)", "日期", "價格（元）", dataset, PlotOrientation.VERTICAL, true, true, false);
             
-            Font font = new Font("Microsoft YaHei", Font.BOLD, 14);
+            // 切換字型以利解決亂碼問題
+            Font font = new Font("Microsoft YaHei", Font.BOLD, 14);  // "Microsoft YaHei"：Windows 中文字體，BOLD 加粗，14pt 大小
+
+            // TextTitle：JFreeChart 標題類別，取得並自訂圖表標題字體。
             TextTitle title = chart.getTitle();
             title.setFont(font);
-            
+
+            // CategoryPlot：JFreeChart 繪圖區域，處理 CategoryDataset 的線圖。
+            // chart.getPlot()：強轉 plot 為 CategoryPlot。
             CategoryPlot plot = (CategoryPlot) chart.getPlot();  // [新增]：取得 CategoryPlot
-            plot.getDomainAxis().setLabelFont(font);  // X 軸字體
-            plot.getRangeAxis().setLabelFont(font);   // Y 軸字體
+            plot.getDomainAxis().setLabelFont(font);  // X 軸字體（"日期"）
+            plot.getRangeAxis().setLabelFont(font);  // Y 軸字體（"價格（元）"）
             
-            // [新增]：Y 軸範圍動態調整（根據資料 min/max，類似 before 的行為，避免從 0 開始）
-            double minClose = candles.stream().mapToDouble(Candle::close).min().orElse(0.0);
-            double maxClose = candles.stream().mapToDouble(Candle::close).max().orElse(0.0);
-            double padding = (maxClose - minClose) * 0.05;  // 5% 緩衝空間
-            plot.getRangeAxis().setLowerBound(Math.max(0, minClose - padding));  // 下限：min - padding，但不低於 0
+            // Y 軸範圍動態調整（根據資料 min/max，類似 before 的行為，避免從 0 開始）
+            // candles.stream().mapToDouble(Candle::close).min().orElse(0.0)：Stream API 計算收盤價最小值（method reference Candle::close）。
+            double minClose = candles.stream().mapToDouble(Candle::close).min().orElse(0.0); // minClose：資料中的最小收盤價
+            double maxClose = candles.stream().mapToDouble(Candle::close).max().orElse(0.0);  // maxClose：資料中最大收盤價
+            double padding = (maxClose - minClose) * 0.05;  // 5% 緩衝空間（padding）：Y 軸上下留白，避免線貼邊
+
+            // getRangeAxis()：Y 軸 ValueAxis，setLowerBound / setUpperBound 動態設範圍。
+            plot.getRangeAxis().setLowerBound(Math.max(0, minClose - padding));  // 下限：min - padding，但不低於 0（股票價 >0）
             plot.getRangeAxis().setUpperBound(maxClose + padding);  // 上限：max + padding
-            
-            // [新增]：系列名稱字體防亂碼（Renderer 套用中文字體）
-            LineAndShapeRenderer renderer = (LineAndShapeRenderer) plot.getRenderer();
-            renderer.setSeriesItemLabelFont(0, font);  // 系列 0 用中文字體
+
+            // LineAndShapeRenderer：CategoryPlot 的渲染器，控制線條/點/標籤樣式。
+            LineAndShapeRenderer renderer = (LineAndShapeRenderer) plot.getRenderer();  // 強轉 renderer 為線圖類型
+            renderer.setSeriesItemLabelFont(0, font);  // （"收盤價走勢"）套中文字體
+
+            // setSeriesToolTipGenerator(int series, CategoryToolTipGenerator generator)：為系列設定 tooltip 生成器（hover 提示）。
+            // CategoryToolTipGenerator：介面，generateToolTip(CategoryDataset dataset, int row, int column) 返回字符串。
+            // 目的：hover 點時顯示 "日期: 價格"，用完整日期避免年份歧義。
             renderer.setSeriesToolTipGenerator(0, (dataset1, row, column) -> {  // [修改]：tooltip 顯示日期/價格（CategoryDataset 版本）
-                String category = (String) dataset1.getColumnKey(column);  // 從 dataset1.getColumnKey(int column) 取日期字符串
-                double y = dataset1.getValue(row, column).doubleValue();  // 從 dataset1.getValue(row, column) 取 double
+                String category = (String) dataset1.getColumnKey(column);
+                double y = dataset1.getValue(row, column).doubleValue();
                 return category + ": " + y;  // 格式化 tooltip "2025-11-03: 1510.0"
             });
             
-            // [新增]：圖例 (legend) 系列名稱 "收盤價走勢" 字體防亂碼（JFreeChart 系列名稱在圖例顯示）
+            // 系列名稱 "收盤價走勢" 字體防亂碼（JFreeChart 系列名稱在圖例顯示）
+            // getLegend()：圖表圖例，setItemFont 套字體到所有項目。
             chart.getLegend().setItemFont(font);  // [新增]：將中文字體套用到圖例所有項目，解決系列名稱亂碼
             
-            // [新增]：X 軸日期標籤調整（CategoryAxis 版本）
+            // CategoryAxis：X 軸類別軸，處理日期標籤位置。
             CategoryAxis domainAxis = (CategoryAxis) plot.getDomainAxis();
-            domainAxis.setCategoryLabelPositions(CategoryLabelPositions.STANDARD);  // [新增]：日期標籤垂直顯示（UP_90），避免擁擠（依需調整為 STANDARD 或 DOWN_90）
+            domainAxis.setCategoryLabelPositions(CategoryLabelPositions.UP_90);  // 日期標籤垂直顯示（UP_90），避免擁擠（依需調整為 STANDARD 或 DOWN_90）
+
+            currentChartPanel = new ChartPanel(chart);  // ChartPanel：JFreeChart 的 Swing 面板容器，包裝 chart 支援互動（zoom、tooltip）。
+            int dynamicWidth = Math.max(800, candles.size() * 160);  // 加大倍率到 160 px/點（你的測試 160 勉強OK），10 日 ~1600px、20 日 ~3200px 自適應（確保最後日期全顯示，無切斷）
+            currentChartPanel.setPreferredSize(new java.awt.Dimension(695, 400));  // 寬動態，高固定 400px
+            swingNode.setContent(currentChartPanel);
             
-            currentChartPanel = new ChartPanel(chart);  // 保持
-            int dynamicWidth = Math.max(800, candles.size() * 160);  // [修改]：加大倍率到 160 px/點（你的測試 160 勉強OK），10 日 ~1600px、20 日 ~3200px 自適應（確保最後日期全顯示，無切斷）
-            currentChartPanel.setPreferredSize(new java.awt.Dimension(695, 400));  // [修改]：寬動態，高固定 400px
-            swingNode.setContent(currentChartPanel);    // 保持
-            
-            // [新增]：立即 revalidate/repaint
-            currentChartPanel.revalidate();
-            currentChartPanel.repaint();
-            
-            // [新增]：雙重 invokeLater + Timer 延遲 200ms 再 repaint（社區 fix SwingNode 初始不渲染）
-            SwingUtilities.invokeLater(() -> {
+            // revalidate() / repaint()：Swing 布局/繪圖工具，強制 ChartPanel 更新（後續 resize hack 用）。
+            // currentChartPanel.revalidate();
+            // currentChartPanel.repaint();
+
+            // 雙重 invokeLater + Timer 延遲 200ms 再 repaint（社區 fix SwingNode 初始不渲染）
+            // SwingUtilities.invokeLater：再排一次 EDT 任務，確保初始渲染。
+            // https://bugs.openjdk.org/browse/JDK-8222317
+            // SwingUtilities.invokeLater(() -> {
+            //     currentChartPanel.revalidate();
+            //     currentChartPanel.repaint();
+            // });
+
+            // Timer：Swing 的計時器，單次延遲 200ms 觸發 ActionListener。
+            // 目的：解決 SwingNode 嵌入 JavaFX 時的初始渲染延遲（社區常見 bug，JFreeChart 需要時間初始化 plot）。
+            Timer timer = new Timer(200, e -> {
                 currentChartPanel.revalidate();
                 currentChartPanel.repaint();
-            });
-            Timer timer = new Timer(200, e -> {  // Swing Timer 延遲
-                currentChartPanel.revalidate();
-                currentChartPanel.repaint();
-                // System.out.println("Swing Timer：延遲 repaint 完成");  // [註解]：除錯 log，DEMO 時移除
-                ((Timer) e.getSource()).stop();  // 單次執行
+                ((Timer) e.getSource()).stop();
             });
             timer.setRepeats(false);
             timer.start();
         });
-        
-        // [修改]：JavaFX 側延遲改 300ms，並針對 chartPane.requestLayout()（修編譯錯誤）
-        PauseTransition pause = new PauseTransition(Duration.millis(300));  // [修改]：簡寫（需 import javafx.util.Duration）
-        pause.setOnFinished(e -> {
-            chartPane.requestLayout();  // 保持：強制 ScrollPane 布局
-            root.requestLayout();       // 保持：頂層更新
-            // [新增]：輕微 stage resize hack（模擬拖曳，觸發 SwingNode 重繪，無視覺影響）
-            double currentWidth = primaryStage.getWidth();  // 保持
-            primaryStage.setWidth(currentWidth + 1);        // 保持
-            primaryStage.setWidth(currentWidth);            // 保持
-            // System.out.println("JavaFX Pause：布局請求 + resize hack 完成");  // [註解]：除錯 log，DEMO 時移除
-        });
-        pause.play();
+
+        // JavaFX 側延遲改 300ms，並針對 chartPane.requestLayout()
+        // PauseTransition：JavaFX 動畫 API，用於單次延遲執行（Duration.millis(300) = 300ms）。
+        // 目的：給 SwingNode 初始化時間（repaint 後），再觸發 JavaFX 布局更新，避免圖表空白。
+        // PauseTransition pause = new PauseTransition(Duration.millis(300));
+        // pause.setOnFinished(e -> {
+        //     chartPane.requestLayout();  // 強制 ScrollPane 布局（計算新內容尺寸）
+        //     root.requestLayout();  // 頂層 BorderPane 更新（傳播到 Scene）
+            
+        //     // 輕微 stage resize hack（模擬拖曳，觸發 SwingNode 重繪）
+        //     // primaryStage：類別成員 Stage，getWidth() 取當前寬。
+        //     double currentWidth = primaryStage.getWidth();
+        //     primaryStage.setWidth(currentWidth + 1); // +1px 觸發 resize 事件
+        //     primaryStage.setWidth(currentWidth);  // 還原，模擬微調（fix SwingNode 不渲染）
+        // });
+        // pause.play();
         
         return swingNode;
     }
