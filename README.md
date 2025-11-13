@@ -35,7 +35,23 @@
   Maven home: C:\project\JavaProjects\apache-maven-3.9.11  
   Java version: 25.0.1, vendor: Eclipse Adoptium, runtime: C:\Program Files\Eclipse Adoptium\jdk-25.0.1.8-hotspot  
   Default locale: zh_TW, platform encoding: UTF-8  
-  OS name: "windows 11", version: "10.0", arch: "amd64", family: "windows"  
+  OS name: "windows 11", version: "10.0", arch: "amd64", family: "windows"
+
+- WiX Toolset v3.14.1  
+  下載連結：https://github.com/wixtoolset/wix3/releases/download/wix3141rtm/wix314-binaries.zip
+
+  [編輯系統變數]  
+  手動加 PATH（搜 "編輯系統環境變數" → 環境變數 > 系統變數 > Path > 編輯 > 新增 > C:\project\JavaProjects\wix314-binaries  
+
+  <img width="1741" height="591" alt="wix314-binaries" src="https://github.com/user-attachments/assets/4453a062-6bf9-4e13-aaf5-ee4bda22b38f" />  
+
+  [命令提示字元]  
+  C:\project\JavaProjects\stock-health-system> candle -?  
+  Windows Installer XML Toolset Compiler version 3.14.1.8722  
+  Copyright (c) .NET Foundation and contributors. All rights reserved.  
+  PS C:\project\JavaProjects\stock-health-system> light -?  
+  Windows Installer XML Toolset Linker version 3.14.1.8722  
+  Copyright (c) .NET Foundation and contributors. All rights reserved.
 
 - Fugle API Key  
   [教學文件與TOKEN申請]  
@@ -125,12 +141,11 @@
   └── README.md               # 此檔  
 
 ## 技術棧
-- **語言**：Java 21 (records, virtual threads)。
+- **語言**：Java 25 (records, virtual threads)。
 - **API 存取**：OkHttp GET 請求 Fugle endpoint (e.g., /intraday/quote/2330)。
 - **資料解析**：Jackson 轉 JSON 到 POJO。
 - **GUI**：JavaFX (VBox 布局、Alert 錯誤)。
 - **圖表**：JFreeChart (折線圖)。
-- **備援**：Jsoup 爬 Yahoo 財經 (若 API 404/401)。
 
 ## 貢獻指南
 1. Fork 專案。
