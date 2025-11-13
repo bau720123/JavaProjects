@@ -1,0 +1,125 @@
+以下為 "歷史行情" 功能
+
+API固定DOMAIN位置：https://api.fugle.tw/marketdata/v1.0/stock
+
+功能：取得 1 年內歷史股價（依代碼查詢）
+Endpoint：/historical/candles/{symbol}
+
+[Request]
+
+curl -X 'GET' \
+  'https://api.fugle.tw/marketdata/v1.0/stock/historical/candles/2330?from=2025-10-30&to=2025-11-06&timeframe=D&fields=open,high,low,close,volume,change&sort=asc' \
+  -H 'X-API-KEY: <YOUR_API_KEY>'
+
+[欄位說明]
+
+symbol*	string	股票代碼
+from	string	開始日期（格式：yyyy-MM-dd）
+to	string	結束日期（格式：yyyy-MM-dd）
+timeframe	string	Ｋ線週期，可選 1 1分Ｋ；3 3分Ｋ；5 5分Ｋ；10 10分Ｋ；15 15分Ｋ；30 30分Ｋ；60 60分Ｋ；D 日Ｋ；W 週Ｋ；M 月Ｋ
+fields	string	欄位，可選：open,high,low,close,volume,turnover,change
+sort	string	時間排序，預設為 desc 降冪 ；可選 asc 升冪
+
+caution
+目前分Ｋ無法指定開始日期（from） 與 結束日期（to），一律回傳近 30 日資料，並且無法選擇 turnover 與 change 的欄位。
+
+[Response]
+
+{
+    "symbol": "2330",
+    "timeframe": "D",
+    "data": [
+        {
+            "date": "2025-11-06",
+            "open": 1470,
+            "high": 1480,
+            "low": 1465,
+            "close": 1465,
+            "volume": 29243147,
+            "change": 5
+        },
+        {
+            "date": "2025-11-05",
+            "open": 1480,
+            "high": 1485,
+            "low": 1455,
+            "close": 1460,
+            "volume": 63423241,
+            "change": -45
+        },
+        {
+            "date": "2025-11-04",
+            "open": 1520,
+            "high": 1525,
+            "low": 1495,
+            "close": 1505,
+            "volume": 35922791,
+            "change": -5
+        },
+        {
+            "date": "2025-11-03",
+            "open": 1510,
+            "high": 1520,
+            "low": 1490,
+            "close": 1510,
+            "volume": 30913479,
+            "change": 10
+        },
+        {
+            "date": "2025-10-31",
+            "open": 1515,
+            "high": 1525,
+            "low": 1500,
+            "close": 1500,
+            "volume": 33838761,
+            "change": -5
+        },
+        {
+            "date": "2025-10-30",
+            "open": 1515,
+            "high": 1520,
+            "low": 1500,
+            "close": 1505,
+            "volume": 30058497,
+            "change": 0
+        }
+    ]
+}
+
+[欄位說明]
+
+date*	string	日期
+symbol*	string	股票代號
+timeframe*	string	Ｋ線週期
+data*	object[]	Ｋ線資料
+data.date*	string	日期（分 K 含時間）
+data.open	number	Ｋ線開盤價
+data.high	number	Ｋ線最高價
+data.low	number	Ｋ線最低價
+data.close	number	Ｋ線收盤價
+data.volume	number	Ｋ線成交量（股）
+data.turnover	number	Ｋ線成交金額（元）
+data.change	number	Ｋ線漲跌
+
+=====
+
+功能：取得近 52 週股價數據（依代碼查詢）
+Endpoint：/historical/stats/{symbol}
+
+[Request]
+
+curl -X 'GET' \
+  'https://api.fugle.tw/marketdata/v1.0/stock/historical/stats/2330' \
+  -H 'X-API-KEY: <YOUR_API_KEY>'
+
+[Response]
+
+{
+    "week52High": 1525,
+    "week52Low": 780
+}
+
+[欄位說明]
+
+week52High*	number	近 52 週高點
+week52Low*	number	近 52 週低點

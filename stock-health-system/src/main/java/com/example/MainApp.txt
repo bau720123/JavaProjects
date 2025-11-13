@@ -1,40 +1,40 @@
 package com.example;
 
-import javafx.application.Application;
-import javafx.application.Platform;
-import javafx.embed.swing.SwingNode;
-import javafx.geometry.Insets;
-import javafx.geometry.Pos;
-import javafx.scene.Node;
-import javafx.scene.Scene;
-import javafx.scene.control.*;
-import javafx.scene.control.Alert.AlertType;
-import javafx.scene.layout.*;
-import javafx.stage.Stage;
-import javafx.animation.PauseTransition;
-import javafx.util.Duration;
+import javafx.application.Application;  // JavaFX應用程式框架的核心類別：用於定義應用程式的生命週期（如start()和stop()方法）。這裡MainApp extends Application，讓我們能用launch(args)啟動整個UI框架，負責初始化視窗、場景和事件循環。
+import javafx.application.Platform;  // JavaFX應用程式框架的Platform類別：提供跨執行緒操作工具，如runLater(Runnable)，用於將UI更新從背景執行緒（如CompletableFuture）切回JavaFX主執行緒。這裡用在queryQuote()和queryHistory()的.thenAccept(quote -> Platform.runLater(...))，避免"IllegalStateException: Not on FX application thread"。這是"執行緒橋樑"，確保API回傳的Fugle資料安全更新TextArea或Chart，而不崩潰。
+import javafx.embed.swing.SwingNode;  // JavaFX-Swing整合模組中的SwingNode類別：用於將Swing組件（如JFreeChart的ChartPanel）嵌入JavaFX場景中。這裡用在createLineChart()和createEmptyChartPanel()，讓K線圖能在ScrollPane中渲染。
+import javafx.geometry.Insets;  // JavaFX布局模組中的Insets類別：定義邊距（top, right, bottom, left），用於設定VBox/HBox的內外邊距。這裡用在root.setPadding(new Insets(10))和inputBox.setPadding(new Insets(0, 0, 20, 0))，這是"間距工具"，像CSS的padding，讓按鈕和文字框不擠在一起。
+import javafx.geometry.Pos;  // JavaFX布局模組中的Pos類別：定義對齊位置（如CENTER_LEFT、TOP_LEFT），用於HBox/VBox的setAlignment()。這裡用在inputBox.setAlignment(Pos.CENTER_LEFT)和centerBox.setAlignment(Pos.TOP_LEFT)，讓內容頂左對齊，這是"對齊指南"，確保股票代號輸入框和圖表視覺一致。
+import javafx.scene.Node;  // JavaFX場景圖（Scene Graph）中的Node介面：所有UI元素的基底（如Button、TextArea），用於泛型返回（如createLineChart()返回Node）。這裡用在createEmptyChartPanel()的SwingNode.setContent(Node)。這是"場景積木"，讓我們用多型（polymorphism）返回不同UI組件，就像是HTML中有input textarea select radio...。
+import javafx.scene.Scene;  // JavaFX場景模組中的Scene類別：定義視窗內容的容器，包含根節點（如BorderPane root）和尺寸。這裡用在stage.setScene(new Scene(root, 1100, 700))，設定主視窗。這是"舞台布景"，包裝所有UI元素，讓JavaFX渲染整個"台股健診系統"介面。
+import javafx.scene.control.*;  // JavaFX控制項模組的星號import：包含Button、TextField、PasswordField、Label、TextArea、Alert、VBox、HBox、ScrollPane等。這裡用在symbolField = new TextField()、queryBtn = new Button("查即時報價")、resultArea = new TextArea()等，建構輸入框、按鈕和文字顯示。這是"UI工具箱"，讓我們快速組裝互動元素；Alert用於showAlert("錯誤訊息")，友好處理Fugle API失敗。
+import javafx.scene.control.Alert.AlertType;  // JavaFX控制項中的AlertType枚舉：定義警示類型（如ERROR、INFORMATION）。這裡用在showAlert(AlertType.ERROR, msg)和showInfoAlert(AlertType.INFORMATION, msg)，顯示錯誤或除錯彈窗。這是"訊息分類器"，讓API Key無效時顯示紅色錯誤，而非console log。
+import javafx.scene.layout.*;  // JavaFX布局模組的星號import：包含BorderPane、VBox、HBox、ScrollPane。這裡用在root = new BorderPane()、buttonBox = new VBox(10)、centerBox = new HBox(10)，實現左中右三欄結構。這是"布局引擎"，像CSS Flexbox，讓按鈕垂直、輸入水平排列。
+import javafx.stage.Stage;  // JavaFX階段模組中的Stage類別：代表視窗（如primaryStage），用於setTitle()、setScene()、setResizable()。這裡用在start(Stage stage)和primaryStage.setWidth()的resize hack。這是"視窗管理器"，控制"台股股票健診系統"的標題和大小。
+import javafx.animation.PauseTransition;  // JavaFX動畫模組中的PauseTransition類別：用於延遲執行（如Duration.millis(300)），這裡用在queryHistory()的pause.setOnFinished()，給SwingNode初始化時間避免渲染延遲。這是"計時器"，確保圖表載入後才顯示，優化UX。
+import javafx.util.Duration;  // JavaFX工具模組中的Duration類別：定義時間單位（如millis(300)），用於PauseTransition。這是"時間單位"，讓延遲精準到毫秒。
 
-import javax.swing.SwingUtilities;
-import javax.swing.Timer;
+import javax.swing.SwingUtilities;  // Swing框架中的SwingUtilities類別：提供執行緒工具，如invokeLater(Runnable)，用在createLineChart()的SwingUtilities.invokeLater(() -> { currentChartPanel.repaint(); })，確保ChartPanel在EDT（Event Dispatch Thread）更新。這是"Swing執行緒橋樑"，與JavaFX的Platform.runLater配對，讓混合UI不卡頓。
+import javax.swing.Timer;  // Swing框架中的Timer類別：用於延遲重繪（如200ms後repaint()），這裡用在Swing Timer解決SwingNode初始不渲染問題。這是"Swing計時器"，單次觸發repaint，社區fix用於JFreeChart嵌入。
 
-import org.jfree.chart.ChartFactory;
-import org.jfree.chart.ChartPanel;
-import org.jfree.chart.JFreeChart;
-import org.jfree.chart.axis.CategoryAxis;
-import org.jfree.chart.axis.CategoryLabelPositions;
-import org.jfree.chart.plot.CategoryPlot;
-import org.jfree.chart.plot.PlotOrientation;
-import org.jfree.chart.title.TextTitle;
-import org.jfree.data.category.DefaultCategoryDataset;
-import org.jfree.chart.renderer.category.LineAndShapeRenderer;
+import org.jfree.chart.ChartFactory;  // JFreeChart庫的核心工廠類別：用於建立圖表類型（如createLineChart(title, x, y, dataset)），這裡用在createLineChart()建"近 10 日 K 線 (收盤價)"。這是"圖表生成器"，從Fugle的Candle資料快速產生線圖；若API取不到，可用Jsoup爬https://www.fugle.tw/history/{symbol}備案填充dataset。
+import org.jfree.chart.ChartPanel;  // JFreeChart的ChartPanel類別：Swing面板包裝JFreeChart，讓圖表可嵌入SwingNode。這裡用在currentChartPanel = new ChartPanel(chart)，並setPreferredSize()調整寬度。這是"圖表容器"，支援滾動和tooltip，顯示收盤價走勢。
+import org.jfree.chart.JFreeChart;  // JFreeChart的核心圖表物件：包含plot、title、legend。這裡用在JFreeChart chart = ChartFactory.createLineChart(...)，並getPlot()調整Y軸範圍。這是"完整圖表"，我們用它動態設minClose/maxClose + padding，避免從0開始。
+import org.jfree.chart.axis.CategoryAxis;  // JFreeChart軸模組中的CategoryAxis類別：用於類別型X軸（如日期標籤）。這裡用在domainAxis = (CategoryAxis) plot.getDomainAxis()，setCategoryLabelPositions(UP_90)讓日期垂直顯示。這是"X軸管理器"，砍掉非營業日空白，只顯示有Fugle資料的日期。
+import org.jfree.chart.axis.CategoryLabelPositions;  // JFreeChart軸標籤位置枚舉：定義標籤旋轉（如UP_90）。這裡用在domainAxis.setCategoryLabelPositions(CategoryLabelPositions.UP_90)，避免日期擁擠。這是"標籤定位器"，讓X軸"2025-11-03"等日期易讀。
+import org.jfree.chart.plot.CategoryPlot;  // JFreeChart繪圖模組中的CategoryPlot類別：線圖的繪圖區域，包含renderer和axis。這裡用在plot = (CategoryPlot) chart.getPlot()，setRangeAxis bounds動態調整Y軸。這是"圖表引擎"，處理Fugle close價的min/max + 5% padding。
+import org.jfree.chart.plot.PlotOrientation;  // JFreeChart繪圖方向枚舉：定義圖表方向（如VERTICAL）。這裡用在createLineChart(..., PlotOrientation.VERTICAL, ...)。這是"方向設定"，確保K線垂直（X日期、Y價格）。
+import org.jfree.chart.title.TextTitle;  // JFreeChart標題類別：自訂圖表標題。這裡用在TextTitle title = chart.getTitle()，setFont(font)防中文字體亂碼。這是"標題樣式"，套用"Microsoft YaHei"讓"近 10 日 K 線"清晰。
+import org.jfree.data.category.DefaultCategoryDataset;  // JFreeChart資料集類別：用於類別資料（如日期-價格對）。這裡用在DefaultCategoryDataset dataset = new DefaultCategoryDataset()，addValue(c.close(), "收盤價走勢", dateStr)。這是"資料餵食器"，從Fugle Candle填充X=日期、Y=close，只用有資料日。
+import org.jfree.chart.renderer.category.LineAndShapeRenderer;  // JFreeChart渲染器類別：控制線條和形狀。這裡用在renderer = (LineAndShapeRenderer) plot.getRenderer()，setSeriesToolTipGenerator顯示"日期: 價格"。這是"繪圖畫筆"，加tooltip讓hover時秀Fugle收盤值。
 
-import java.awt.Font;
-import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.time.LocalDate;
-import java.time.ZoneId;
-import java.util.List;
-import java.util.concurrent.CompletableFuture;
+import java.awt.Font;  // AWT（Abstract Window Toolkit）中的Font類別：定義字體（如"Microsoft YaHei", BOLD, 14）。這裡用在中文字體防亂碼，如title.setFont(font)和chart.getLegend().setItemFont(font)。這是"Swing字體工具"，確保圖例"收盤價走勢"不亂碼。
+import java.text.SimpleDateFormat;  // Java文字處理中的SimpleDateFormat類別：格式化日期（如"yyyy-MM-dd"）。這裡用在sdf.format(Date.from(localDate...))轉Candle日期為X軸標籤。這是"日期格式器"，讓Fugle LocalDate變字符串，避免X軸顯示"Mon Nov 03 00:00:00 CST 2025"。
+import java.util.Date;  // Java核心時間類別：可變日期物件。這裡用在sdf.format(Date.from(...))橋接LocalDate到舊Date API。這是"舊日期橋"，雖然java.time更好，但JFreeChart需它格式化。
+import java.time.LocalDate;  // Java時間API中的LocalDate類別：不可變日期。這裡用在Candle.date()和sdf.format(Date.from(localDate.atStartOfDay(ZoneId.systemDefault()).toInstant()))。這是"現代日期"，精準處理Fugle歷史K線日期。
+import java.time.ZoneId;  // Java時間API中的ZoneId類別：時區ID（如systemDefault()）。這裡用在localDate.atStartOfDay(ZoneId.systemDefault()).toInstant()轉Instant。這是"時區轉換器"，確保台灣時間正確。
+import java.util.List;  // Java集合框架的List介面：有序集合。這裡用在createLineChart(List<Candle> candles)和for (Candle c : candles)。這是"列表藍圖"，接收Fugle fetchHistory返回。
+import java.util.concurrent.CompletableFuture;  // Java並行API中的CompletableFuture類別：非同步任務。這裡用在CompletableFuture.supplyAsync(() -> service.fetchQuote(...)).thenAccept(...)，背景取Fugle資料不擋UI。這是"非同步魔法"，讓按鈕點擊後即時顯示loading，而非凍結視窗。
 
 public class MainApp extends Application {
     private final FugleService service = new FugleService(); // 使用 Fugle API 做資料存取
@@ -199,7 +199,7 @@ public class MainApp extends Application {
 
                     if (!candles.isEmpty()) {
                         chartPane.setContent(createLineChart(candles));
-                        chartPane.setFitToWidth(false);  // 關閉自動壓縮，讓 ChartPanel 自然寬度，溢出時滾動
+                        chartPane.setFitToWidth(false);  // [新增]：關閉自動壓縮，讓 ChartPanel 自然寬度，溢出時滾動
                         chartPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);  // 水平滾動條自動出現（當寬度溢出時），確保用戶拖曳查看全圖，不切斷日期
 
                         // 延遲 setVisible，給 Swing 初始化時間
@@ -215,13 +215,6 @@ public class MainApp extends Application {
                             sb.append(String.format("日期：%s\n開盤價：%.1f\n最高價：%.1f\n最低價：%.1f\n收盤價：%.1f\n成交量：%d\n漲跌：%.1f\n\n",
                                 c.date(), c.open(), c.high(), c.low(), c.close(), c.volume(), c.change()));
                         }
-
-                        // 計算區間最高價（所有 high 的 max）和最低價（所有 low 的 min）
-                        // 用 Stream API：mapToDouble(Candle::high).max().orElse(0.0) - 高效 O(n)，method reference 簡潔
-                        double maxHigh = candles.stream().mapToDouble(Candle::high).max().orElse(0.0);  // 區間最高價
-                        double minLow = candles.stream().mapToDouble(Candle::low).min().orElse(0.0);  // 區間最低價
-                        sb.append(String.format("區間最高價：%.1f\n區間最低價：%.1f\n", maxHigh, minLow));  // 格式化添加（%.1f 保留1位小數）
-
                         resultArea.setText(sb.toString());  // 設定完整文字
                     } else {
                         resultArea.setText("歷史資料載入失敗，請稍後再試\n若 API 不可用，請確認 API key 有效。");
@@ -318,6 +311,18 @@ public class MainApp extends Application {
             int dynamicWidth = Math.max(800, candles.size() * 160);  // 加大倍率到 160 px/點（你的測試 160 勉強OK），10 日 ~1600px、20 日 ~3200px 自適應（確保最後日期全顯示，無切斷）
             currentChartPanel.setPreferredSize(new java.awt.Dimension(695, 400));  // 寬動態，高固定 400px
             swingNode.setContent(currentChartPanel);
+            
+            // revalidate() / repaint()：Swing 布局/繪圖工具，強制 ChartPanel 更新（後續 resize hack 用）。
+            // currentChartPanel.revalidate();
+            // currentChartPanel.repaint();
+
+            // 雙重 invokeLater + Timer 延遲 200ms 再 repaint（社區 fix SwingNode 初始不渲染）
+            // SwingUtilities.invokeLater：再排一次 EDT 任務，確保初始渲染。
+            // https://bugs.openjdk.org/browse/JDK-8222317
+            // SwingUtilities.invokeLater(() -> {
+            //     currentChartPanel.revalidate();
+            //     currentChartPanel.repaint();
+            // });
 
             // Timer：Swing 的計時器，單次延遲 200ms 觸發 ActionListener。
             // 目的：解決 SwingNode 嵌入 JavaFX 時的初始渲染延遲（社區常見 bug，JFreeChart 需要時間初始化 plot）。
@@ -329,6 +334,22 @@ public class MainApp extends Application {
             timer.setRepeats(false);
             timer.start();
         });
+
+        // JavaFX 側延遲改 300ms，並針對 chartPane.requestLayout()
+        // PauseTransition：JavaFX 動畫 API，用於單次延遲執行（Duration.millis(300) = 300ms）。
+        // 目的：給 SwingNode 初始化時間（repaint 後），再觸發 JavaFX 布局更新，避免圖表空白。
+        // PauseTransition pause = new PauseTransition(Duration.millis(300));
+        // pause.setOnFinished(e -> {
+        //     chartPane.requestLayout();  // 強制 ScrollPane 布局（計算新內容尺寸）
+        //     root.requestLayout();  // 頂層 BorderPane 更新（傳播到 Scene）
+            
+        //     // 輕微 stage resize hack（模擬拖曳，觸發 SwingNode 重繪）
+        //     // primaryStage：類別成員 Stage，getWidth() 取當前寬。
+        //     double currentWidth = primaryStage.getWidth();
+        //     primaryStage.setWidth(currentWidth + 1); // +1px 觸發 resize 事件
+        //     primaryStage.setWidth(currentWidth);  // 還原，模擬微調（fix SwingNode 不渲染）
+        // });
+        // pause.play();
         
         return swingNode;
     }

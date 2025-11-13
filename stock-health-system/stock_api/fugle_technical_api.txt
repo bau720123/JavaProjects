@@ -1,0 +1,395 @@
+以下為 "技術指標" 功能
+
+API固定DOMAIN位置：https://api.fugle.tw/marketdata/v1.0/stock
+
+功能：取得特定股票在指定時間範圍內的簡單移動平均 (SMA)
+Endpoint：/technical/sma/{symbol}}
+
+[Request]
+
+curl -X 'GET' \
+  'https://api.fugle.tw/marketdata/v1.0/stock/technical/sma/2330?from=2025-10-30&to=2025-11-06&timeframe=D&period=5' \
+  -H 'X-API-KEY: <YOUR_API_KEY>'
+
+[欄位說明]
+
+symbol*	string	股票代碼
+from*	string	開始日期（格式：yyyy-MM-dd）
+to*	string	結束日期（格式：yyyy-MM-dd）
+timeframe*	string	Ｋ線週期，可選 1 1分Ｋ；3 3分Ｋ；5 5分Ｋ；10 10分Ｋ；15 15分Ｋ；30 30分Ｋ；60 60分Ｋ；D 日Ｋ；W 週Ｋ；M 月Ｋ
+period*	number	SMA 週期
+
+caution
+目前分Ｋ無法指定開始日期（from） 與 結束日期（to），一律回傳近 30 日資料。
+
+[Response]
+
+{
+    "symbol": "2330",
+    "from": "2025-10-30",
+    "to": "2025-11-06",
+    "timeframe": "D",
+    "period": 5,
+    "data": [
+        {
+            "date": "2025-10-30",
+            "sma": 1483
+        },
+        {
+            "date": "2025-10-31",
+            "sma": 1493
+        },
+        {
+            "date": "2025-11-03",
+            "sma": 1499
+        },
+        {
+            "date": "2025-11-04",
+            "sma": 1505
+        },
+        {
+            "date": "2025-11-05",
+            "sma": 1496
+        },
+        {
+            "date": "2025-11-06",
+            "sma": 1488
+        }
+    ]
+}
+
+[欄位說明]
+
+symbol*	string	股票代號
+from*	string	開始日期
+to*	string	結束日期
+timeframe*	string	Ｋ線週期
+period*	number	SMA 週期
+data*	object[]	SMA 資料
+data[0].date*	string	資料時間
+data[0].sma*	number	SMA
+
+=====
+
+功能：取得特定股票在指定時間範圍內的相對強弱指標 (RSI)
+Endpoint：/technical/rsi/{symbol}
+
+[Request]
+
+curl -X 'GET' \
+  'https://api.fugle.tw/marketdata/v1.0/stock/technical/rsi/2330?from=2025-10-30&to=2025-11-06&timeframe=D&period=6' \
+  -H 'X-API-KEY: <YOUR_API_KEY>'
+
+[欄位說明]
+
+symbol*	string	股票代碼
+from*	string	開始日期（格式：yyyy-MM-dd）
+to*	string	結束日期（格式：yyyy-MM-dd）
+timeframe*	string	Ｋ線週期，可選 1 1分Ｋ；3 3分Ｋ；5 5分Ｋ；10 10分Ｋ；15 15分Ｋ；30 30分Ｋ；60 60分Ｋ；D 日Ｋ；W 週Ｋ；M 月Ｋ
+period*	number	RSI 週期
+
+caution
+目前分Ｋ無法指定開始日期（from） 與 結束日期（to），一律回傳近 30 日資料。
+
+[Response]
+
+{
+    "symbol": "2330",
+    "from": "2025-10-30",
+    "to": "2025-11-06",
+    "timeframe": "D",
+    "period": 6,
+    "data": [
+        {
+            "date": "2025-10-30",
+            "rsi": 80
+        },
+        {
+            "date": "2025-10-31",
+            "rsi": 74.07407407407408
+        },
+        {
+            "date": "2025-11-03",
+            "rsi": 77.9874213836478
+        },
+        {
+            "date": "2025-11-04",
+            "rsi": 71.51095732410612
+        },
+        {
+            "date": "2025-11-05",
+            "rsi": 37.69913656816247
+        },
+        {
+            "date": "2025-11-06",
+            "rsi": 41.393827075754466
+        }
+    ]
+}
+
+[欄位說明]
+
+symbol*	string	股票代號
+from*	string	開始日期
+to*	string	結束日期
+timeframe*	string	Ｋ線週期
+period*	number	RSI 週期
+data*	object[]	RSI 資料
+data[0].date*	string	資料時間
+data[0].rsi*	number	RSI
+
+=====
+
+功能：取得特定股票在指定時間範圍內的隨機指標 (KDJ)
+Endpoint：/technical/kdj/{symbol}
+
+[Request]
+
+curl -X 'GET' \
+  'https://api.fugle.tw/marketdata/v1.0/stock/technical/kdj/2330?from=2025-10-30&to=2025-11-06&timeframe=D&rPeriod=9&kPeriod=3&dPeriod=3' \
+  -H 'X-API-KEY: <YOUR_API_KEY>'
+
+[欄位說明]
+
+symbol*	string	股票代碼
+from*	string	開始日期（格式：yyyy-MM-dd）
+to*	string	結束日期（格式：yyyy-MM-dd）
+timeframe*	string	Ｋ線週期，可選 1 1分Ｋ；3 3分Ｋ；5 5分Ｋ；10 10分Ｋ；15 15分Ｋ；30 30分Ｋ；60 60分Ｋ；D 日Ｋ；W 週Ｋ；M 月Ｋ
+rPeriod*	number	KDJ 週期
+kPeriod*	number	%K 週期
+dPeriod*	number	%D 週期
+
+caution
+目前分Ｋ無法指定開始日期（from） 與 結束日期（to），一律回傳近 30 日資料。
+
+[Response]
+
+{
+    "symbol": "2330",
+    "from": "2025-10-30",
+    "to": "2025-11-06",
+    "timeframe": "D",
+    "rPeriod": 9,
+    "kPeriod": 3,
+    "dPeriod": 3,
+    "data": [
+        {
+            "date": "2025-10-30",
+            "k": 77.13046757164403,
+            "d": 67.05630970336851,
+            "j": 97.27878330819507
+        },
+        {
+            "date": "2025-10-31",
+            "k": 80.6917211328976,
+            "d": 76.85953298698395,
+            "j": 88.35609742472488
+        },
+        {
+            "date": "2025-11-03",
+            "k": 79.30283224400871,
+            "d": 79.04167364951677,
+            "j": 79.82514943299262
+        },
+        {
+            "date": "2025-11-04",
+            "k": 77.77777777777779,
+            "d": 79.257443718228,
+            "j": 74.81844589687736
+        },
+        {
+            "date": "2025-11-05",
+            "k": 62.96296296296297,
+            "d": 73.34785766158313,
+            "j": 42.193173565722645
+        },
+        {
+            "date": "2025-11-06",
+            "k": 39.94708994708995,
+            "d": 60.22927689594354,
+            "j": -0.6172839506172352
+        }
+    ]
+}
+
+[欄位說明]
+
+symbol*	string	股票代號
+from*	string	開始日期
+to*	string	結束日期
+timeframe*	string	Ｋ線週期
+rPeriod*	number	KDJ 週期
+kPeriod*	number	%K 週期
+dPeriod*	number	%D 週期
+data*	object[]	KDJ 資料
+data[0].date*	string	資料時間
+data[0].k*	number	K
+data[0].d*	number	D
+data[0].j*	number	J
+
+=====
+
+功能：取得特定股票在指定時間範圍內的指數平滑異同移動平均線 (MACD)
+Endpoint：/technical/macd/{symbol}
+
+[Request]
+
+curl -X 'GET' \
+  'https://api.fugle.tw/marketdata/v1.0/stock/technical/macd/2330?from=2025-10-30&to=2025-11-06&timeframe=D&rPeriod=9&fast=12&slow=26&signal=9' \
+  -H 'X-API-KEY: <YOUR_API_KEY>'
+
+[欄位說明]
+
+symbol*	string	股票代碼
+from*	string	開始日期（格式：yyyy-MM-dd）
+to*	string	結束日期（格式：yyyy-MM-dd）
+timeframe*	string	Ｋ線週期，可選 1 1分Ｋ；3 3分Ｋ；5 5分Ｋ；10 10分Ｋ；15 15分Ｋ；30 30分Ｋ；60 60分Ｋ；D 日Ｋ；W 週Ｋ；M 月Ｋ
+fast*	number	快線週期
+slow*	number	慢線週期
+signal*	number	信號線週期
+
+caution
+目前分Ｋ無法指定開始日期（from） 與 結束日期（to），一律回傳近 30 日資料。
+
+[Response]
+
+{
+    "symbol": "2330",
+    "from": "2025-10-30",
+    "to": "2025-11-06",
+    "timeframe": "D",
+    "fast": 12,
+    "slow": 26,
+    "signal": 9,
+    "data": [
+        {
+            "date": "2025-10-30",
+            "macdLine": 46.430442596762305,
+            "signalLine": 45.40953609095133
+        },
+        {
+            "date": "2025-10-31",
+            "macdLine": 45.726037030275165,
+            "signalLine": 45.4728362788161
+        },
+        {
+            "date": "2025-11-03",
+            "macdLine": 45.4507786858162,
+            "signalLine": 45.468424760216124
+        },
+        {
+            "date": "2025-11-04",
+            "macdLine": 44.31830244801131,
+            "signalLine": 45.23840029777516
+        },
+        {
+            "date": "2025-11-05",
+            "macdLine": 39.336239270836586,
+            "signalLine": 44.05796809238745
+        },
+        {
+            "date": "2025-11-06",
+            "macdLine": 35.38349758762752,
+            "signalLine": 42.323073991435464
+        }
+    ]
+}
+
+[欄位說明]
+
+symbol*	string	股票代號
+from*	string	開始日期
+to*	string	結束日期
+timeframe*	string	Ｋ線週期
+fast*	number	快線週期
+slow*	number	慢線週期
+signal*	number	信號線週期
+data*	object[]	MACD 資料
+data[0].date*	string	資料時間
+data[0].macdLine*	number	MACD 線
+data[0].signalLine*	number	信號線
+
+=====
+
+功能：取得特定股票在指定時間範圍內的布林通通 (Bollinger Bands)
+Endpoint：/technical/bb/{symbol}
+
+[Request]
+
+curl -X 'GET' \
+  'https://api.fugle.tw/marketdata/v1.0/stock/technical/bb/2330?from=2025-10-30&to=2025-11-06&timeframe=D&period=20' \
+  -H 'X-API-KEY: <YOUR_API_KEY>'
+
+[欄位說明]
+
+symbol*	string	股票代碼
+from*	string	開始日期（格式：yyyy-MM-dd）
+to*	string	結束日期（格式：yyyy-MM-dd）
+timeframe*	string	Ｋ線週期，可選 1 1分Ｋ；3 3分Ｋ；5 5分Ｋ；10 10分Ｋ；15 15分Ｋ；30 30分Ｋ；60 60分Ｋ；D 日Ｋ；W 週Ｋ；M 月Ｋ
+period*	number	布林通道週期
+
+caution
+目前分Ｋ無法指定開始日期（from） 與 結束日期（to），一律回傳近 30 日資料。
+
+[Response]
+
+{
+    "symbol": "2330",
+    "from": "2025-10-30",
+    "to": "2025-11-06",
+    "timeframe": "D",
+    "period": 20,
+    "data": [
+        {
+            "date": "2025-10-30",
+            "upper": 1545.5360404701605,
+            "middle": 1438,
+            "lower": 1330.4639595298395
+        },
+        {
+            "date": "2025-10-31",
+            "upper": 1539.4819464526945,
+            "middle": 1447.75,
+            "lower": 1356.0180535473055
+        },
+        {
+            "date": "2025-11-03",
+            "upper": 1533.3806258157133,
+            "middle": 1457,
+            "lower": 1380.6193741842867
+        },
+        {
+            "date": "2025-11-04",
+            "upper": 1530.3777071011043,
+            "middle": 1464,
+            "lower": 1397.6222928988957
+        },
+        {
+            "date": "2025-11-05",
+            "upper": 1526.6154342431555,
+            "middle": 1467,
+            "lower": 1407.3845657568445
+        },
+        {
+            "date": "2025-11-06",
+            "upper": 1526.3013840664737,
+            "middle": 1468.5,
+            "lower": 1410.6986159335263
+        }
+    ]
+}
+
+[欄位說明]
+
+symbol*	string	股票代號
+from*	string	開始日期
+to*	string	結束日期
+timeframe*	string	Ｋ線週期
+fast*	number	快線週期
+slow*	number	慢線週期
+signal*	number	信號線週期
+data*	object[]	布林通道資料
+data[0].date*	string	資料時間
+data[0].upper*	number	上軌線
+data[0].middle*	number	中軌線
+data[0].lower*	number	下軌線

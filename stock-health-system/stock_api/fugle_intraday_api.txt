@@ -1,0 +1,222 @@
+以下為 "日內行情" 功能
+
+API固定DOMAIN位置：https://api.fugle.tw/marketdata/v1.0/stock
+
+功能：取得股票即時報價（依代碼查詢）
+Endpoint：/intraday/quote/{symbol}
+
+[Request]
+
+curl -X 'GET' \
+  'https://api.fugle.tw/marketdata/v1.0/stock/intraday/quote/2330' \
+  -H 'X-API-KEY: <YOUR_API_KEY>'
+
+[Response]
+
+{
+  "date": "2023-05-29",
+  "symbol": "2330",
+  "name": "台積電",
+  "referencePrice": 566,
+  "previousClose": 566,
+  "openPrice": 574,
+  "openTime": 1685322000049353,
+  "highPrice": 574,
+  "highTime": 1685322000049353,
+  "lowPrice": 564,
+  "lowTime": 1685327142152580,
+  "closePrice": 568,
+  "closeTime": 1685338200000000,
+  "avgPrice": 568.77,
+  "bids": [
+    {
+      "price": 567,
+      "size": 87
+    },
+    {
+      "price": 566,
+      "size": 2454
+    },
+    {
+      "price": 565,
+      "size": 611
+    },
+    {
+      "price": 564,
+      "size": 609
+    },
+    {
+      "price": 563,
+      "size": 636
+    }
+  ],
+  "asks": [
+    {
+      "price": 568,
+      "size": 800
+    },
+    {
+      "price": 569,
+      "size": 806
+    },
+    {
+      "price": 570,
+      "size": 3643
+    },
+    {
+      "price": 571,
+      "size": 1041
+    },
+    {
+      "price": 572,
+      "size": 2052
+    }
+  ],
+  "total": {
+    "tradeValue": 31019803000,
+    "tradeVolume": 54538,
+    "tradeVolumeAtBid": 19853,
+    "tradeVolumeAtAsk": 27900,
+    "transaction": 9530,
+    "time": 1685338200000000
+  },
+  "isClose": true,
+  "serial": 6652422,
+  "lastUpdated": 1685338200000000
+}
+
+[欄位說明]
+
+Name	Type	Description
+date*	string	日期
+symbol*	string	股票代碼
+name*	string	股票簡稱
+referencePrice	number	今日參考價
+previousClose	number	昨日收盤價
+openPrice	number	開盤價
+openTime	number	開盤價成交時間
+highPrice	number	最高價
+highTime	number	最高價成交時間
+lowPrice	number	最低價
+lowTime	number	最低價成交時間
+closePrice	number	收盤價（最後成交價）
+closeTime	number	收盤價（最後成交價）成交時間
+avgPrice	number	當日成交均價
+bids	object[]	最佳五檔委買
+bids[0].price	number	最佳五檔委買價格
+bids[0].size	number	最佳五檔委買數量
+asks	object[]	最佳五檔委賣
+asks[0].price	number	最佳五檔委賣價格
+asks[0].size	number	最佳五檔委賣數量
+total	object	統計資訊
+total.tradeValue	number	累計成交金額
+total.tradeVolume	number	累計成交量
+total.tradeVolumeAtBid	number	累計內盤成交量
+total.tradeVolumeAtAsk	number	累計外盤成交量
+total.transaction	number	累計成交筆數
+total.time	number	統計時間
+isOpen	boolean	開盤信號：true
+isClose	boolean	收盤信號：true
+lastUpdated	number	最後更新時間
+
+=====
+
+功能：取得股票成交明細（依代碼查詢）
+Endpoint：/intraday/trades/{symbol}
+
+[Request]
+
+curl -X 'GET' \
+  'https://api.fugle.tw/marketdata/v1.0/stock/intraday/volumes/2330' \
+  -H 'X-API-KEY: <YOUR_API_KEY>'
+
+[Response]
+
+{
+  "date": "2023-05-29",
+  "type": "EQUITY",
+  "exchange": "TWSE",
+  "market": "TSE",
+  "symbol": "2330",
+  "data": [
+    {
+      "price": 574,
+      "volume": 7309,
+      "volumeAtBid": 0,
+      "volumeAtAsk": 524
+    },
+    {
+      "price": 573,
+      "volume": 771,
+      "volumeAtBid": 657,
+      "volumeAtAsk": 114
+    },
+    {
+      "price": 572,
+      "volume": 3364,
+      "volumeAtBid": 843,
+      "volumeAtAsk": 2521
+    },
+    {
+      "price": 571,
+      "volume": 3723,
+      "volumeAtBid": 1026,
+      "volumeAtAsk": 2697
+    },
+    {
+      "price": 570,
+      "volume": 5541,
+      "volumeAtBid": 3019,
+      "volumeAtAsk": 2522
+    },
+    {
+      "price": 569,
+      "volume": 1952,
+      "volumeAtBid": 1318,
+      "volumeAtAsk": 634
+    },
+    {
+      "price": 568,
+      "volume": 7906,
+      "volumeAtBid": 1422,
+      "volumeAtAsk": 6484
+    },
+    {
+      "price": 567,
+      "volume": 10498,
+      "volumeAtBid": 2816,
+      "volumeAtAsk": 7682
+    },
+    {
+      "price": 566,
+      "volume": 8206,
+      "volumeAtBid": 5988,
+      "volumeAtAsk": 2218
+    },
+    {
+      "price": 565,
+      "volume": 4833,
+      "volumeAtBid": 2329,
+      "volumeAtAsk": 2504
+    },
+    {
+      "price": 564,
+      "volume": 435,
+      "volumeAtBid": 435,
+      "volumeAtAsk": 0
+    }
+  ]
+}
+
+[欄位說明]
+
+date*	string	日期
+type*	string	Ticker 類型
+exchange*	string	交易所
+market	string	市場別
+symbol*	string	股票代號
+data	object[]	分價量表
+data[0].price	number	成交價
+data[0].volume	number	該成交價之累計成交量
+data[0].volumeAtBid	number	該成交價之內盤累計成交量
+data[0].volumeAtAsk	number	該成交價之外盤累計成交量
