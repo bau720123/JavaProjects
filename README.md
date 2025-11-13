@@ -123,6 +123,8 @@
 - 或打包 .exe：
 - mvn jpackage:jpackage
 - 生成 dist/stock-health.exe，雙擊執行。
+<img width="490" height="384" alt="螢幕擷取畫面 2025-11-13 161616" src="https://github.com/user-attachments/assets/b9253686-ca3b-41e9-8e31-58d6a3af79a9" />
+<img width="488" height="383" alt="螢幕擷取畫面 2025-11-13 161638" src="https://github.com/user-attachments/assets/85b0c3bc-7449-440e-aa2b-524877f3cb24" />
 
 ### 4. 使用步驟
 1. 輸入股票代號 (e.g., 2330)。
