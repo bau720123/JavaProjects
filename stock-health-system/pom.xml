@@ -12,8 +12,8 @@
         <maven.compiler.source>25</maven.compiler.source>
         <maven.compiler.target>25</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <jpackage.version>1.7.1</jpackage.version>  <!-- 最新穩定版，支援 jpackage -->
-        <javafx.version>25</javafx.version>  <!-- 確保一致 -->
+        <jpackage.version>1.7.1</jpackage.version>
+        <javafx.version>25</javafx.version>
     </properties>
 
     <dependencies>
@@ -76,34 +76,54 @@
                 </configuration>
             </plugin>
 
-            <!-- jpackage-maven-plugin，用來打包成 .exe -->
             <plugin>
                 <groupId>org.panteleyev</groupId>
                 <artifactId>jpackage-maven-plugin</artifactId>
                 <version>${jpackage.version}</version>
-                <configuration>
-                    <input>${project.build.directory}</input> 
-                    <name>StockHealth</name>  <!-- 應用名稱（.exe 檔名會以此為基） -->
-                    <mainJar>stock-health-1.0.0.jar</mainJar>  <!-- 主 JAR（從 package 階段產生，動態用版本） -->
-                    <mainClass>com.example.MainApp</mainClass>  <!-- 入口類別 -->
-                    <type>EXE</type>  <!-- 打包類型：EXE for Windows .exe -->
-                    <destination>${project.build.directory}/jpackage</destination>  <!-- 輸出目錄 -->
+                <executions>
+                    <execution>
+                        <id>jpackage-bundle</id>
+                        <phase>package</phase> 
+                        <goals>
+                            <goal>jpackage</goal>
+                        </goals>
+                        <configuration> 
+                            <name>StockHealth</name>  <!-- 應用名稱（.exe 檔名會以此為基） -->
+                            <mainJar>stock-health-1.0.0.jar</mainJar>  <!-- 主 JAR（從 package 階段產生，動態用版本） -->
+                            <mainClass>com.example.MainApp</mainClass>  <!-- 入口類別 -->
+                            <type>EXE</type>  <!-- 打包類型：EXE for Windows .exe -->
 
-                    <!-- JavaFX 模組：包含必要依賴，避免運行時 NoClassDefFoundError -->
-                    <addModules>
-                        javafx.controls
-                        javafx.swing
-                        javafx.graphics  <!-- 若有圖形需求 -->
-                        java.desktop  <!-- Swing/JFreeChart 用 -->
-                    </addModules>
+                            <jlinkModules>
+                                <dependency>
+                                    <groupId>org.openjfx</groupId>
+                                    <artifactId>javafx-controls</artifactId>
+                                </dependency>
+                                <dependency>
+                                    <groupId>org.openjfx</groupId>
+                                    <artifactId>javafx-swing</artifactId>
+                                </dependency>
+                                <dependency>
+                                    <groupId>org.openjfx</groupId>
+                                    <artifactId>javafx-graphics</artifactId>
+                                    <classifier>win</classifier> 
+                                </dependency>
+                            </jlinkModules>
 
-                    <appVersion>${project.version}</appVersion>  <!-- 版本資訊 -->
-                    <icon>${project.basedir}/src/main/resources/icon.ico</icon>  <!-- 可選：圖示（放 ICO 檔到 src/main/resources/icon.ico） -->
-                    <winConsole>false</winConsole>  <!-- 隱藏控制台，純 GUI App -->
-                    <winDirChooser>true</winDirChooser>  <!-- 安裝時選目錄 -->
-                    <vendor>YourName</vendor>  <!-- 替換為你的名稱 -->
-                    <removeDestination>true</removeDestination>  <!-- 移除舊輸出目錄，避免重複運行錯誤 -->
-                </configuration>
+                            <addModules>
+                                java.desktop 
+                            </addModules>
+
+                            <input>${project.build.directory}</input>
+                            <destination>${project.build.directory}/jpackage</destination>  <!-- 輸出目錄 -->
+                            <appVersion>${project.version}</appVersion>  <!-- 版本資訊 -->
+                            <icon>${project.basedir}/src/main/resources/icon.ico</icon>  <!-- 可選：圖示（放 ICO 檔到 src/main/resources/icon.ico） -->
+                            <winConsole>false</winConsole>  <!-- 隱藏控制台，純 GUI App -->
+                            <winDirChooser>true</winDirChooser>  <!-- 安裝時選目錄 -->
+                            <vendor>YourName</vendor>  <!-- 替換為你的名稱 -->
+                            <removeDestination>true</removeDestination>  <!-- 移除舊輸出目錄，避免重複運行錯誤 -->
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>
