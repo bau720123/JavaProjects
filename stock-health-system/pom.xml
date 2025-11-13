@@ -5,22 +5,27 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.example</groupId>
     <artifactId>stock-health</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <version>1.0.0</version>
+
+    <!-- 指定 jpackage 版本，確保相容 Java 25 -->
     <properties>
         <maven.compiler.source>25</maven.compiler.source>
         <maven.compiler.target>25</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <jpackage.version>1.7.1</jpackage.version>  <!-- 最新穩定版，支援 jpackage -->
+        <javafx.version>25</javafx.version>  <!-- 確保一致 -->
     </properties>
+
     <dependencies>
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-controls</artifactId>
-            <version>25</version>
+            <version>${javafx.version}</version>
         </dependency>
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-swing</artifactId>
-            <version>25</version>
+            <version>${javafx.version}</version>
         </dependency>
         <dependency>
             <groupId>com.squareup.okhttp3</groupId>
@@ -43,6 +48,7 @@
             <version>1.5.4</version>
         </dependency>
     </dependencies>
+
     <build>
         <plugins>
             <plugin>
@@ -51,14 +57,52 @@
                 <version>3.13.0</version>
                 <configuration>
                     <release>25</release>
+                    <compilerArgs>
+                        <arg>--add-reads</arg>
+                        <arg>com.example.stockhealth=org.jfree.jfreechart</arg>
+                        <arg>--add-reads</arg>
+                        <arg>com.example.stockhealth=ALL-UNNAMED</arg>
+                    </compilerArgs>
                 </configuration>
             </plugin>
+
             <plugin>
                 <groupId>org.openjfx</groupId>
                 <artifactId>javafx-maven-plugin</artifactId>
                 <version>0.0.8</version>
                 <configuration>
                     <mainClass>com.example.MainApp</mainClass>
+                    <launcher>stockhealth</launcher>
+                </configuration>
+            </plugin>
+
+            <!-- jpackage-maven-plugin，用來打包成 .exe -->
+            <plugin>
+                <groupId>org.panteleyev</groupId>
+                <artifactId>jpackage-maven-plugin</artifactId>
+                <version>${jpackage.version}</version>
+                <configuration>
+                    <input>${project.build.directory}</input> 
+                    <name>StockHealth</name>  <!-- 應用名稱（.exe 檔名會以此為基） -->
+                    <mainJar>stock-health-1.0.0.jar</mainJar>  <!-- 主 JAR（從 package 階段產生，動態用版本） -->
+                    <mainClass>com.example.MainApp</mainClass>  <!-- 入口類別 -->
+                    <type>EXE</type>  <!-- 打包類型：EXE for Windows .exe -->
+                    <destination>${project.build.directory}/jpackage</destination>  <!-- 輸出目錄 -->
+
+                    <!-- JavaFX 模組：包含必要依賴，避免運行時 NoClassDefFoundError -->
+                    <addModules>
+                        javafx.controls
+                        javafx.swing
+                        javafx.graphics  <!-- 若有圖形需求 -->
+                        java.desktop  <!-- Swing/JFreeChart 用 -->
+                    </addModules>
+
+                    <appVersion>${project.version}</appVersion>  <!-- 版本資訊 -->
+                    <icon>${project.basedir}/src/main/resources/icon.ico</icon>  <!-- 可選：圖示（放 ICO 檔到 src/main/resources/icon.ico） -->
+                    <winConsole>false</winConsole>  <!-- 隱藏控制台，純 GUI App -->
+                    <winDirChooser>true</winDirChooser>  <!-- 安裝時選目錄 -->
+                    <vendor>YourName</vendor>  <!-- 替換為你的名稱 -->
+                    <removeDestination>true</removeDestination>  <!-- 移除舊輸出目錄，避免重複運行錯誤 -->
                 </configuration>
             </plugin>
         </plugins>
