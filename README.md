@@ -123,8 +123,13 @@
 - 或打包 .exe：
 - mvn jpackage:jpackage
 - 生成 dist/stock-health.exe，雙擊執行。
-<img width="490" height="384" alt="螢幕擷取畫面 2025-11-13 161616" src="https://github.com/user-attachments/assets/b9253686-ca3b-41e9-8e31-58d6a3af79a9" />
-<img width="488" height="383" alt="螢幕擷取畫面 2025-11-13 161638" src="https://github.com/user-attachments/assets/85b0c3bc-7449-440e-aa2b-524877f3cb24" />
+<img width="387" height="301" alt="01_install" src="https://github.com/user-attachments/assets/f179288c-2575-4a29-97a5-c9148d90c6f6" />
+<img width="387" height="301" alt="02_install" src="https://github.com/user-attachments/assets/ef598c74-949f-4a34-83a7-57b64bf1f121" />
+<img width="315" height="108" alt="03_install" src="https://github.com/user-attachments/assets/189e5fde-81af-4f99-824f-f4ee6105bf4c" />
+<img width="387" height="301" alt="04_install" src="https://github.com/user-attachments/assets/7571ae48-f864-4829-982a-e3133351349a" />
+<img width="387" height="301" alt="05_install" src="https://github.com/user-attachments/assets/58581d7e-aab1-47ed-8166-79105d5f5964" />
+<img width="387" height="301" alt="06_install" src="https://github.com/user-attachments/assets/0ffccc25-303c-413d-b5b0-a0e2d6d0c92e" />
+<img width="1456" height="767" alt="07_install" src="https://github.com/user-attachments/assets/28458862-619b-4235-891a-80c3b16fa1ee" />
 
 ### 4. 使用步驟
 1. 輸入股票代號 (e.g., 2330)。
