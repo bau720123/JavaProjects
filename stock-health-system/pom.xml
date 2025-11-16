@@ -7,7 +7,6 @@
     <artifactId>stock-health</artifactId>
     <version>1.0.0</version>
 
-    <!-- 指定 jpackage 版本，確保相容 Java 25 -->
     <properties>
         <maven.compiler.source>25</maven.compiler.source>
         <maven.compiler.target>25</maven.compiler.target>
@@ -51,6 +50,29 @@
 
     <build>
         <plugins>
+            <!-- 在 Shade 之後複製 Fat JAR -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <version>3.1.0</version>
+                <executions>
+                    <execution>
+                        <id>copy-fat-jar</id>
+                        <phase>install</phase>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                        <configuration>
+                            <target>
+                                <mkdir dir="${project.build.directory}/jpackage-input"/>
+                                <copy file="${project.build.directory}/stock-health-${project.version}-full.jar" 
+                                      tofile="${project.build.directory}/jpackage-input/stock-health-${project.version}.jar"/>
+                            </target>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
@@ -64,6 +86,44 @@
                         <arg>com.example.stockhealth=ALL-UNNAMED</arg>
                     </compilerArgs>
                 </configuration>
+            </plugin>
+
+            <!-- Shade Plugin: 建立包含所有依賴的 Fat JAR -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>3.5.1</version>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                        <configuration>
+                            <!-- 使用不同的檔名,避免被覆蓋 -->
+                            <finalName>stock-health-${project.version}-full</finalName>
+                            <shadedArtifactAttached>false</shadedArtifactAttached>
+                            <transformers>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                    <mainClass>com.example.Launcher</mainClass>
+                                </transformer>
+                                <!-- 合併 service 檔案 -->
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                            </transformers>
+                            <filters>
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <exclude>META-INF/*.SF</exclude>
+                                        <exclude>META-INF/*.DSA</exclude>
+                                        <exclude>META-INF/*.RSA</exclude>
+                                        <exclude>META-INF/MANIFEST.MF</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
 
             <plugin>
@@ -83,44 +143,42 @@
                 <executions>
                     <execution>
                         <id>jpackage-bundle</id>
-                        <phase>package</phase> 
+                        <phase>install</phase> 
                         <goals>
                             <goal>jpackage</goal>
                         </goals>
                         <configuration> 
-                            <name>StockHealth</name>  <!-- 應用名稱（.exe 檔名會以此為基） -->
-                            <mainJar>stock-health-1.0.0.jar</mainJar>  <!-- 主 JAR（從 package 階段產生，動態用版本） -->
-                            <mainClass>com.example.MainApp</mainClass>  <!-- 入口類別 -->
-                            <type>EXE</type>  <!-- 打包類型：EXE for Windows .exe -->
+                            <name>StockHealth</name>
+                            <mainJar>stock-health-1.0.0.jar</mainJar>
+                            <mainClass>com.example.Launcher</mainClass>
+                            <type>EXE</type>
 
-                            <jlinkModules>
-                                <dependency>
-                                    <groupId>org.openjfx</groupId>
-                                    <artifactId>javafx-controls</artifactId>
-                                </dependency>
-                                <dependency>
-                                    <groupId>org.openjfx</groupId>
-                                    <artifactId>javafx-swing</artifactId>
-                                </dependency>
-                                <dependency>
-                                    <groupId>org.openjfx</groupId>
-                                    <artifactId>javafx-graphics</artifactId>
-                                    <classifier>win</classifier> 
-                                </dependency>
-                            </jlinkModules>
+                            <javaOptions>
+                                <option>-Dfile.encoding=UTF-8</option>
+                                <option>--enable-native-access=ALL-UNNAMED</option>
+                            </javaOptions>
 
                             <addModules>
-                                java.desktop 
+                                <addModule>java.desktop</addModule>
+                                <addModule>java.logging</addModule>
+                                <addModule>java.sql</addModule>
+                                <addModule>java.xml</addModule>
+                                <addModule>jdk.unsupported</addModule>
+                                <addModule>jdk.unsupported.desktop</addModule>
                             </addModules>
 
-                            <input>${project.build.directory}</input>
-                            <destination>${project.build.directory}/jpackage</destination>  <!-- 輸出目錄 -->
-                            <appVersion>${project.version}</appVersion>  <!-- 版本資訊 -->
-                            <icon>${project.basedir}/src/main/resources/icon.ico</icon>  <!-- 可選：圖示（放 ICO 檔到 src/main/resources/icon.ico） -->
-                            <winConsole>false</winConsole>  <!-- 隱藏控制台，純 GUI App -->
-                            <winDirChooser>true</winDirChooser>  <!-- 安裝時選目錄 -->
-                            <vendor>YourName</vendor>  <!-- 替換為你的名稱 -->
-                            <removeDestination>true</removeDestination>  <!-- 移除舊輸出目錄，避免重複運行錯誤 -->
+                            <!-- 使用乾淨的 input 目錄 -->
+                            <input>${project.build.directory}/jpackage-input</input>
+                            <destination>${project.build.directory}/jpackage</destination>
+                            <appVersion>${project.version}</appVersion>
+                            <icon>${project.basedir}/src/main/resources/icon.ico</icon>
+                            <winConsole>false</winConsole>
+                            <winShortcut>true</winShortcut>
+                            <winMenu>true</winMenu>
+                            <winMenuGroup>StockHealth</winMenuGroup>
+                            <winShortcutPrompt>true</winShortcutPrompt>
+                            <winDirChooser>true</winDirChooser>
+                            <vendor>YourName</vendor>
                         </configuration>
                     </execution>
                 </executions>
