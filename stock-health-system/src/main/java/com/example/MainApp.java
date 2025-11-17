@@ -113,7 +113,7 @@ public class MainApp extends Application {
         queryBtn.setPrefWidth(120); // 按鈕固定寬度
 
         // 查歷史 K 線 按鈕 + 天數輸入（水平排列）
-        daysField = new TextField("10");
+        daysField = new TextField("");
         daysField.setPromptText("天數");
         daysField.setPrefWidth(50); // 天數輸入欄位小寬度
 
@@ -132,7 +132,7 @@ public class MainApp extends Application {
         centerBox.setAlignment(Pos.TOP_LEFT);  // 調整：改為 TOP_LEFT，讓內容頂左對齊
 
         // 文字區塊（中間靠左，寬度 200px，並向左微移以對齊紅線）
-        resultArea = new TextArea("歡迎使用台股健診系統\nJava不是很好用\n請多見諒！"); // 可設定文字區塊預設文字
+        resultArea = new TextArea("歡迎使用台股健診系統\n功能持續擴充中\n請多多支持！"); // 可設定文字區塊預設文字
         resultArea.setWrapText(true); // 設定當文字超過欄位的寬度時是否自動換行
         resultArea.setPrefRowCount(10); // 但JavaFX布局系統的響應式設計（responsive layout）會讓其根據視窗大小的變化來自動延展其高
         resultArea.setEditable(false); // 設定該文字區塊可否修改
@@ -155,6 +155,10 @@ public class MainApp extends Application {
         stage.setMaximized(false); // 初始視窗最大化
         stage.setResizable(true); // 允許調整大小
         this.primaryStage = stage;  // 初始化成員變數
+
+        // 取消自動聚焦,將焦點移到根容器
+        Platform.runLater(() -> root.requestFocus());
+
         stage.show();
     }
 
