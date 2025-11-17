@@ -34,7 +34,13 @@ import java.util.Date;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Comparator;
+import java.util.stream.Collectors;
 import java.util.concurrent.CompletableFuture;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Properties;
 
 public class MainApp extends Application {
     private final FugleService service = new FugleService(); // 使用 Fugle API 做資料存取
@@ -42,11 +48,27 @@ public class MainApp extends Application {
     private PasswordField keyField; // Fugle API Key
     private Button queryBtn; // 查即時報價
     private Button historyBtn; // 查歷史 K 線
+    private TextField daysField; // 天數輸入欄位
     private TextArea resultArea; // 文字顯示區塊
     private ScrollPane chartPane; // 圖表顯示區塊
     private BorderPane root;  // 讓 queryHistory() 可存取
     private ChartPanel currentChartPanel;  // 存取 ChartPanel 成員，允許多次 repaint（解決 SwingNode 延遲）
     private Stage primaryStage;  // 將 stage 升級為類別成員變數，讓 createLineChart 可存取（修 stage cannot find symbol）
+
+    private static String APP_VERSION = "Unknown";
+    // 靜態區塊:在類別載入時讀取版本號
+    static {
+        try (InputStream input = MainApp.class.getClassLoader()
+                .getResourceAsStream("application.properties")) {
+            if (input != null) {
+                Properties prop = new Properties();
+                prop.load(input);
+                APP_VERSION = prop.getProperty("app.version", "Unknown");
+            }
+        } catch (IOException e) {
+            System.err.println("無法載入版本資訊: " + e.getMessage());
+        }
+    }
 
     @Override
     public void start(Stage stage) {
@@ -90,12 +112,19 @@ public class MainApp extends Application {
         queryBtn.setOnAction(e -> queryQuote());
         queryBtn.setPrefWidth(120); // 按鈕固定寬度
 
-        // 查歷史 K 線 按鈕
+        // 查歷史 K 線 按鈕 + 天數輸入（水平排列）
+        daysField = new TextField("10");
+        daysField.setPromptText("天數");
+        daysField.setPrefWidth(50); // 天數輸入欄位小寬度
+
         historyBtn = new Button("查歷史 K 線");
         historyBtn.setOnAction(e -> queryHistory());
-        historyBtn.setPrefWidth(120);
+        historyBtn.setPrefWidth(100); // 縮小按鈕寬度為100
 
-        buttonBox.getChildren().addAll(queryBtn, historyBtn); // 添加子節點到容器的操作，將兩個Button（queryBtn和historyBtn）同時加入buttonBox（VBox容器）的子節點列表中。結果：按鈕垂直排列（查即時報價在上，查歷史 K 線在下），間距10px（來自new VBox(10)）。
+        HBox historyBox = new HBox(5, daysField, historyBtn); // 水平排列：天數 Label + TextField + 按鈕
+        historyBox.setAlignment(Pos.CENTER_LEFT);
+
+        buttonBox.getChildren().addAll(queryBtn, historyBox); // 添加子節點到容器的操作，將 queryBtn 和 historyBox 加入 buttonBox
         root.setLeft(buttonBox); // 將buttonBox（已含兩個Button的VBox）設定為根容器root（BorderPane）的左側區域。結果：按鈕區固定在左側視窗，寬度150px（來自setPrefWidth(150)），高度跟隨視窗拉伸，但內容不變形。
 
         // 中間：文字區塊（靠左）+ 圖表區塊（靠右），使用 HBox
@@ -122,7 +151,7 @@ public class MainApp extends Application {
         // 設定場景
         Scene scene = new Scene(root, 1100, 700); // 初始寬度維持 1100px
         stage.setScene(scene);
-        stage.setTitle("台股股票健診系統");
+        stage.setTitle("台股股票健診系統（版本號：" + APP_VERSION + "）");
         stage.setMaximized(false); // 初始視窗最大化
         stage.setResizable(true); // 允許調整大小
         this.primaryStage = stage;  // 初始化成員變數
@@ -181,6 +210,18 @@ public class MainApp extends Application {
     private void queryHistory() {
         String symbol = symbolField.getText().trim(); // 股票代號
         String apiKey = keyField.getText().trim(); // Fugle API Key
+        String daysText = daysField.getText().trim();
+        int days;
+        try {
+            days = Integer.parseInt(daysText);
+            if (days < 1) {
+                showAlert("天數必須為 1 以上");
+                return;
+            }
+        } catch (NumberFormatException e) {
+            showAlert("天數必須為有效數字（1 以上）");
+            return;
+        }
 
         if (symbol.isEmpty()) {
             showAlert("請輸入 股票代號");
@@ -193,10 +234,8 @@ public class MainApp extends Application {
         }
 
         // 處裡非同步的操作，有點像是jQuery中的$.ajax(...)
-        CompletableFuture.supplyAsync(() -> service.fetchHistory(symbol, 10, apiKey))
+        CompletableFuture.supplyAsync(() -> service.fetchHistory(symbol, days, apiKey))
                 .thenAccept(candles -> Platform.runLater(() -> {
-                    // [Candle[date=2025-11-03, open=1510.0, high=1520.0, low=1490.0, close=1510.0, volume=30913479, change=10.0], Candle[date=2025-11-04, open=1520.0, high=1525.0, low=1495.0, close=1505.0, volume=35922791, change=-5.0], Candle[date=2025-11-05, open=1480.0, high=1485.0, low=1455.0, close=1460.0, volume=63423241, change=-45.0], Candle[date=2025-11-06, open=1470.0, high=1480.0, low=1465.0, close=1465.0, volume=29955147, change=5.0], Candle[date=2025-11-07, open=1460.0, high=1465.0, low=1455.0, close=1460.0, volume=23551721, change=-5.0], Candle[date=2025-11-10, open=1470.0, high=1485.0, low=1465.0, close=1475.0, volume=26579263, change=15.0], Candle[date=2025-11-11, open=1490.0, high=1495.0, low=1465.0, close=1465.0, volume=24857058, change=-10.0], Candle[date=2025-11-12, open=1470.0, high=1485.0, low=1460.0, close=1475.0, volume=24523385, change=10.0]]
-
                     if (!candles.isEmpty()) {
                         chartPane.setContent(createLineChart(candles));
                         chartPane.setFitToWidth(false);  // 關閉自動壓縮，讓 ChartPanel 自然寬度，溢出時滾動
@@ -210,7 +249,7 @@ public class MainApp extends Application {
                         delayVisible.play();
                         
                         // 原文字 + 歷史股價列表
-                        StringBuilder sb = new StringBuilder("歷史 K 線圖已載入（近 10 日收盤價走勢）。\n\n歷史股價如下：\n\n"); // 使用 StringBuilder 可多行段落顯示，並且在字串相接時比較高效，無額外開銷
+                        StringBuilder sb = new StringBuilder(String.format("歷史 K 線圖已載入（近 %d 日收盤價走勢）。\n\n歷史股價如下：\n\n", days)); // 使用 StringBuilder 可多行段落顯示，並且在字串相接時比較高效，無額外開銷
                         for (Candle c : candles) {
                             sb.append(String.format("日期：%s\n開盤價：%.1f\n最高價：%.1f\n最低價：%.1f\n收盤價：%.1f\n成交量：%d\n漲跌：%.1f\n\n",
                                 c.date(), c.open(), c.high(), c.low(), c.close(), c.volume(), c.change()));
@@ -220,7 +259,29 @@ public class MainApp extends Application {
                         // 用 Stream API：mapToDouble(Candle::high).max().orElse(0.0) - 高效 O(n)，method reference 簡潔
                         double maxHigh = candles.stream().mapToDouble(Candle::high).max().orElse(0.0);  // 區間最高價
                         double minLow = candles.stream().mapToDouble(Candle::low).min().orElse(0.0);  // 區間最低價
-                        sb.append(String.format("區間最高價：%.1f\n區間最低價：%.1f\n", maxHigh, minLow));  // 格式化添加（%.1f 保留1位小數）
+
+                        // 找出達到最高價的所有日期，並按遞減（從最新到最舊）排序
+                        List<LocalDate> maxHighDates = candles.stream()
+                                .filter(c -> c.high() == maxHigh)
+                                .map(Candle::date)
+                                .sorted(Comparator.reverseOrder())
+                                .collect(Collectors.toList());
+                        String maxHighDateStr = maxHighDates.stream()
+                                .map(LocalDate::toString)
+                                .collect(Collectors.joining("、"));
+
+                        // 找出達到最低價的所有日期，並按遞減（從最新到最舊）排序
+                        List<LocalDate> minLowDates = candles.stream()
+                                .filter(c -> c.low() == minLow)
+                                .map(Candle::date)
+                                .sorted(Comparator.reverseOrder())
+                                .collect(Collectors.toList());
+                        String minLowDateStr = minLowDates.stream()
+                                .map(LocalDate::toString)
+                                .collect(Collectors.joining("、"));
+
+                        sb.append(String.format("區間最高價：%.1f（%s）\n", maxHigh, maxHighDateStr));  // 格式化添加（%.1f 保留1位小數）
+                        sb.append(String.format("區間最低價：%.1f（%s）\n", minLow, minLowDateStr));  // 格式化添加（%.1f 保留1位小數）
 
                         resultArea.setText(sb.toString());  // 設定完整文字
                     } else {
@@ -268,7 +329,7 @@ public class MainApp extends Application {
             }
 
             // JFreeChart 核心工廠，生成線圖（CategoryPlot 類型）。
-            JFreeChart chart = ChartFactory.createLineChart("近 10 日 K 線 (收盤價)", "日期", "價格（元）", dataset, PlotOrientation.VERTICAL, true, true, false);
+            JFreeChart chart = ChartFactory.createLineChart("近 " + candles.size() + " 日 K 線 (收盤價)", "日期", "價格（元）", dataset, PlotOrientation.VERTICAL, true, true, false);
             
             // 切換字型以利解決亂碼問題
             Font font = new Font("Microsoft YaHei", Font.BOLD, 14);  // "Microsoft YaHei"：Windows 中文字體，BOLD 加粗，14pt 大小
