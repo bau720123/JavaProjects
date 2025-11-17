@@ -29,6 +29,7 @@ import org.jfree.data.category.DefaultCategoryDataset;
 import org.jfree.chart.renderer.category.LineAndShapeRenderer;
 
 import java.awt.Font;
+import java.awt.Color;  // 新增：顏色設定用於 MACD 圖表線條
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.time.LocalDate;
@@ -49,8 +50,10 @@ public class MainApp extends Application {
     private Button queryBtn; // 查即時報價
     private Button historyBtn; // 查歷史 K 線
     private TextField daysField; // 天數輸入欄位（歷史 K 線用）
-    private TextField rsiDaysField; // 新增：天數輸入欄位（RSI 用）
-    private Button rsiBtn; // 新增：查相對強弱指數按鈕
+    private TextField rsiDaysField; // 天數輸入欄位（RSI 用）
+    private TextField macdDaysField; // 新增：天數輸入欄位（MACD 用）
+    private Button rsiBtn; // 查相對強弱指數按鈕
+    private Button macdBtn; // 新增：查移動平均線按鈕
     private TextArea resultArea; // 文字顯示區塊
     private ScrollPane chartPane; // 圖表顯示區塊
     private BorderPane root;  // 讓 queryHistory() 可存取
@@ -126,7 +129,7 @@ public class MainApp extends Application {
         HBox historyBox = new HBox(5, daysField, historyBtn); // 水平排列：天數 Label + TextField + 按鈕
         historyBox.setAlignment(Pos.CENTER_LEFT);
 
-        // 新增：查相對強弱指數 按鈕 + 天數輸入（水平排列，接續歷史 K 線下方）
+        // 查相對強弱指數 按鈕 + 天數輸入（水平排列，接續歷史 K 線下方）
         rsiDaysField = new TextField("");
         rsiDaysField.setPromptText("天數");
         rsiDaysField.setPrefWidth(50); // 天數輸入欄位小寬度
@@ -138,8 +141,20 @@ public class MainApp extends Application {
         HBox rsiBox = new HBox(5, rsiDaysField, rsiBtn); // 水平排列：天數 TextField + 按鈕
         rsiBox.setAlignment(Pos.CENTER_LEFT);
 
-        buttonBox.getChildren().addAll(queryBtn, historyBox, rsiBox); // 添加子節點到容器的操作，將 queryBtn、historyBox 和 rsiBox 加入 buttonBox
-        root.setLeft(buttonBox); // 將buttonBox（已含三個元素的VBox）設定為根容器root（BorderPane）的左側區域。結果：按鈕區固定在左側視窗，寬度150px（來自setPrefWidth(150)），高度跟隨視窗拉伸，但內容不變形。
+        // 新增：查移動平均線 按鈕 + 天數輸入（水平排列，接續 RSI 下方）
+        macdDaysField = new TextField("");
+        macdDaysField.setPromptText("天數");
+        macdDaysField.setPrefWidth(50); // 天數輸入欄位小寬度
+
+        macdBtn = new Button("查移動平均線");
+        macdBtn.setOnAction(e -> queryMACD());
+        macdBtn.setPrefWidth(120); // 按鈕寬度調整為120，與上方對齊
+
+        HBox macdBox = new HBox(5, macdDaysField, macdBtn); // 水平排列：天數 TextField + 按鈕
+        macdBox.setAlignment(Pos.CENTER_LEFT);
+
+        buttonBox.getChildren().addAll(queryBtn, historyBox, rsiBox, macdBox); // 添加子節點到容器的操作，將 queryBtn、historyBox、rsiBox 和 macdBox 加入 buttonBox
+        root.setLeft(buttonBox); // 將buttonBox（已含四個元素的VBox）設定為根容器root（BorderPane）的左側區域。結果：按鈕區固定在左側視窗，寬度150px（來自setPrefWidth(150)），高度跟隨視窗拉伸，但內容不變形。
 
         // 中間：文字區塊（靠左）+ 圖表區塊（靠右），使用 HBox
         HBox centerBox = new HBox(10);
@@ -313,7 +328,7 @@ public class MainApp extends Application {
                 });
     }
 
-    // 新增：查詢 RSI 邏輯
+    // 查詢 RSI 邏輯
     private void queryRSI() {
         String symbol = symbolField.getText().trim(); // 股票代號
         String apiKey = keyField.getText().trim(); // Fugle API Key
@@ -399,6 +414,101 @@ public class MainApp extends Application {
                         resultArea.setText(sb.toString());  // 設定完整文字
                     } else {
                         resultArea.setText("RSI 資料載入失敗，請稍後再試\n若 API 不可用，請確認 API key 有效。");
+                    }
+                }))
+                .exceptionally(ex -> {
+                    // exceptionally 像是 "非同步catch"，上游supplyAsync拋錯（如Fugle Key無效）時，自動恢復null並秀Alert—避免整個CompletableFuture崩潰，若直接showAlert，會造成整個應用程式crash
+                    Platform.runLater(() -> showAlert("系統異常，請稍後再試：" + ex.getMessage()));
+                    return null;
+                });
+    }
+
+    // 查詢 MACD 邏輯
+    private void queryMACD() {
+        String symbol = symbolField.getText().trim(); // 股票代號
+        String apiKey = keyField.getText().trim(); // Fugle API Key
+        String daysText = macdDaysField.getText().trim();
+        int days;
+        try {
+            days = Integer.parseInt(daysText);
+            if (days < 1) {
+                showAlert("天數必須為 1 以上");
+                return;
+            }
+        } catch (NumberFormatException e) {
+            showAlert("天數必須為有效數字（1 以上）");
+            return;
+        }
+
+        if (symbol.isEmpty()) {
+            showAlert("請輸入 股票代號");
+            return;
+        }
+
+        if (apiKey.isEmpty()) {
+            showAlert("請輸入 Fugle API Key");
+            return;
+        }
+
+        // 處裡非同步的操作，有點像是jQuery中的$.ajax(...)
+        CompletableFuture.supplyAsync(() -> service.fetchMACD(symbol, days, apiKey))
+                .thenAccept(macdList -> Platform.runLater(() -> {
+                    if (!macdList.isEmpty()) {
+                        chartPane.setContent(createMACDChart(macdList));
+                        chartPane.setFitToWidth(false);  // 關閉自動壓縮，讓 ChartPanel 自然寬度，溢出時滾動
+                        chartPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);  // 水平滾動條自動出現（當寬度溢出時），確保用戶拖曳查看全圖，不切斷日期
+
+                        // 延遲 setVisible，給 Swing 初始化時間
+                        PauseTransition delayVisible = new PauseTransition(Duration.millis(400));
+                        delayVisible.setOnFinished(e -> {
+                            chartPane.setVisible(true);
+                        });
+                        delayVisible.play();
+                        
+                        // MACD 文字列表
+                        StringBuilder sb = new StringBuilder(String.format("移動平均指標 （MACD）已載入（近 %d 日MACD走勢）。\n\n移動平均指數如下：\n\n", days)); // 使用 StringBuilder 可多行段落顯示，並且在字串相接時比較高效，無額外開銷
+                        for (MACD m : macdList) {
+                            sb.append(String.format("日期：%s\nMACD 線：%.2f\n信號線：%.2f\n\n",
+                                m.date(), m.macdLine(), m.signalLine()));
+                        }
+
+                        // 計算區間最強勢（所有 macdLine 的 max）和最弱勢（所有 macdLine 的 min）
+                        // 用 Stream API：mapToDouble(MACD::macdLine).max().orElse(0.0) - 高效 O(n)，method reference 簡潔
+                        double maxMacd = macdList.stream().mapToDouble(MACD::macdLine).max().orElse(0.0);  // 區間最強勢
+                        double minMacd = macdList.stream().mapToDouble(MACD::macdLine).min().orElse(0.0);  // 區間最弱勢
+
+                        // 找出達到最高 MACD 的所有日期，並按遞減（從最新到最舊）排序
+                        List<LocalDate> maxMacdDates = macdList.stream()
+                                .filter(m -> m.macdLine() == maxMacd)
+                                .map(MACD::date)
+                                .sorted(Comparator.reverseOrder())
+                                .collect(Collectors.toList());
+                        String maxMacdDateStr = maxMacdDates.stream()
+                                .map(LocalDate::toString)
+                                .collect(Collectors.joining("、"));
+
+                        // 找出達到最低 MACD 的所有日期，並按遞減（從最新到最舊）排序
+                        List<LocalDate> minMacdDates = macdList.stream()
+                                .filter(m -> m.macdLine() == minMacd)
+                                .map(MACD::date)
+                                .sorted(Comparator.reverseOrder())
+                                .collect(Collectors.toList());
+                        String minMacdDateStr = minMacdDates.stream()
+                                .map(LocalDate::toString)
+                                .collect(Collectors.joining("、"));
+
+                        sb.append(String.format("區間最強勢：%.2f（%s）\n", maxMacd, maxMacdDateStr));  // 格式化添加（%.2f 保留2位小數）
+                        sb.append(String.format("區間最弱勢：%.2f（%s）\n", minMacd, minMacdDateStr));  // 格式化添加（%.2f 保留2位小數）
+
+                        // 新增：MACD 解釋文字（修正死亡交叉為賣出訊號）
+                        sb.append("\n* 黃金交叉：\n");
+                        sb.append("  當移動平均線（MACD）慢慢往上交叉信號線（signalLine）時發生。這通常被視為一個買進訊號，表示上漲趨勢可能增強。\n\n");
+                        sb.append("* 死亡交叉：\n");
+                        sb.append("  當移動平均線（MACD）慢慢往下交叉信號線（signalLine）時發生。這通常被視為一個賣出訊號，表示下跌趨勢可能增強。");
+
+                        resultArea.setText(sb.toString());  // 設定完整文字
+                    } else {
+                        resultArea.setText("MACD 資料載入失敗，請稍後再試\n若 API 不可用，請確認 API key 有效。");
                     }
                 }))
                 .exceptionally(ex -> {
@@ -507,7 +617,7 @@ public class MainApp extends Application {
         return swingNode;
     }
 
-    // 新增：創建 RSI 線圖（複製自 createLineChart 並調整）
+    // 創建 RSI 線圖（複製自 createLineChart 並調整）
     private Node createRSIChart(List<RSI> rsiList) {
         SwingNode swingNode = new SwingNode();
 
@@ -551,6 +661,88 @@ public class MainApp extends Application {
                 String category = (String) dataset1.getColumnKey(column);
                 double y = dataset1.getValue(row, column).doubleValue();
                 return category + ": " + y;
+            });
+            
+            chart.getLegend().setItemFont(font);
+            
+            CategoryAxis domainAxis = (CategoryAxis) plot.getDomainAxis();
+            domainAxis.setCategoryLabelPositions(CategoryLabelPositions.UP_90);
+
+            currentChartPanel = new ChartPanel(chart);
+            currentChartPanel.setPreferredSize(new java.awt.Dimension(695, 400));
+            swingNode.setContent(currentChartPanel);
+
+            Timer timer = new Timer(200, e -> {
+                currentChartPanel.revalidate();
+                currentChartPanel.repaint();
+                ((Timer) e.getSource()).stop();
+            });
+            timer.setRepeats(false);
+            timer.start();
+        });
+        
+        return swingNode;
+    }
+
+    // 新增：創建 MACD 線圖（複製自 createRSIChart 並調整為兩系列）
+    private Node createMACDChart(List<MACD> macdList) {
+        SwingNode swingNode = new SwingNode();
+
+        SwingUtilities.invokeLater(() -> {
+            DefaultCategoryDataset dataset = new DefaultCategoryDataset();
+
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+
+            for (int i = 0; i < macdList.size(); i++) {
+                MACD m = macdList.get(i);
+                LocalDate localDate = m.date();
+
+                String dateStr = sdf.format(Date.from(localDate.atStartOfDay(ZoneId.systemDefault()).toInstant()));
+
+                dataset.addValue(m.macdLine(), "MACD 線", dateStr);  // 系列 0：MACD 線
+                dataset.addValue(m.signalLine(), "信號線", dateStr);  // 系列 1：信號線
+            }
+
+            JFreeChart chart = ChartFactory.createLineChart("近 " + macdList.size() + " 日 MACD 指標", "日期", "MACD 值", dataset, PlotOrientation.VERTICAL, true, true, false);
+            
+            Font font = new Font("Microsoft YaHei", Font.BOLD, 14);
+
+            TextTitle title = chart.getTitle();
+            title.setFont(font);
+
+            CategoryPlot plot = (CategoryPlot) chart.getPlot();
+            plot.getDomainAxis().setLabelFont(font);
+            plot.getRangeAxis().setLabelFont(font);
+            
+            // Y 軸範圍動態調整（基於 MACD 線 min/max，padding 5%）
+            double minMacd = macdList.stream().mapToDouble(MACD::macdLine).min().orElse(0.0);
+            double maxMacd = macdList.stream().mapToDouble(MACD::macdLine).max().orElse(0.0);
+            double padding = (maxMacd - minMacd) * 0.05;
+
+            plot.getRangeAxis().setLowerBound(minMacd - padding);
+            plot.getRangeAxis().setUpperBound(maxMacd + padding);
+
+            LineAndShapeRenderer renderer = (LineAndShapeRenderer) plot.getRenderer();
+            renderer.setSeriesItemLabelFont(0, font);  // MACD 線字體
+            renderer.setSeriesItemLabelFont(1, font);  // 信號線字體
+
+            // 設定線條顏色：系列 0 (MACD) 紅色，系列 1 (信號線) 藍色
+            renderer.setSeriesPaint(0, Color.RED);
+            renderer.setSeriesPaint(1, Color.BLUE);
+
+            // Tooltip：顯示日期 + 各系列值
+            renderer.setSeriesToolTipGenerator(0, (dataset1, row, column) -> {
+                String category = (String) dataset1.getColumnKey(column);
+                double macdVal = dataset1.getValue(0, column).doubleValue();  // 系列 0
+                double signalVal = dataset1.getValue(1, column).doubleValue();  // 系列 1
+                return String.format("%s: MACD=%.2f, Signal=%.2f", category, macdVal, signalVal);
+            });
+            renderer.setSeriesToolTipGenerator(1, (dataset1, row, column) -> {
+                // 信號線 tooltip 同上（避免重複）
+                String category = (String) dataset1.getColumnKey(column);
+                double macdVal = dataset1.getValue(0, column).doubleValue();
+                double signalVal = dataset1.getValue(1, column).doubleValue();
+                return String.format("%s: MACD=%.2f, Signal=%.2f", category, macdVal, signalVal);
             });
             
             chart.getLegend().setItemFont(font);

@@ -20,8 +20,11 @@ import java.time.format.DateTimeFormatter;  // Java 時間 API 中的 DateTimeFo
 import java.util.List; // Java 集合框架的 List 介面（抽象）：有序、可重複元素的集合介面。這裡用作泛型（如 List<BidAsk>），讓方法返回靈活的資料結構。ArrayList 實現它。
 import java.util.ArrayList;  // Java 集合框架中的 ArrayList 類別（具體）：動態陣列實現 List 介面，用於儲存可變大小的資料。這裡用來建構 bids/asks 的 List<BidAsk>，或 fetchHistory 的 candles 清單。
 
-// 新增：RSI 記錄類別（簡潔記錄 date 和 rsi）
+// RSI 記錄類別（簡潔記錄 date 和 rsi）
 record RSI(LocalDate date, double rsi) {}
+
+// 新增：MACD 記錄類別（簡潔記錄 date、macdLine 和 signalLine）
+record MACD(LocalDate date, double macdLine, double signalLine) {}
 
 public class FugleService {
     private final OkHttpClient client = new OkHttpClient();
@@ -127,7 +130,7 @@ public class FugleService {
         return List.of();
     }
 
-    // 新增：取得 RSI 指標
+    // 取得 RSI 指標
     public List<RSI> fetchRSI(String symbol, int days, String apiKey) {
         try {
             LocalDate to = LocalDate.now();
@@ -152,6 +155,41 @@ public class FugleService {
                         ));
                     }
                     return rsiList;
+                } else if (response.code() == 401 || response.code() == 404) {
+                    return List.of();  // API 失效時返回空 list，讓 UI 顯示錯誤提示
+                }
+            }
+        } catch (IOException e) {
+            return List.of();  // API 失效時返回空 list，讓 UI 顯示錯誤提示
+        }
+        return List.of();
+    }
+
+    // 取得 MACD 指標
+    public List<MACD> fetchMACD(String symbol, int days, String apiKey) {
+        try {
+            LocalDate to = LocalDate.now();
+            LocalDate from = to.minusDays(days);
+            String params = String.format("?from=%s&to=%s&timeframe=D&fast=12&slow=26&signal=9", from.format(formatter), to.format(formatter));
+            String url = "https://api.fugle.tw/marketdata/v1.0/stock/technical/macd/" + symbol + params;
+
+            Request request = new Request.Builder()
+                    .url(url)
+                    .header("X-API-KEY", apiKey)
+                    .build();
+            try (Response response = client.newCall(request).execute()) {
+                if (response.isSuccessful()) {
+                    JsonNode root = mapper.readTree(response.body().string());
+                    JsonNode dataArray = root.path("data");
+                    List<MACD> macdList = new ArrayList<>();
+                    for (JsonNode node : dataArray) {
+                        macdList.add(new MACD(
+                                LocalDate.parse(node.path("date").asText(), formatter),
+                                node.path("macdLine").asDouble(),
+                                node.path("signalLine").asDouble()
+                        ));
+                    }
+                    return macdList;
                 } else if (response.code() == 401 || response.code() == 404) {
                     return List.of();  // API 失效時返回空 list，讓 UI 顯示錯誤提示
                 }
