@@ -285,7 +285,8 @@ WARNING: sun.misc.Unsafe::staticFieldBase will be removed in a future release
 3. 點 "查即時報價" 或是 "查歷史 K 線" → 顯示報價/圖表。
 4. 若 API 失效，自動顯示 "系統異常，請稍後再試"。
 
-## 6. 專案結構  
+## 6. 專案結構（Maven 的標準目錄布局） 
+https://maven.apache.org/guides/introduction/introduction-to-the-standard-directory-layout.html  
   stock-health-system/  
   ├── .gitignore              # 版控檔案忽略配置  
   ├── build.bat               # 打包自動執行檔   
