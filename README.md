@@ -23,7 +23,8 @@ OpenJDK Runtime Environment Temurin-25.0.1+8 (build 25.0.1+8-LTS)
 OpenJDK 64-Bit Server VM Temurin-25.0.1+8 (build 25.0.1+8-LTS, mixed mode, sharing)
 ```
 
-- Maven 3.9.11+  
+- Maven 3.9.11+
+  Maven是一個管理和構建項目的工具，是 Java 程序員的得力助手。它使開發人員在工作的每個階段都更加輕鬆：從創建項目結構和連接必要的庫到在服務器上部署產品。
   下載連結：https://dlcdn.apache.org/maven/maven-3/3.9.11/binaries/apache-maven-3.9.11-bin.zip
 
   [編輯系統變數]  
@@ -40,7 +41,8 @@ Default locale: zh_TW, platform encoding: UTF-8
 OS name: "windows 11", version: "10.0", arch: "amd64", family: "windows"
 ```
 
-- WiX Toolset v3.14.1  
+- WiX Toolset v3.14.1
+  作為Maven的外掛套件，可以將Java應用打包成.exe的安裝檔，並根據該安裝檔設定相關的配置細節
   下載連結：https://github.com/wixtoolset/wix3/releases/download/wix3141rtm/wix314-binaries.zip
 
   [編輯系統變數]  
