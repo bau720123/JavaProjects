@@ -48,7 +48,9 @@ public class MainApp extends Application {
     private PasswordField keyField; // Fugle API Key
     private Button queryBtn; // 查即時報價
     private Button historyBtn; // 查歷史 K 線
-    private TextField daysField; // 天數輸入欄位
+    private TextField daysField; // 天數輸入欄位（歷史 K 線用）
+    private TextField rsiDaysField; // 新增：天數輸入欄位（RSI 用）
+    private Button rsiBtn; // 新增：查相對強弱指數按鈕
     private TextArea resultArea; // 文字顯示區塊
     private ScrollPane chartPane; // 圖表顯示區塊
     private BorderPane root;  // 讓 queryHistory() 可存取
@@ -124,8 +126,20 @@ public class MainApp extends Application {
         HBox historyBox = new HBox(5, daysField, historyBtn); // 水平排列：天數 Label + TextField + 按鈕
         historyBox.setAlignment(Pos.CENTER_LEFT);
 
-        buttonBox.getChildren().addAll(queryBtn, historyBox); // 添加子節點到容器的操作，將 queryBtn 和 historyBox 加入 buttonBox
-        root.setLeft(buttonBox); // 將buttonBox（已含兩個Button的VBox）設定為根容器root（BorderPane）的左側區域。結果：按鈕區固定在左側視窗，寬度150px（來自setPrefWidth(150)），高度跟隨視窗拉伸，但內容不變形。
+        // 新增：查相對強弱指數 按鈕 + 天數輸入（水平排列，接續歷史 K 線下方）
+        rsiDaysField = new TextField("");
+        rsiDaysField.setPromptText("天數");
+        rsiDaysField.setPrefWidth(50); // 天數輸入欄位小寬度
+
+        rsiBtn = new Button("查相對強弱指數");
+        rsiBtn.setOnAction(e -> queryRSI());
+        rsiBtn.setPrefWidth(120); // 按鈕寬度調整為120，與上方對齊
+
+        HBox rsiBox = new HBox(5, rsiDaysField, rsiBtn); // 水平排列：天數 TextField + 按鈕
+        rsiBox.setAlignment(Pos.CENTER_LEFT);
+
+        buttonBox.getChildren().addAll(queryBtn, historyBox, rsiBox); // 添加子節點到容器的操作，將 queryBtn、historyBox 和 rsiBox 加入 buttonBox
+        root.setLeft(buttonBox); // 將buttonBox（已含三個元素的VBox）設定為根容器root（BorderPane）的左側區域。結果：按鈕區固定在左側視窗，寬度150px（來自setPrefWidth(150)），高度跟隨視窗拉伸，但內容不變形。
 
         // 中間：文字區塊（靠左）+ 圖表區塊（靠右），使用 HBox
         HBox centerBox = new HBox(10);
@@ -299,6 +313,101 @@ public class MainApp extends Application {
                 });
     }
 
+    // 新增：查詢 RSI 邏輯
+    private void queryRSI() {
+        String symbol = symbolField.getText().trim(); // 股票代號
+        String apiKey = keyField.getText().trim(); // Fugle API Key
+        String daysText = rsiDaysField.getText().trim();
+        int days;
+        try {
+            days = Integer.parseInt(daysText);
+            if (days < 1) {
+                showAlert("天數必須為 1 以上");
+                return;
+            }
+        } catch (NumberFormatException e) {
+            showAlert("天數必須為有效數字（1 以上）");
+            return;
+        }
+
+        if (symbol.isEmpty()) {
+            showAlert("請輸入 股票代號");
+            return;
+        }
+
+        if (apiKey.isEmpty()) {
+            showAlert("請輸入 Fugle API Key");
+            return;
+        }
+
+        // 處裡非同步的操作，有點像是jQuery中的$.ajax(...)
+        CompletableFuture.supplyAsync(() -> service.fetchRSI(symbol, days, apiKey))
+                .thenAccept(rsiList -> Platform.runLater(() -> {
+                    if (!rsiList.isEmpty()) {
+                        chartPane.setContent(createRSIChart(rsiList));
+                        chartPane.setFitToWidth(false);  // 關閉自動壓縮，讓 ChartPanel 自然寬度，溢出時滾動
+                        chartPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);  // 水平滾動條自動出現（當寬度溢出時），確保用戶拖曳查看全圖，不切斷日期
+
+                        // 延遲 setVisible，給 Swing 初始化時間
+                        PauseTransition delayVisible = new PauseTransition(Duration.millis(400));
+                        delayVisible.setOnFinished(e -> {
+                            chartPane.setVisible(true);
+                        });
+                        delayVisible.play();
+                        
+                        // RSI 文字列表
+                        StringBuilder sb = new StringBuilder(String.format("相對強弱指標 （RSI）已載入（近 %d 日 RSI 走勢）。\n\n強弱指數如下：\n\n", days)); // 使用 StringBuilder 可多行段落顯示，並且在字串相接時比較高效，無額外開銷
+                        for (RSI r : rsiList) {
+                            sb.append(String.format("日期：%s\n指數：%.2f\n\n",
+                                r.date(), r.rsi()));
+                        }
+
+                        // 計算區間最強勢（所有 rsi 的 max）和最弱勢（所有 rsi 的 min）
+                        // 用 Stream API：mapToDouble(RSI::rsi).max().orElse(0.0) - 高效 O(n)，method reference 簡潔
+                        double maxRsi = rsiList.stream().mapToDouble(RSI::rsi).max().orElse(0.0);  // 區間最強勢
+                        double minRsi = rsiList.stream().mapToDouble(RSI::rsi).min().orElse(0.0);  // 區間最弱勢
+
+                        // 找出達到最高 RSI 的所有日期，並按遞減（從最新到最舊）排序
+                        List<LocalDate> maxRsiDates = rsiList.stream()
+                                .filter(r -> r.rsi() == maxRsi)
+                                .map(RSI::date)
+                                .sorted(Comparator.reverseOrder())
+                                .collect(Collectors.toList());
+                        String maxRsiDateStr = maxRsiDates.stream()
+                                .map(LocalDate::toString)
+                                .collect(Collectors.joining("、"));
+
+                        // 找出達到最低 RSI 的所有日期，並按遞減（從最新到最舊）排序
+                        List<LocalDate> minRsiDates = rsiList.stream()
+                                .filter(r -> r.rsi() == minRsi)
+                                .map(RSI::date)
+                                .sorted(Comparator.reverseOrder())
+                                .collect(Collectors.toList());
+                        String minRsiDateStr = minRsiDates.stream()
+                                .map(LocalDate::toString)
+                                .collect(Collectors.joining("、"));
+
+                        sb.append(String.format("區間最強勢：%.2f（%s）\n", maxRsi, maxRsiDateStr));  // 格式化添加（%.2f 保留2位小數）
+                        sb.append(String.format("區間最弱勢：%.2f（%s）\n", minRsi, minRsiDateStr));  // 格式化添加（%.2f 保留2位小數）
+
+                        // 新增：RSI 解釋文字
+                        sb.append("\n* 超買與超賣：\n");
+                        sb.append("  當RSI 顯示超買時（通常大於70），可能表示市場過熱，價格有回調的可能，是賣出訊號。 反之，當RSI 顯示超賣時（通常小於30），可能表示市場過冷，價格有上漲的潛力，是買入訊號。\n\n");
+                        sb.append("* 市場趨勢：\n");
+                        sb.append("  RSI 值越高，表示過去一段期間的上漲機率較大；值越小，則下跌機率較大。");
+
+                        resultArea.setText(sb.toString());  // 設定完整文字
+                    } else {
+                        resultArea.setText("RSI 資料載入失敗，請稍後再試\n若 API 不可用，請確認 API key 有效。");
+                    }
+                }))
+                .exceptionally(ex -> {
+                    // exceptionally 像是 "非同步catch"，上游supplyAsync拋錯（如Fugle Key無效）時，自動恢復null並秀Alert—避免整個CompletableFuture崩潰，若直接showAlert，會造成整個應用程式crash
+                    Platform.runLater(() -> showAlert("系統異常，請稍後再試：" + ex.getMessage()));
+                    return null;
+                });
+    }
+
     // 創建線圖（使用 JFreeChart API）：這是個私有方法，返回一個 Node（JavaFX 的 UI 節點），用來嵌入 SwingNode 組件到 ScrollPane 中顯示 K 線圖。
     // 輸入：List<Candle> candles - 從 FugleService.fetchHistory() 取得的歷史 K 線資料（每個 Candle 含日期、開高低收等）。
     // 輸出：SwingNode - 包裝 JFreeChart 的 ChartPanel，讓圖表在 JavaFX 場景中渲染。
@@ -386,6 +495,73 @@ public class MainApp extends Application {
 
             // Timer：Swing 的計時器，單次延遲 200ms 觸發 ActionListener。
             // 目的：解決 SwingNode 嵌入 JavaFX 時的初始渲染延遲（社區常見 bug，JFreeChart 需要時間初始化 plot）。
+            Timer timer = new Timer(200, e -> {
+                currentChartPanel.revalidate();
+                currentChartPanel.repaint();
+                ((Timer) e.getSource()).stop();
+            });
+            timer.setRepeats(false);
+            timer.start();
+        });
+        
+        return swingNode;
+    }
+
+    // 新增：創建 RSI 線圖（複製自 createLineChart 並調整）
+    private Node createRSIChart(List<RSI> rsiList) {
+        SwingNode swingNode = new SwingNode();
+
+        SwingUtilities.invokeLater(() -> {
+            DefaultCategoryDataset dataset = new DefaultCategoryDataset();
+
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+
+            for (int i = 0; i < rsiList.size(); i++) {
+                RSI r = rsiList.get(i);
+                LocalDate localDate = r.date();
+
+                String dateStr = sdf.format(Date.from(localDate.atStartOfDay(ZoneId.systemDefault()).toInstant()));
+
+                dataset.addValue(r.rsi(), "RSI 指標", dateStr);  // 用日期字符串作為類別（X 軸標籤），Y 為 rsi 值
+            }
+
+            JFreeChart chart = ChartFactory.createLineChart("近 " + rsiList.size() + " 日 RSI 指標", "日期", "RSI 值 (0-100)", dataset, PlotOrientation.VERTICAL, true, true, false);
+            
+            Font font = new Font("Microsoft YaHei", Font.BOLD, 14);
+
+            TextTitle title = chart.getTitle();
+            title.setFont(font);
+
+            CategoryPlot plot = (CategoryPlot) chart.getPlot();
+            plot.getDomainAxis().setLabelFont(font);
+            plot.getRangeAxis().setLabelFont(font);
+            
+            // Y 軸範圍動態調整（RSI 通常 0-100，padding 5%）
+            double minRsi = rsiList.stream().mapToDouble(RSI::rsi).min().orElse(0.0);
+            double maxRsi = rsiList.stream().mapToDouble(RSI::rsi).max().orElse(100.0);
+            double padding = (maxRsi - minRsi) * 0.05;
+
+            plot.getRangeAxis().setLowerBound(Math.max(0, minRsi - padding));
+            plot.getRangeAxis().setUpperBound(Math.min(100, maxRsi + padding));
+
+            LineAndShapeRenderer renderer = (LineAndShapeRenderer) plot.getRenderer();
+            renderer.setSeriesItemLabelFont(0, font);
+
+            renderer.setSeriesToolTipGenerator(0, (dataset1, row, column) -> {
+                String category = (String) dataset1.getColumnKey(column);
+                double y = dataset1.getValue(row, column).doubleValue();
+                return category + ": " + y;
+            });
+            
+            chart.getLegend().setItemFont(font);
+            
+            CategoryAxis domainAxis = (CategoryAxis) plot.getDomainAxis();
+            domainAxis.setCategoryLabelPositions(CategoryLabelPositions.UP_90);
+
+            currentChartPanel = new ChartPanel(chart);
+            currentChartPanel.setPreferredSize(new java.awt.Dimension(695, 400));
+            swingNode.setContent(currentChartPanel);
+
             Timer timer = new Timer(200, e -> {
                 currentChartPanel.revalidate();
                 currentChartPanel.repaint();
