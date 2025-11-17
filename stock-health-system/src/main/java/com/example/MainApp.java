@@ -29,7 +29,7 @@ import org.jfree.data.category.DefaultCategoryDataset;
 import org.jfree.chart.renderer.category.LineAndShapeRenderer;
 
 import java.awt.Font;
-import java.awt.Color;  // 新增：顏色設定用於 MACD 圖表線條
+import java.awt.Color;  // 顏色設定用於 MACD 圖表線條
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.time.LocalDate;
@@ -47,13 +47,11 @@ public class MainApp extends Application {
     private final FugleService service = new FugleService(); // 使用 Fugle API 做資料存取
     private TextField symbolField; // 股票代號
     private PasswordField keyField; // Fugle API Key
+    private TextField daysField; // 天數輸入欄位（共用給歷史 K 線、RSI、MACD）
     private Button queryBtn; // 查即時報價
     private Button historyBtn; // 查歷史 K 線
-    private TextField daysField; // 天數輸入欄位（歷史 K 線用）
-    private TextField rsiDaysField; // 天數輸入欄位（RSI 用）
-    private TextField macdDaysField; // 新增：天數輸入欄位（MACD 用）
     private Button rsiBtn; // 查相對強弱指數按鈕
-    private Button macdBtn; // 新增：查移動平均線按鈕
+    private Button macdBtn; // 查移動平均線按鈕
     private TextArea resultArea; // 文字顯示區塊
     private ScrollPane chartPane; // 圖表顯示區塊
     private BorderPane root;  // 讓 queryHistory() 可存取
@@ -81,7 +79,7 @@ public class MainApp extends Application {
         this.root = new BorderPane();  // 用 this.root 初始化成員變數（非局部）
         root.setPadding(new Insets(10));
 
-        // 上方：輸入區（股票代號 + API Key），使用 HBox 水平排列
+        // 上方：輸入區（股票代號 + API Key + 天數），使用 HBox 水平排列
         HBox inputBox = new HBox(10);
         inputBox.setAlignment(Pos.CENTER_LEFT);
         inputBox.setPadding(new Insets(0, 0, 20, 0));  // 下方額外 20px 間距，隔開上方輸入與左側按鈕
@@ -94,7 +92,7 @@ public class MainApp extends Application {
         symbolField.setPrefWidth(155);  // 設定偏好寬度為
         symbolVBox.getChildren().addAll(symbolLabel, symbolField);
 
-        // API Key 輸入（右側）
+        // API Key 輸入（中間）
         VBox keyVBox = new VBox(5);
         Label keyLabel = new Label("Fugle API Key：");
         keyField = new PasswordField();
@@ -103,8 +101,16 @@ public class MainApp extends Application {
         keyField.setPrefWidth(200);  // 設定偏好寬度為
         keyVBox.getChildren().addAll(keyLabel, keyField);
 
-        inputBox.getChildren().addAll(symbolVBox, keyVBox); // 添加子節點到容器的操作，將兩個VBox（symbolVBox和keyVBox，各含Label + TextField）同時加入inputBox（HBox容器）的子節點列表中。
-        root.setTop(inputBox); // 將inputBox（已含兩個VBox的HBox）設定為根容器root（BorderPane）的頂部區域。結果：輸入區固定在上方視窗，無論視窗resize，BorderPane會自動拉伸中間/底部內容。
+        // 天數輸入（右側，共用）
+        VBox daysVBox = new VBox(5);
+        Label daysLabel = new Label("天數：");
+        daysField = new TextField("");
+        daysField.setPromptText("天數");
+        daysField.setPrefWidth(50); // 天數輸入欄位小寬度
+        daysVBox.getChildren().addAll(daysLabel, daysField);
+
+        inputBox.getChildren().addAll(symbolVBox, keyVBox, daysVBox); // 添加子節點到容器的操作，將三個VBox（symbolVBox、keyVBox、daysVBox）同時加入inputBox（HBox容器）的子節點列表中。
+        root.setTop(inputBox); // 將inputBox（已含三個VBox的HBox）設定為根容器root（BorderPane）的頂部區域。結果：輸入區固定在上方視窗，無論視窗resize，BorderPane會自動拉伸中間/底部內容。
 
         // 左側：功能按鈕垂直擺設，使用 VBox
         VBox buttonBox = new VBox(10);
@@ -117,43 +123,22 @@ public class MainApp extends Application {
         queryBtn.setOnAction(e -> queryQuote());
         queryBtn.setPrefWidth(120); // 按鈕固定寬度
 
-        // 查歷史 K 線 按鈕 + 天數輸入（水平排列）
-        daysField = new TextField("");
-        daysField.setPromptText("天數");
-        daysField.setPrefWidth(50); // 天數輸入欄位小寬度
-
+        // 查歷史 K 線 按鈕
         historyBtn = new Button("查歷史 K 線");
         historyBtn.setOnAction(e -> queryHistory());
-        historyBtn.setPrefWidth(100); // 縮小按鈕寬度為100
+        historyBtn.setPrefWidth(120); // 按鈕寬度調整為120，與其他對齊
 
-        HBox historyBox = new HBox(5, daysField, historyBtn); // 水平排列：天數 Label + TextField + 按鈕
-        historyBox.setAlignment(Pos.CENTER_LEFT);
-
-        // 查相對強弱指數 按鈕 + 天數輸入（水平排列，接續歷史 K 線下方）
-        rsiDaysField = new TextField("");
-        rsiDaysField.setPromptText("天數");
-        rsiDaysField.setPrefWidth(50); // 天數輸入欄位小寬度
-
+        // 查相對強弱指數 按鈕
         rsiBtn = new Button("查相對強弱指數");
         rsiBtn.setOnAction(e -> queryRSI());
-        rsiBtn.setPrefWidth(120); // 按鈕寬度調整為120，與上方對齊
+        rsiBtn.setPrefWidth(120); // 按鈕寬度調整為120
 
-        HBox rsiBox = new HBox(5, rsiDaysField, rsiBtn); // 水平排列：天數 TextField + 按鈕
-        rsiBox.setAlignment(Pos.CENTER_LEFT);
-
-        // 新增：查移動平均線 按鈕 + 天數輸入（水平排列，接續 RSI 下方）
-        macdDaysField = new TextField("");
-        macdDaysField.setPromptText("天數");
-        macdDaysField.setPrefWidth(50); // 天數輸入欄位小寬度
-
+        // 查移動平均線 按鈕
         macdBtn = new Button("查移動平均線");
         macdBtn.setOnAction(e -> queryMACD());
-        macdBtn.setPrefWidth(120); // 按鈕寬度調整為120，與上方對齊
+        macdBtn.setPrefWidth(120); // 按鈕寬度調整為120
 
-        HBox macdBox = new HBox(5, macdDaysField, macdBtn); // 水平排列：天數 TextField + 按鈕
-        macdBox.setAlignment(Pos.CENTER_LEFT);
-
-        buttonBox.getChildren().addAll(queryBtn, historyBox, rsiBox, macdBox); // 添加子節點到容器的操作，將 queryBtn、historyBox、rsiBox 和 macdBox 加入 buttonBox
+        buttonBox.getChildren().addAll(queryBtn, historyBtn, rsiBtn, macdBtn); // 添加子節點到容器的操作，將 queryBtn、historyBtn、rsiBtn 和 macdBtn 加入 buttonBox
         root.setLeft(buttonBox); // 將buttonBox（已含四個元素的VBox）設定為根容器root（BorderPane）的左側區域。結果：按鈕區固定在左側視窗，寬度150px（來自setPrefWidth(150)），高度跟隨視窗拉伸，但內容不變形。
 
         // 中間：文字區塊（靠左）+ 圖表區塊（靠右），使用 HBox
@@ -239,22 +224,12 @@ public class MainApp extends Application {
                 });
     }
 
-    // 查詢歷史 K 線邏輯
+    // 查詢歷史 K 線邏輯（使用共用 daysField）
     private void queryHistory() {
         String symbol = symbolField.getText().trim(); // 股票代號
         String apiKey = keyField.getText().trim(); // Fugle API Key
-        String daysText = daysField.getText().trim();
+        String daysText = daysField.getText().trim(); // 使用共用天數欄位
         int days;
-        try {
-            days = Integer.parseInt(daysText);
-            if (days < 1) {
-                showAlert("天數必須為 1 以上");
-                return;
-            }
-        } catch (NumberFormatException e) {
-            showAlert("天數必須為有效數字（1 以上）");
-            return;
-        }
 
         if (symbol.isEmpty()) {
             showAlert("請輸入 股票代號");
@@ -263,6 +238,17 @@ public class MainApp extends Application {
 
         if (apiKey.isEmpty()) {
             showAlert("請輸入 Fugle API Key");
+            return;
+        }
+
+        try {
+            days = Integer.parseInt(daysText);
+            if (days < 1) {
+                showAlert("天數必須為 1 以上");
+                return;
+            }
+        } catch (NumberFormatException e) {
+            showAlert("天數必須為有效數字（1 以上）");
             return;
         }
 
@@ -328,22 +314,12 @@ public class MainApp extends Application {
                 });
     }
 
-    // 查詢 RSI 邏輯
+    // 查詢 RSI 邏輯（使用共用 daysField）
     private void queryRSI() {
         String symbol = symbolField.getText().trim(); // 股票代號
         String apiKey = keyField.getText().trim(); // Fugle API Key
-        String daysText = rsiDaysField.getText().trim();
+        String daysText = daysField.getText().trim(); // 使用共用天數欄位
         int days;
-        try {
-            days = Integer.parseInt(daysText);
-            if (days < 1) {
-                showAlert("天數必須為 1 以上");
-                return;
-            }
-        } catch (NumberFormatException e) {
-            showAlert("天數必須為有效數字（1 以上）");
-            return;
-        }
 
         if (symbol.isEmpty()) {
             showAlert("請輸入 股票代號");
@@ -352,6 +328,17 @@ public class MainApp extends Application {
 
         if (apiKey.isEmpty()) {
             showAlert("請輸入 Fugle API Key");
+            return;
+        }
+
+        try {
+            days = Integer.parseInt(daysText);
+            if (days < 1) {
+                showAlert("天數必須為 1 以上");
+                return;
+            }
+        } catch (NumberFormatException e) {
+            showAlert("天數必須為有效數字（1 以上）");
             return;
         }
 
@@ -423,22 +410,12 @@ public class MainApp extends Application {
                 });
     }
 
-    // 查詢 MACD 邏輯
+    // 查詢 MACD 邏輯（使用共用 daysField）
     private void queryMACD() {
         String symbol = symbolField.getText().trim(); // 股票代號
         String apiKey = keyField.getText().trim(); // Fugle API Key
-        String daysText = macdDaysField.getText().trim();
+        String daysText = daysField.getText().trim(); // 使用共用天數欄位
         int days;
-        try {
-            days = Integer.parseInt(daysText);
-            if (days < 1) {
-                showAlert("天數必須為 1 以上");
-                return;
-            }
-        } catch (NumberFormatException e) {
-            showAlert("天數必須為有效數字（1 以上）");
-            return;
-        }
 
         if (symbol.isEmpty()) {
             showAlert("請輸入 股票代號");
@@ -447,6 +424,17 @@ public class MainApp extends Application {
 
         if (apiKey.isEmpty()) {
             showAlert("請輸入 Fugle API Key");
+            return;
+        }
+
+        try {
+            days = Integer.parseInt(daysText);
+            if (days < 1) {
+                showAlert("天數必須為 1 以上");
+                return;
+            }
+        } catch (NumberFormatException e) {
+            showAlert("天數必須為有效數字（1 以上）");
             return;
         }
 
@@ -684,7 +672,7 @@ public class MainApp extends Application {
         return swingNode;
     }
 
-    // 新增：創建 MACD 線圖（複製自 createRSIChart 並調整為兩系列）
+    // 創建 MACD 線圖（複製自 createRSIChart 並調整為兩系列）
     private Node createMACDChart(List<MACD> macdList) {
         SwingNode swingNode = new SwingNode();
 

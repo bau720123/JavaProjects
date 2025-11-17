@@ -86,12 +86,6 @@
                 <version>3.13.0</version>
                 <configuration>
                     <release>25</release>
-                    <compilerArgs>
-                        <arg>--add-reads</arg>
-                        <arg>com.example.stockhealth=org.jfree.jfreechart</arg>
-                        <arg>--add-reads</arg>
-                        <arg>com.example.stockhealth=ALL-UNNAMED</arg>
-                    </compilerArgs>
                 </configuration>
             </plugin>
 
