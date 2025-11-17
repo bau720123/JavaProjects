@@ -13,7 +13,7 @@
 
 ## 系統需求
 - Java 25 LTS (Temurin 或 Oracle JDK)。  
-  開源下載連結：https://adoptium.net/zh-CN/temurin/releases?version=25
+  開源下載連結：https://adoptium.net/zh-CN/temurin/releases?version=25  
   官方下載連結：https://www.oracle.com/tw/java/technologies/downloads/#jdk25-windows
 
 ```
