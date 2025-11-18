@@ -828,6 +828,10 @@ public class MainApp extends Application {
         alert.showAndWait();
     }
 
+    // JVM 的要求：所有 Java 應用程式必須有一個 public static void main(String[] args) 作為啟動入口
+    // JavaFX 的特殊性：JavaFX 應用程式繼承 Application 類別，但仍需要 main() 來橋接傳統 Java 啟動方式
+    // mvn javafx:run 的關係：Maven 會讀取 pom.xml 中 javafx-maven-plugin 中 <mainClass> 的設定值，找到 MainApp.main() 並執行
+    // 與 .exe 安裝檔的關係：跟 run 差不多，啟動時執行 com.example.MainApp.main()
     public static void main(String[] args) {
         launch(args);
     }
