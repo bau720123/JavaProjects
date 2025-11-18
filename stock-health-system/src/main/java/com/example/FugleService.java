@@ -103,6 +103,8 @@ public class FugleService {
                     .url(url)
                     .header("X-API-KEY", apiKey)
                     .build();
+
+            // try-with-resources（Java 7+語法，自動關閉Response資源），所以無需再catch
             try (Response response = client.newCall(request).execute()) {
                 if (response.isSuccessful()) {
                     JsonNode root = mapper.readTree(response.body().string());
@@ -143,6 +145,8 @@ public class FugleService {
                     .url(url)
                     .header("X-API-KEY", apiKey)
                     .build();
+
+            // try-with-resources（Java 7+語法，自動關閉Response資源），所以無需再catch
             try (Response response = client.newCall(request).execute()) {
                 if (response.isSuccessful()) {
                     JsonNode root = mapper.readTree(response.body().string());
