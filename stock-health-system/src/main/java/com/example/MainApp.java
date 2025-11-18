@@ -58,8 +58,8 @@ public class MainApp extends Application {
     private ChartPanel currentChartPanel;  // 存取 ChartPanel 成員，允許多次 repaint（解決 SwingNode 延遲）
     private Stage primaryStage;  // 將 stage 升級為類別成員變數，讓 createLineChart 可存取（修 stage cannot find symbol）
 
+    // 在類別載入時讀取版本號
     private static String APP_VERSION = "Unknown";
-    // 靜態區塊:在類別載入時讀取版本號
     static {
         try (InputStream input = MainApp.class.getClassLoader()
                 .getResourceAsStream("application.properties")) {
@@ -79,29 +79,29 @@ public class MainApp extends Application {
         this.root = new BorderPane();  // 用 this.root 初始化成員變數（非局部）
         root.setPadding(new Insets(10));
 
-        // 上方：輸入區（股票代號 + API Key + 天數），使用 HBox 水平排列
-        HBox inputBox = new HBox(10);
+        /* 上方版面配置（股票資訊輸入區），使用 HBox 水平排列 */
+        HBox inputBox = new HBox(10); // 每個節點「水平」之間間隔 10 像素
         inputBox.setAlignment(Pos.CENTER_LEFT);
         inputBox.setPadding(new Insets(0, 0, 20, 0));  // 下方額外 20px 間距，隔開上方輸入與左側按鈕
 
-        // 股票代號輸入（左側）
+        // 股票代號輸入
         VBox symbolVBox = new VBox(5);
         Label symbolLabel = new Label("股票代號：");
         symbolField = new TextField("");
         symbolField.setPromptText("請輸入股票代號");
-        symbolField.setPrefWidth(155);  // 設定偏好寬度為
+        symbolField.setPrefWidth(155);  // 設定偏好寬度
         symbolVBox.getChildren().addAll(symbolLabel, symbolField);
 
-        // API Key 輸入（中間）
+        // API Key 輸入
         VBox keyVBox = new VBox(5);
         Label keyLabel = new Label("Fugle API Key：");
         keyField = new PasswordField();
         keyField.setText("");
         keyField.setPromptText("請輸入 Fugle API Key");
-        keyField.setPrefWidth(200);  // 設定偏好寬度為
+        keyField.setPrefWidth(200);  // 設定偏好寬度
         keyVBox.getChildren().addAll(keyLabel, keyField);
 
-        // 天數輸入（右側，共用）
+        // 天數輸入
         VBox daysVBox = new VBox(5);
         Label daysLabel = new Label("天數：");
         daysField = new TextField("");
@@ -112,23 +112,23 @@ public class MainApp extends Application {
         inputBox.getChildren().addAll(symbolVBox, keyVBox, daysVBox); // 添加子節點到容器的操作，將三個VBox（symbolVBox、keyVBox、daysVBox）同時加入inputBox（HBox容器）的子節點列表中。
         root.setTop(inputBox); // 將inputBox（已含三個VBox的HBox）設定為根容器root（BorderPane）的頂部區域。結果：輸入區固定在上方視窗，無論視窗resize，BorderPane會自動拉伸中間/底部內容。
 
-        // 左側：功能按鈕垂直擺設，使用 VBox
-        VBox buttonBox = new VBox(10);
+        /* 下方左側版面配置（功能列表），使用 VBox 垂直排列 */
+        VBox buttonBox = new VBox(10); // 每個節點「垂直」之間間隔 10 像素
         buttonBox.setAlignment(Pos.TOP_CENTER);
         buttonBox.setPrefWidth(150); // 左側固定寬度
         buttonBox.setPadding(new Insets(0, 0, 0, 10));  // 右側 10px 內邊距，避免太貼中間區塊
 
-        // 查即時報價 按鈕
+        // 查即時報價
         queryBtn = new Button("查即時報價");
         queryBtn.setOnAction(e -> queryQuote());
-        queryBtn.setPrefWidth(120); // 按鈕固定寬度
+        queryBtn.setPrefWidth(120); // 按鈕寬度調整為120
 
-        // 查歷史 K 線 按鈕
+        // 查歷史 K 線
         historyBtn = new Button("查歷史 K 線");
         historyBtn.setOnAction(e -> queryHistory());
-        historyBtn.setPrefWidth(120); // 按鈕寬度調整為120，與其他對齊
+        historyBtn.setPrefWidth(120); // 按鈕寬度調整為120
 
-        // 查相對強弱指數 按鈕
+        // 查相對強弱指數
         rsiBtn = new Button("查相對強弱指數");
         rsiBtn.setOnAction(e -> queryRSI());
         rsiBtn.setPrefWidth(120); // 按鈕寬度調整為120
@@ -141,11 +141,11 @@ public class MainApp extends Application {
         buttonBox.getChildren().addAll(queryBtn, historyBtn, rsiBtn, macdBtn); // 添加子節點到容器的操作，將 queryBtn、historyBtn、rsiBtn 和 macdBtn 加入 buttonBox
         root.setLeft(buttonBox); // 將buttonBox（已含四個元素的VBox）設定為根容器root（BorderPane）的左側區域。結果：按鈕區固定在左側視窗，寬度150px（來自setPrefWidth(150)），高度跟隨視窗拉伸，但內容不變形。
 
-        // 中間：文字區塊（靠左）+ 圖表區塊（靠右），使用 HBox
-        HBox centerBox = new HBox(10);
-        centerBox.setAlignment(Pos.TOP_LEFT);  // 調整：改為 TOP_LEFT，讓內容頂左對齊
+        /* 下方右側版面配置（文字跟圖表顯示區），使用 HBox 水平排列 */
+        HBox centerBox = new HBox(10); // 每個節點「水平」之間間隔 10 像素
+        centerBox.setAlignment(Pos.TOP_LEFT);  // 改為 TOP_LEFT，讓內容頂左對齊
 
-        // 文字區塊（中間靠左，寬度 200px，並向左微移以對齊紅線）
+        // 文字區塊
         resultArea = new TextArea("歡迎使用台股健診系統\n功能持續擴充中\n請多多支持！"); // 可設定文字區塊預設文字
         resultArea.setWrapText(true); // 設定當文字超過欄位的寬度時是否自動換行
         resultArea.setPrefRowCount(10); // 但JavaFX布局系統的響應式設計（responsive layout）會讓其根據視窗大小的變化來自動延展其高
@@ -153,7 +153,7 @@ public class MainApp extends Application {
         resultArea.setPrefWidth(200); // 寬度維持 200px
         HBox.setMargin(resultArea, new Insets(0, 0, 0, 15));  // 新增：向左微移 20px，盡可能對齊上方區塊位置
 
-        // 圖表區塊（中間靠右，寬度 700px）
+        // 圖表區塊
         chartPane = new ScrollPane(createEmptyChartPanel());
         chartPane.setVisible(false); // 一開始不直接顯示圖表區塊
         chartPane.setPrefWidth(700); // 寬度維持 700px
@@ -162,7 +162,7 @@ public class MainApp extends Application {
         centerBox.getChildren().addAll(resultArea, chartPane); // 添加子節點到容器的操作，將TextArea（resultArea）和ScrollPane（chartPane）同時加入centerBox（HBox容器）的子節點列表中。結果：中間內容水平排列（左：文字區200px，右：圖表區700px），間距10px（來自new HBox(10)）。
         root.setCenter(centerBox); // 將centerBox（已含TextArea和ScrollPane的HBox）設定為根容器root（BorderPane）的中間區域。結果：中間內容填滿剩餘視窗空間（寬=視窗寬 - left 150px - padding，高=視窗高 - top），無論視窗resize，BorderPane會自動拉伸中間區內容。
 
-        // 設定場景
+        // 桌面視窗的設定
         Scene scene = new Scene(root, 1100, 700); // 初始寬度維持 1100px
         stage.setScene(scene);
         stage.setTitle("台股股票健診系統（版本號：" + APP_VERSION + "）");
@@ -170,7 +170,12 @@ public class MainApp extends Application {
         stage.setResizable(true); // 允許調整大小
         this.primaryStage = stage;  // 初始化成員變數
 
-        // 取消自動聚焦,將焦點移到根容器
+        // 監聽視窗寬度變化，動態調整 chartPane 寬度
+        scene.widthProperty().addListener((obs, oldWidth, newWidth) -> {
+            resizeChartProportionally(); // 統一調用等比例縮放方法
+        });
+
+        // 取消自動聚焦，將焦點移到根容器，不然會預設聚焦在 "股票代號" 那個欄位
         Platform.runLater(() -> root.requestFocus());
 
         stage.show();
@@ -200,21 +205,21 @@ public class MainApp extends Application {
                                 quote.symbol(), quote.name(), quote.previousClose(), quote.openPrice(), quote.highPrice(), quote.lowPrice(), quote.closePrice(),
                                 quote.avgPrice(), quote.tradeVolume(), quote.change(), quote.changePercent()));
 
-                        // [委買價] 區段
-                        sb.append("\n[委買價]\n\n");
+                        // 委買價區段內容
+                        sb.append("\n【委買價】\n\n");
                         for (BidAsk ba : quote.bids()) {
                             sb.append(String.format("    價格：%.0f\n    張數：%d\n\n", ba.price(), ba.size()));
                         }
 
-                        // [委賣價] 區段
-                        sb.append("[委賣價]\n\n");
+                        // 委賣價區段內容
+                        sb.append("【委賣價】\n\n");
                         for (BidAsk ba : quote.asks()) {
                             sb.append(String.format("    價格：%.0f\n    張數：%d\n\n", ba.price(), ba.size()));
                         }
 
                         resultArea.setText(sb.toString());
                     } else {
-                        resultArea.setText("查詢失敗，請稍後再試\n若 API 不可用，請確認 FugleService 已加入爬蟲備案。");
+                        resultArea.setText("查詢失敗，請稍後再試\n若 API 不可用，請稍後再使用。");
                     }
                 }))
                 .exceptionally(ex -> {
@@ -257,8 +262,9 @@ public class MainApp extends Application {
                 .thenAccept(candles -> Platform.runLater(() -> {
                     if (!candles.isEmpty()) {
                         chartPane.setContent(createLineChart(candles));
-                        chartPane.setFitToWidth(false);  // 關閉自動壓縮，讓 ChartPanel 自然寬度，溢出時滾動
-                        chartPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);  // 水平滾動條自動出現（當寬度溢出時），確保用戶拖曳查看全圖，不切斷日期
+                        // chartPane.setFitToWidth(false);  // 關閉自動壓縮，讓 ChartPanel 自然寬度，溢出時滾動
+                        // chartPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);  // 水平滾動條自動出現（當寬度溢出時），確保用戶拖曳查看全圖，不切斷日期
+                        resizeChartProportionally(); // 改用統一的等比例縮放方法
 
                         // 延遲 setVisible，給 Swing 初始化時間
                         PauseTransition delayVisible = new PauseTransition(Duration.millis(400));
@@ -347,8 +353,9 @@ public class MainApp extends Application {
                 .thenAccept(rsiList -> Platform.runLater(() -> {
                     if (!rsiList.isEmpty()) {
                         chartPane.setContent(createRSIChart(rsiList));
-                        chartPane.setFitToWidth(false);  // 關閉自動壓縮，讓 ChartPanel 自然寬度，溢出時滾動
-                        chartPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);  // 水平滾動條自動出現（當寬度溢出時），確保用戶拖曳查看全圖，不切斷日期
+                        // chartPane.setFitToWidth(true);  // 關閉自動壓縮，讓 ChartPanel 自然寬度，溢出時滾動
+                        // chartPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);  // 水平滾動條自動出現（當寬度溢出時），確保用戶拖曳查看全圖，不切斷日期
+                        resizeChartProportionally(); // 改用統一的等比例縮放方法
 
                         // 延遲 setVisible，給 Swing 初始化時間
                         PauseTransition delayVisible = new PauseTransition(Duration.millis(400));
@@ -443,8 +450,9 @@ public class MainApp extends Application {
                 .thenAccept(macdList -> Platform.runLater(() -> {
                     if (!macdList.isEmpty()) {
                         chartPane.setContent(createMACDChart(macdList));
-                        chartPane.setFitToWidth(false);  // 關閉自動壓縮，讓 ChartPanel 自然寬度，溢出時滾動
-                        chartPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);  // 水平滾動條自動出現（當寬度溢出時），確保用戶拖曳查看全圖，不切斷日期
+                        // chartPane.setFitToWidth(true);  // 關閉自動壓縮，讓 ChartPanel 自然寬度，溢出時滾動
+                        // chartPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);  // 水平滾動條自動出現（當寬度溢出時），確保用戶拖曳查看全圖，不切斷日期
+                        resizeChartProportionally(); // 改用統一的等比例縮放方法
 
                         // 延遲 setVisible，給 Swing 初始化時間
                         PauseTransition delayVisible = new PauseTransition(Duration.millis(400));
@@ -504,6 +512,49 @@ public class MainApp extends Application {
                     Platform.runLater(() -> showAlert("系統異常，請稍後再試：" + ex.getMessage()));
                     return null;
                 });
+    }
+
+    // 等比例調整圖表尺寸（統一方法，避免程式碼重複）
+    // 參數：無（自動從 scene 和 chartPane 讀取當前尺寸）
+    // 目的：根據視窗寬度計算等比例的圖表高度，並觸發 Swing 組件重繪
+    private void resizeChartProportionally() {
+        if (primaryStage == null || primaryStage.getScene() == null) {
+            return; // 防止 stage 未初始化時調用
+        }
+        
+        // 計算可用寬度：視窗寬度 - 左側按鈕區 - 文字區 - padding/margin
+        double sceneWidth = primaryStage.getScene().getWidth();
+        double availableWidth = sceneWidth - 400; // 左側 150px + 文字區 200px + 間距 50px
+        
+        // 設定最小寬度 500px，避免過窄
+        double chartWidth = Math.max(500, availableWidth);
+        
+        // 等比例縮放：假設原始圖表是 16:9（可依需求調整 aspectRatio）
+        double aspectRatio = 16.0 / 9.0; // 寬高比 16:9
+        double chartHeight = chartWidth / aspectRatio;
+        
+        chartPane.setPrefWidth(chartWidth);
+        chartPane.setPrefHeight(chartHeight); // 同步調整高度
+        chartPane.setFitToWidth(false); // 關閉自動拉寬（改用等比例）
+        chartPane.setFitToHeight(false); // 關閉自動拉高
+        
+        // 若圖表已載入，延遲 200ms 後觸發 Swing 組件重繪
+        if (currentChartPanel != null) {
+            SwingUtilities.invokeLater(() -> {
+                // 調整 ChartPanel 實際尺寸（等比例）
+                currentChartPanel.setPreferredSize(
+                    new java.awt.Dimension((int)chartWidth, (int)chartHeight)
+                );
+                
+                Timer timer = new Timer(200, e -> {
+                    currentChartPanel.revalidate();
+                    currentChartPanel.repaint();
+                    ((Timer) e.getSource()).stop();
+                });
+                timer.setRepeats(false);
+                timer.start();
+            });
+        }
     }
 
     // 創建線圖（使用 JFreeChart API）：這是個私有方法，返回一個 Node（JavaFX 的 UI 節點），用來嵌入 SwingNode 組件到 ScrollPane 中顯示 K 線圖。
@@ -771,7 +822,7 @@ public class MainApp extends Application {
         alert.showAndWait();
     }
 
-    // [新增]：顯示資訊（INFO 型，用於除錯 Alert）
+    // 顯示資訊（INFO 型，用於除錯 Alert）
     private void showInfoAlert(String msg) {
         Alert alert = new Alert(AlertType.INFORMATION, msg);
         alert.showAndWait();
