@@ -170,6 +170,18 @@ public class MainApp extends Application {
         stage.setResizable(true); // 允許調整大小
         this.primaryStage = stage;  // 初始化成員變數
 
+
+        // 使用 getClass().getResourceAsStream() 從 resources 資料夾讀取圖標
+        InputStream iconStream = getClass().getResourceAsStream("/icon.png");
+
+        if (iconStream != null) {
+            // 將圖檔載入為 JavaFX Image 物件
+            stage.getIcons().add(new javafx.scene.image.Image(iconStream));
+        } else {
+            // 如果找不到檔案，輸出警告（不會中斷程式）
+            System.err.println("警告：找不到視窗圖標檔案 /icon.png");
+        }
+
         // 監聽視窗寬度變化，動態調整 chartPane 寬度
         scene.widthProperty().addListener((obs, oldWidth, newWidth) -> {
             resizeChartProportionally(); // 統一調用等比例縮放方法
