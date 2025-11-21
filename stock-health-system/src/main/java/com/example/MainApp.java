@@ -35,6 +35,7 @@ import java.util.Date;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.stream.Collectors;
 import java.util.concurrent.CompletableFuture;
@@ -364,6 +365,34 @@ public class MainApp extends Application {
         CompletableFuture.supplyAsync(() -> service.fetchRSI(symbol, days, apiKey))
                 .thenAccept(rsiList -> Platform.runLater(() -> {
                     if (!rsiList.isEmpty()) {
+                        // RSI 盤中預估（基於資料歸檔，Fugle 的 API最其碼要在今天收盤之後，才會進行歸檔，在那之前，是不會有今天的資料的）
+                        LocalDate today = LocalDate.now();
+                        boolean hasToday = rsiList.stream().anyMatch(r -> r.date().equals(today));
+
+                        if (!hasToday) {
+                            Quote quote = service.fetchQuote(symbol, apiKey);
+                            List<Candle> history = service.fetchHistory(symbol, days, apiKey);
+
+                            // 建立今日虛擬K棒
+                            Candle todayCandle = new Candle(
+                                today,
+                                0, 0, 0, quote.closePrice(), 0L, 0.0
+                            );
+
+                            List<Candle> fullCandles = new ArrayList<>(history);
+                            fullCandles.add(todayCandle);
+                            fullCandles.sort(Comparator.comparing(Candle::date));
+
+                            // 呼叫標準 Wilder RSI 計算
+                            List<RSI> calculated = calculateWilderRSI(fullCandles, 6);
+
+                            if (!calculated.isEmpty()) {
+                                RSI todayRSI = calculated.get(calculated.size() - 1);
+                                rsiList.add(todayRSI);
+                                rsiList.sort(Comparator.comparing(RSI::date));
+                            }
+                        }
+
                         chartPane.setContent(createRSIChart(rsiList));
                         // chartPane.setFitToWidth(true);  // 關閉自動壓縮，讓 ChartPanel 自然寬度，溢出時滾動
                         // chartPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);  // 水平滾動條自動出現（當寬度溢出時），確保用戶拖曳查看全圖，不切斷日期
@@ -411,7 +440,6 @@ public class MainApp extends Application {
                         sb.append(String.format("區間最強勢：%.2f（%s）\n", maxRsi, maxRsiDateStr));  // 格式化添加（%.2f 保留2位小數）
                         sb.append(String.format("區間最弱勢：%.2f（%s）\n", minRsi, minRsiDateStr));  // 格式化添加（%.2f 保留2位小數）
 
-                        // 新增：RSI 解釋文字
                         sb.append("\n* 超買與超賣：\n");
                         sb.append("  當RSI 顯示超買時（通常大於70），可能表示市場過熱，價格有回調的可能，是賣出訊號。 反之，當RSI 顯示超賣時（通常小於30），可能表示市場過冷，價格有上漲的潛力，是買入訊號。\n\n");
                         sb.append("* 市場趨勢：\n");
@@ -427,6 +455,45 @@ public class MainApp extends Application {
                     Platform.runLater(() -> showAlert("系統異常，請稍後再試：" + ex.getMessage()));
                     return null;
                 });
+    }
+
+    // 標準 Wilder RSI 計算
+    private List<RSI> calculateWilderRSI(List<Candle> candles, int period) {
+        List<RSI> result = new ArrayList<>();
+        if (candles.size() < period + 1) return result;
+
+        double avgGain = 0.0;
+        double avgLoss = 0.0;
+
+        // 計算最初 period 天的平均漲跌
+        for (int i = 1; i <= period; i++) {
+            double change = candles.get(i).close() - candles.get(i - 1).close();
+            if (change > 0) avgGain += change;
+            else avgLoss += Math.abs(change);
+        }
+        avgGain /= period;
+        avgLoss /= period;
+
+        // 第 period 天的 RSI
+        double rs = avgLoss == 0 ? 100 : avgGain / avgLoss;
+        double rsi = avgLoss == 0 ? 100 : 100.0 - (100.0 / (1.0 + rs));
+        result.add(new RSI(candles.get(period).date(), Math.round(rsi * 100.0) / 100.0));
+
+        // 之後使用 Wilder 平滑公式
+        for (int i = period + 1; i < candles.size(); i++) {
+            double change = candles.get(i).close() - candles.get(i - 1).close();
+            double gain = change > 0 ? change : 0.0;
+            double loss = change < 0 ? Math.abs(change) : 0.0;
+
+            avgGain = (avgGain * (period - 1) + gain) / period;
+            avgLoss = (avgLoss * (period - 1) + loss) / period;
+
+            rs = avgLoss == 0 ? 100 : avgGain / avgLoss;
+            rsi = avgLoss == 0 ? 100 : 100.0 - (100.0 / (1.0 + rs));
+
+            result.add(new RSI(candles.get(i).date(), Math.round(rsi * 100.0) / 100.0));
+        }
+        return result;
     }
 
     // 查詢 MACD 邏輯（使用共用 daysField）
@@ -461,6 +528,34 @@ public class MainApp extends Application {
         CompletableFuture.supplyAsync(() -> service.fetchMACD(symbol, days, apiKey))
                 .thenAccept(macdList -> Platform.runLater(() -> {
                     if (!macdList.isEmpty()) {
+                        // MACD 盤中預估（基於資料歸檔，Fugle 的 API最其碼要在今天收盤之後，才會進行歸檔，在那之前，是不會有今天的資料的）
+                        LocalDate today = LocalDate.now();
+                        boolean hasToday = macdList.stream().anyMatch(m -> m.date().equals(today));
+
+                        if (!hasToday) {
+                            Quote quote = service.fetchQuote(symbol, apiKey);
+                            List<Candle> history = service.fetchHistory(symbol, days, apiKey);
+
+                            // 建立今日虛擬K棒
+                            Candle todayCandle = new Candle(
+                                today,
+                                0, 0, 0, quote.closePrice(), 0L, 0.0
+                            );
+
+                            List<Candle> fullCandles = new ArrayList<>(history);
+                            fullCandles.add(todayCandle);
+                            fullCandles.sort(Comparator.comparing(Candle::date));
+
+                            // 呼叫標準 MACD 計算
+                            List<MACD> calculated = calculateStandardMACD(fullCandles);
+
+                            if (!calculated.isEmpty()) {
+                                MACD todayMACD = calculated.get(calculated.size() - 1);
+                                macdList.add(todayMACD);
+                                macdList.sort(Comparator.comparing(MACD::date));
+                            }
+                        }
+
                         chartPane.setContent(createMACDChart(macdList));
                         // chartPane.setFitToWidth(true);  // 關閉自動壓縮，讓 ChartPanel 自然寬度，溢出時滾動
                         // chartPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);  // 水平滾動條自動出現（當寬度溢出時），確保用戶拖曳查看全圖，不切斷日期
@@ -524,6 +619,40 @@ public class MainApp extends Application {
                     Platform.runLater(() -> showAlert("系統異常，請稍後再試：" + ex.getMessage()));
                     return null;
                 });
+    }
+
+    // 標準 MACD 計算（12,26,9）
+    private List<MACD> calculateStandardMACD(List<Candle> candles) {
+        List<MACD> result = new ArrayList<>();
+        if (candles.size() < 26 + 9) return result;
+
+        int fast = 12, slow = 26, signal = 9;
+        double[] close = candles.stream().mapToDouble(Candle::close).toArray();
+
+        // EMA12, EMA26
+        double emaFast = close[0];
+        double emaSlow = close[0];
+        double multiplierFast = 2.0 / (fast + 1);
+        double multiplierSlow = 2.0 / (slow + 1);
+
+        for (int i = 1; i < close.length; i++) {
+            emaFast = (close[i] - emaFast) * multiplierFast + emaFast;
+            emaSlow = (close[i] - emaSlow) * multiplierSlow + emaSlow;
+
+            if (i >= slow - 1) {
+                double dif = emaFast - emaSlow;
+
+                // 從第 slow-1 天開始計算 DEA (Signal Line)
+                if (i == slow - 1) {
+                    result.add(new MACD(candles.get(i).date(), dif, dif)); // 第一筆 DEA = DIF
+                } else {
+                    MACD prev = result.get(result.size() - 1);
+                    double dea = (dif - prev.signalLine()) * (2.0 / (signal + 1)) + prev.signalLine();
+                    result.add(new MACD(candles.get(i).date(), dif, dea));
+                }
+            }
+        }
+        return result;
     }
 
     // 等比例調整圖表尺寸（統一方法，避免程式碼重複）

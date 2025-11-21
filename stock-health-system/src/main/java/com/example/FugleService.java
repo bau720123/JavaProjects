@@ -137,7 +137,6 @@ public class FugleService {
         try {
             LocalDate to = LocalDate.now();
             LocalDate from = to.minusDays(days);
-            // 修正：正確端點格式，symbol 放路徑，新增 timeframe=D
             String params = String.format("?from=%s&to=%s&timeframe=D&period=6", from.format(formatter), to.format(formatter));
             String url = "https://api.fugle.tw/marketdata/v1.0/stock/technical/rsi/" + symbol + params;
 
