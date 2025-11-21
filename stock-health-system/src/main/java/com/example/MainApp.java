@@ -26,6 +26,10 @@ import org.jfree.chart.plot.CategoryPlot;
 import org.jfree.chart.plot.PlotOrientation;
 import org.jfree.chart.title.TextTitle;
 import org.jfree.data.category.DefaultCategoryDataset;
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
+import org.jsoup.select.Elements;
 import org.jfree.chart.renderer.category.LineAndShapeRenderer;
 
 import java.awt.Font;
@@ -36,6 +40,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.stream.Collectors;
 import java.util.concurrent.CompletableFuture;
@@ -53,6 +58,7 @@ public class MainApp extends Application {
     private Button historyBtn; // 查歷史 K 線
     private Button rsiBtn; // 查相對強弱指數按鈕
     private Button macdBtn; // 查移動平均線按鈕
+    private Button foreignNetBtn; // 查外資空口數按鈕
     private TextArea resultArea; // 文字顯示區塊
     private ScrollPane chartPane; // 圖表顯示區塊
     private BorderPane root;  // 讓 queryHistory() 可存取
@@ -139,7 +145,12 @@ public class MainApp extends Application {
         macdBtn.setOnAction(e -> queryMACD());
         macdBtn.setPrefWidth(120); // 按鈕寬度調整為120
 
-        buttonBox.getChildren().addAll(queryBtn, historyBtn, rsiBtn, macdBtn); // 添加子節點到容器的操作，將 queryBtn、historyBtn、rsiBtn 和 macdBtn 加入 buttonBox
+        // 查外資空口數 按鈕
+        foreignNetBtn = new Button("查外資空口數");
+        foreignNetBtn.setOnAction(e -> queryForeignNetPosition());
+        foreignNetBtn.setPrefWidth(120); // 按鈕寬度調整為120
+
+        buttonBox.getChildren().addAll(queryBtn, historyBtn, rsiBtn, macdBtn, foreignNetBtn); // 添加子節點到容器的操作，將 queryBtn、historyBtn、rsiBtn 和 macdBtn 加入 buttonBox
         root.setLeft(buttonBox); // 將buttonBox（已含四個元素的VBox）設定為根容器root（BorderPane）的左側區域。結果：按鈕區固定在左側視窗，寬度150px（來自setPrefWidth(150)），高度跟隨視窗拉伸，但內容不變形。
 
         /* 下方右側版面配置（文字跟圖表顯示區），使用 HBox 水平排列 */
@@ -653,6 +664,208 @@ public class MainApp extends Application {
             }
         }
         return result;
+    }
+
+    // 查外資空口數
+    private void queryForeignNetPosition() {
+        resultArea.setText("外資空口數載入中，請稍候...");
+        chartPane.setVisible(false);
+
+        CompletableFuture.supplyAsync(() -> {
+            try {
+                Document doc = Jsoup.connect("https://stock.wearn.com/taifexphoto.asp")
+                        .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                        .timeout(12000)
+                        .get();
+
+                Element table = doc.selectFirst("table.taifexphoto");
+                if (table == null) {
+                    return new ForeignNetData("錯誤：無法找到外資空口數表格（網站可能改版）", null, null);
+                }
+
+                // 原始資料
+                List<String> originalDates = new ArrayList<>();
+                List<Integer> originalNet = new ArrayList<>();
+
+                Elements rows = table.select("tr:gt(1)");
+                for (Element row : rows) {
+                    Elements tds = row.select("td");
+                    if (tds.size() >= 9) {
+                        String dateStr = tds.get(0).text().trim();
+                        String foreignStr = tds.get(5).text().trim().replace(",", "");
+
+                        if (dateStr.matches("\\d{3}/\\d{2}/\\d{2}")) {
+                            int rocYear = Integer.parseInt(dateStr.substring(0, 3));
+                            int year = 1911 + rocYear;
+                            String adDate = year + dateStr.substring(3); // 2025/11/21
+
+                            try {
+                                int net = Integer.parseInt(foreignStr);
+                                originalDates.add(adDate);
+                                originalNet.add(net);
+                            } catch (NumberFormatException ignored) {}
+                        }
+                    }
+                }
+
+                if (originalDates.isEmpty()) {
+                    return new ForeignNetData("錯誤：未解析到任何外資空口數資料", null, null);
+                }
+
+                // 反轉：最舊在前
+                List<String> ascendingDates = new ArrayList<>(originalDates);
+                List<Integer> ascendingNet = new ArrayList<>(originalNet);
+                Collections.reverse(ascendingDates);
+                Collections.reverse(ascendingNet);
+
+                // 轉換為 JFreeChart 格式 yyyy-MM-dd
+                List<String> chartDates = ascendingDates.stream()
+                        .map(d -> d.replace("/", "-"))
+                        .collect(Collectors.toList());
+
+                // 計算增減（基於原始順序：最新在前）
+                List<Integer> changes = new ArrayList<>();
+                for (int i = 0; i < originalNet.size(); i++) {
+                    if (i < originalNet.size() - 1) {
+                        changes.add(originalNet.get(i) - originalNet.get(i + 1));
+                    } else {
+                        changes.add(0);
+                    }
+                }
+                // 反轉增減順序對應文字區
+                Collections.reverse(changes);
+
+                // 刪除第一筆不需顯示的資料
+                if (!ascendingDates.isEmpty()) {
+                    ascendingDates.remove(0);
+                    ascendingNet.remove(0);
+                    chartDates.remove(0);
+                    changes.remove(0);
+                }
+
+                // 最大最小空口數
+                int highestNet = ascendingNet.stream().mapToInt(Integer::intValue).min().orElse(0);
+                int lowestNet  = ascendingNet.stream().mapToInt(Integer::intValue).max().orElse(0);
+
+                List<String> highestDates = new ArrayList<>();
+                List<String> lowestDates = new ArrayList<>();
+                for (int i = 0; i < ascendingNet.size(); i++) {
+                    if (ascendingNet.get(i) == highestNet) highestDates.add(ascendingDates.get(i));
+                    if (ascendingNet.get(i) == lowestNet)  lowestDates.add(ascendingDates.get(i));
+                }
+
+                // 文字區
+                StringBuilder sb = new StringBuilder();
+                sb.append("外資空口數已載入\n\n");
+                sb.append("歷史空口數如下：\n\n");
+
+                for (int i = 0; i < ascendingDates.size(); i++) {
+                    String displayDate = ascendingDates.get(i).replace("/", "-"); // 轉成 yyyy-MM-dd
+                    sb.append(String.format("日期：%s\n空口數：%,d\n增減：%,d\n\n",
+                            displayDate, ascendingNet.get(i), changes.get(i)));
+                }
+
+                sb.append(String.format("區間最高空口數：%,d（%s）\n",
+                        highestNet, String.join("、", highestDates.stream()
+                                .map(d -> d.replace("/", "-"))
+                                .collect(Collectors.toList()))));
+                sb.append(String.format("區間最低空口數：%,d（%s）\n",
+                        lowestNet, String.join("、", lowestDates.stream()
+                                .map(d -> d.replace("/", "-"))
+                                .collect(Collectors.toList()))));
+
+                return new ForeignNetData(sb.toString(), chartDates, ascendingNet);
+
+            } catch (Exception e) {
+                return new ForeignNetData("爬蟲失敗：" + e.getMessage(), null, null);
+            }
+        }).thenAccept(data -> Platform.runLater(() -> {
+            resultArea.setText(data.text);
+
+            if (data.dates != null && data.netPositions != null) {
+                chartPane.setContent(createForeignNetLineChart(data.dates, data.netPositions));
+                resizeChartProportionally();
+                PauseTransition delay = new PauseTransition(Duration.millis(400));
+                delay.setOnFinished(e -> chartPane.setVisible(true));
+                delay.play();
+            }
+        }));
+    }
+
+    // 外資空口數折線圖（Y 軸倒置 + 自動範圍 + 與 K 線完全一致）
+    private Node createForeignNetLineChart(List<String> dates, List<Integer> netPositions) {
+        SwingNode swingNode = new SwingNode();
+
+        SwingUtilities.invokeLater(() -> {
+            DefaultCategoryDataset dataset = new DefaultCategoryDataset();
+
+            for (int i = 0; i < dates.size(); i++) {
+                dataset.addValue(netPositions.get(i), "外資淨空口數", dates.get(i));
+            }
+
+            JFreeChart chart = ChartFactory.createLineChart(
+                "外資台指期淨空口數趨勢圖",
+                "日期",
+                "淨空口數",
+                dataset,
+                PlotOrientation.VERTICAL,
+                false, true, false
+            );
+
+            CategoryPlot plot = chart.getCategoryPlot();
+
+            // Y 軸倒置（數值越小越在上方）
+            plot.getRangeAxis().setInverted(true);
+
+            // 自動調整範圍 + 10% padding
+            if (!netPositions.isEmpty()) {
+                int min = netPositions.stream().mapToInt(Integer::intValue).min().orElse(0);
+                int max = netPositions.stream().mapToInt(Integer::intValue).max().orElse(0);
+                int range = max - min;
+                int padding = range == 0 ? 2000 : (int) (range * 0.1);
+
+                plot.getRangeAxis().setLowerBound(min - padding);
+                plot.getRangeAxis().setUpperBound(max + padding);
+            }
+
+            Font font = new Font("Microsoft YaHei", Font.BOLD, 14);
+            chart.getTitle().setFont(font);
+            plot.getDomainAxis().setLabelFont(font);
+            plot.getRangeAxis().setLabelFont(font);
+
+            LineAndShapeRenderer renderer = (LineAndShapeRenderer) plot.getRenderer();
+            renderer.setSeriesPaint(0, Color.BLUE);
+            renderer.setSeriesStroke(0, new java.awt.BasicStroke(2.5f));
+
+            CategoryAxis domainAxis = (CategoryAxis) plot.getDomainAxis();
+            domainAxis.setCategoryLabelPositions(CategoryLabelPositions.UP_90);
+
+            currentChartPanel = new ChartPanel(chart);
+            currentChartPanel.setPreferredSize(new java.awt.Dimension(695, 400));
+            swingNode.setContent(currentChartPanel);
+
+            Timer timer = new Timer(200, e -> {
+                currentChartPanel.revalidate();
+                currentChartPanel.repaint();
+                ((Timer) e.getSource()).stop();
+            });
+            timer.setRepeats(false);
+            timer.start();
+        });
+
+        return swingNode;
+    }
+
+    private static class ForeignNetData {
+        final String text;
+        final List<String> dates;
+        final List<Integer> netPositions;
+
+        ForeignNetData(String text, List<String> dates, List<Integer> netPositions) {
+            this.text = text;
+            this.dates = dates;
+            this.netPositions = netPositions;
+        }
     }
 
     // 等比例調整圖表尺寸（統一方法，避免程式碼重複）
