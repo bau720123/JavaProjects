@@ -11,6 +11,8 @@ import javafx.scene.control.*;
 import javafx.scene.control.Alert.AlertType;
 import javafx.scene.layout.*;
 import javafx.stage.Stage;
+import javafx.animation.KeyFrame;
+import javafx.animation.KeyValue;
 import javafx.animation.PauseTransition;
 import javafx.util.Duration;
 
@@ -30,6 +32,9 @@ import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
+
+import com.example.FugleService.SMA;
+
 import org.jfree.chart.renderer.category.LineAndShapeRenderer;
 
 import java.awt.Font;
@@ -49,6 +54,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Properties;
 
+import javafx.animation.Timeline;
+
 public class MainApp extends Application {
     private final FugleService service = new FugleService(); // 使用 Fugle API 做資料存取
     private TextField symbolField; // 股票代號
@@ -56,6 +63,7 @@ public class MainApp extends Application {
     private TextField daysField; // 天數輸入欄位（共用給歷史 K 線、RSI、MACD）
     private Button queryBtn; // 查即時報價
     private Button historyBtn; // 查歷史 K 線
+    private Button smaBtn; // 查簡單移動平均線
     private Button rsiBtn; // 查相對強弱指數按鈕
     private Button macdBtn; // 查移動平均線按鈕
     private Button foreignNetBtn; // 查外資空口數按鈕
@@ -127,30 +135,35 @@ public class MainApp extends Application {
 
         // 查即時報價
         queryBtn = new Button("查即時報價");
-        queryBtn.setOnAction(e -> queryQuote());
         queryBtn.setPrefWidth(120); // 按鈕寬度調整為120
+        queryBtn.setOnAction(e -> queryQuote());
 
         // 查歷史 K 線
         historyBtn = new Button("查歷史 K 線");
-        historyBtn.setOnAction(e -> queryHistory());
         historyBtn.setPrefWidth(120); // 按鈕寬度調整為120
+        historyBtn.setOnAction(e -> queryHistory());
+
+        // 查簡單移動平均線
+        smaBtn = new Button("查簡單移動平均線");
+        smaBtn.setPrefWidth(120); // 按鈕寬度調整為120
+        smaBtn.setOnAction(e -> querySMA());
 
         // 查相對強弱指數
         rsiBtn = new Button("查相對強弱指數");
-        rsiBtn.setOnAction(e -> queryRSI());
         rsiBtn.setPrefWidth(120); // 按鈕寬度調整為120
+        rsiBtn.setOnAction(e -> queryRSI());
 
         // 查移動平均線 按鈕
         macdBtn = new Button("查移動平均線");
-        macdBtn.setOnAction(e -> queryMACD());
         macdBtn.setPrefWidth(120); // 按鈕寬度調整為120
+        macdBtn.setOnAction(e -> queryMACD());
 
         // 查外資空口數 按鈕
         foreignNetBtn = new Button("查外資空口數");
-        foreignNetBtn.setOnAction(e -> queryForeignNetPosition());
         foreignNetBtn.setPrefWidth(120); // 按鈕寬度調整為120
+        foreignNetBtn.setOnAction(e -> queryForeignNetPosition());
 
-        buttonBox.getChildren().addAll(queryBtn, historyBtn, rsiBtn, macdBtn, foreignNetBtn); // 添加子節點到容器的操作，將 queryBtn、historyBtn、rsiBtn 和 macdBtn 加入 buttonBox
+        buttonBox.getChildren().addAll(queryBtn, historyBtn, smaBtn, rsiBtn, macdBtn, foreignNetBtn); // 添加子節點到容器的操作，將 queryBtn、historyBtn、smaBtn、rsiBtn、macdBtn 加入 buttonBox
         root.setLeft(buttonBox); // 將buttonBox（已含四個元素的VBox）設定為根容器root（BorderPane）的左側區域。結果：按鈕區固定在左側視窗，寬度150px（來自setPrefWidth(150)），高度跟隨視窗拉伸，但內容不變形。
 
         /* 下方右側版面配置（文字跟圖表顯示區），使用 HBox 水平排列 */
@@ -203,6 +216,33 @@ public class MainApp extends Application {
         Platform.runLater(() -> root.requestFocus());
 
         stage.show();
+
+        // 重大事件自動提醒
+        Platform.runLater(() -> {
+            String eventMsg = MarketEventCalendar.getTodayEventMessage();
+            if (eventMsg != null) {
+                // 把原來的歡迎訊息保留在下面
+                String original = resultArea.getText();
+                resultArea.setText(eventMsg +
+                        "────────────────────────────────────\n" +
+                        original);
+
+                // 紅字 + 粗體 + 淡橘底色 + 閃爍動畫（可選）
+                resultArea.setStyle("-fx-font-weight: bold; " +
+                        "-fx-text-fill: #d32f2f; " +
+                        "-fx-background-color: #ffebee; " +
+                        "-fx-font-size: 14px;");
+
+                // 閃爍效果（可自行決定要不要）
+                Timeline blink = new Timeline(
+                        new KeyFrame(Duration.seconds(0),   new KeyValue(resultArea.opacityProperty(), 1)),
+                        new KeyFrame(Duration.seconds(0.5), new KeyValue(resultArea.opacityProperty(), 0.6)),
+                        new KeyFrame(Duration.seconds(1),   new KeyValue(resultArea.opacityProperty(), 1))
+                );
+                blink.setCycleCount(6);   // 閃 3 次
+                blink.play();
+            }
+        });
     }
 
     // 查詢即時報價邏輯
@@ -225,7 +265,7 @@ public class MainApp extends Application {
                 .thenAccept(quote -> Platform.runLater(() -> {
                     if (quote != null) {
                         StringBuilder sb = new StringBuilder(); // 使用 StringBuilder 可多行段落顯示，並且在字串相接時比較高效，無額外開銷
-                        sb.append(String.format("股票：%s（%s）\n昨日收盤價：%.0f\n開盤價：%.0f\n最高價：%.0f\n最低價：%.0f\n收盤價或現價：%.0f\n均價：%.2f\n總量：%d 股\n漲跌：%.0f\n幅度：%.2f\n",
+                        sb.append(String.format("股票：%s（%s）\n上個收盤價：%.0f\n開盤價：%.0f\n最高價：%.0f\n最低價：%.0f\n收盤價或現價：%.0f\n均價：%.2f\n總量：%d 股\n漲跌：%.0f\n幅度：%.2f\n",
                                 quote.symbol(), quote.name(), quote.previousClose(), quote.openPrice(), quote.highPrice(), quote.lowPrice(), quote.closePrice(),
                                 quote.avgPrice(), quote.tradeVolume(), quote.change(), quote.changePercent()));
 
@@ -342,6 +382,115 @@ public class MainApp extends Application {
                     Platform.runLater(() -> showAlert("系統異常，請稍後再試：" + ex.getMessage()));
                     return null;
                 });
+    }
+
+    // 查詢 SMA 邏輯（使用共用 daysField）
+    private void querySMA() {
+        String symbol = symbolField.getText().trim();
+        String apiKey = keyField.getText().trim();
+        String daysText = daysField.getText().trim(); // 使用共用天數欄位
+        int days;
+
+        if (symbol.isEmpty()) {
+            showAlert("請輸入 股票代號");
+            return;
+        }
+        if (apiKey.isEmpty()) {
+            showAlert("請輸入 Fugle API Key");
+            return;
+        }
+
+        try {
+            days = Integer.parseInt(daysText);
+            if (days < 1) {
+                showAlert("天數必須為 1 以上");
+                return;
+            }
+        } catch (NumberFormatException e) {
+            showAlert("天數必須為有效數字（1 以上）");
+            return;
+        }
+
+        // 處裡非同步的操作，有點像是jQuery中的$.ajax(...)
+        CompletableFuture.supplyAsync(() -> service.fetchSMA(symbol, days, apiKey))
+                .thenAccept(smaList -> Platform.runLater(() -> {
+                    if (!smaList.isEmpty()) {
+                        // SMA 盤中預估（基於資料歸檔，Fugle 的 API最其碼要在今天收盤之後，才會進行歸檔，在那之前，是不會有今天的資料的）
+                        LocalDate today = LocalDate.now();
+                        boolean hasToday = smaList.stream().anyMatch(s -> s.date().equals(today));
+                        System.err.println("today：" + today);
+                        System.err.println("smaList_before：" + smaList);
+
+                        if (!hasToday) {
+                            Quote quote = service.fetchQuote(symbol, apiKey);
+                            List<Candle> history = service.fetchHistory(symbol, days, apiKey);
+                            System.err.println("quote_closePrice：" + quote.closePrice());
+                            System.err.println("history：" + history);
+
+                            // 建立今日虛擬K棒
+                            Candle todayCandle = new Candle(
+                                today,
+                                0, 0, 0, quote.closePrice(), 0L, 0.0
+                            );
+
+                            List<Candle> fullCandles = new ArrayList<>(history);
+                            fullCandles.add(todayCandle);
+                            fullCandles.sort(Comparator.comparing(Candle::date));
+
+                            // 計算 SMA(5)
+                            double sum = fullCandles.stream()
+                                .skip(Math.max(0, fullCandles.size() - 5))
+                                .mapToDouble(Candle::close)
+                                .sum();
+                            double sma5 = sum / 5.0;
+
+                            smaList.add(new SMA(today, round(sma5)));
+                            smaList.sort(Comparator.comparing(SMA::date));
+
+                            System.err.println("smaList_after：" + smaList);
+                        }
+
+                        chartPane.setContent(createSMAChart(smaList));
+                        // chartPane.setFitToWidth(false);  // 關閉自動壓縮，讓 ChartPanel 自然寬度，溢出時滾動
+                        // chartPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);  // 水平滾動條自動出現（當寬度溢出時），確保用戶拖曳查看全圖，不切斷日期
+                        resizeChartProportionally(); // 改用統一的等比例縮放方法
+
+                        // 延遲 setVisible，給 Swing 初始化時間
+                        PauseTransition delayVisible = new PauseTransition(Duration.millis(400));
+                        delayVisible.setOnFinished(e -> {
+                            chartPane.setVisible(true);
+                        });
+                        delayVisible.play();
+
+                        // SMA 文字列表
+                        StringBuilder sb = new StringBuilder(String.format("簡單移動平均線（SMA）已載入（近 %d 日 SMA(5) 走勢）\n\n", days));
+                        for (SMA s : smaList) {
+                            String tag = s.date().equals(today) && !hasToday ? "（盤中預估）" : "";
+                            sb.append(String.format("日期：%s %s\nSMA：%.2f\n\n", s.date(), tag, s.sma()));
+                        }
+
+                        double max = smaList.stream().mapToDouble(SMA::sma).max().orElse(0);
+                        double min = smaList.stream().mapToDouble(SMA::sma).min().orElse(0);
+
+                        List<LocalDate> maxDates = smaList.stream()
+                                .filter(s -> s.sma() == max)
+                                .map(SMA::date)
+                                .sorted(Comparator.reverseOrder())
+                                .collect(Collectors.toList());
+                        List<LocalDate> minDates = smaList.stream()
+                                .filter(s -> s.sma() == min)
+                                .map(SMA::date)
+                                .sorted(Comparator.reverseOrder())
+                                .collect(Collectors.toList());
+
+                        sb.append(String.format("區間最高：%.2f（%s）\n", max, maxDates.stream().map(Object::toString).collect(Collectors.joining("、"))));
+                        sb.append(String.format("區間最低：%.2f（%s）\n", min, minDates.stream().map(Object::toString).collect(Collectors.joining("、"))));
+
+                        resultArea.setText(sb.toString());
+                    } else {
+                        resultArea.setText("SMA 資料載入失敗，請稍後再試\n若 API 不可用，請確認 API key 有效。");
+                    }
+                }));
     }
 
     // 查詢 RSI 邏輯（使用共用 daysField）
@@ -919,18 +1068,9 @@ public class MainApp extends Application {
         }
     }
 
-    // 創建線圖（使用 JFreeChart API）：這是個私有方法，返回一個 Node（JavaFX 的 UI 節點），用來嵌入 SwingNode 組件到 ScrollPane 中顯示 K 線圖。
-    // 輸入：List<Candle> candles - 從 FugleService.fetchHistory() 取得的歷史 K 線資料（每個 Candle 含日期、開高低收等）。
-    // 輸出：SwingNode - 包裝 JFreeChart 的 ChartPanel，讓圖表在 JavaFX 場景中渲染。
-    // 目的：根據 candles 資料動態生成線圖（X 軸：日期，Y 軸：收盤價），支援滾動和 tooltip。
     private Node createLineChart(List<Candle> candles) {
-        // 創建 SwingNode：JavaFX-Swing 橋接器，用來將 Swing 組件（如 JFreeChart 的 ChartPanel）嵌入 JavaFX 場景圖中。
-        // JFreeChart 是基於 Swing 的圖表庫，需嵌入到 JavaFX 的 ScrollPane 中渲染。
         SwingNode swingNode = new SwingNode();
 
-        // SwingUtilities.invokeLater(Runnable)：Swing 框架的執行緒工具，確保以下代碼在 Swing 的 EDT (Event Dispatch Thread) 中運行。
-        // 目的：JFreeChart 的 chart 建構和 repaint 必須在 EDT，避免 "IllegalComponentStateException" 或渲染錯誤。
-        // 這是混合 UI (JavaFX + Swing) 的標準實務，類似 JavaFX 的 Platform.runLater() 但針對 Swing。
         SwingUtilities.invokeLater(() -> {
             // DefaultCategoryDataset：JFreeChart 的資料集類別，用於類別型資料（如 X=日期字符串，Y=數值），支援多系列。
             // 日期是離散類別（非連續時間），CategoryAxis 只顯示有資料的點，解決假日空白問題。
@@ -1018,7 +1158,69 @@ public class MainApp extends Application {
         return swingNode;
     }
 
-    // 創建 RSI 線圖（複製自 createLineChart 並調整）
+    private Node createSMAChart(List<SMA> smaList) {
+        SwingNode swingNode = new SwingNode();
+
+        SwingUtilities.invokeLater(() -> {
+            DefaultCategoryDataset dataset = new DefaultCategoryDataset();
+
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+
+            for (int i = 0; i < smaList.size(); i++) {
+                SMA s = smaList.get(i);
+                LocalDate localDate = s.date();
+
+                String dateStr = sdf.format(Date.from(localDate.atStartOfDay(ZoneId.systemDefault()).toInstant()));
+
+                dataset.addValue(s.sma(), "SMA 指標", dateStr);  // 用日期字符串作為類別（X 軸標籤），Y 為 sma 值
+            }
+
+            JFreeChart chart = ChartFactory.createLineChart(
+                "簡單移動平均線 SMA(5)",
+                "日期", "價格",
+                dataset, PlotOrientation.VERTICAL, false, true, false
+            );
+
+            Font font = new Font("Microsoft YaHei", Font.BOLD, 14);
+
+            chart.getTitle().setFont(font);
+            CategoryPlot plot = chart.getCategoryPlot();
+            plot.getDomainAxis().setLabelFont(font);
+            plot.getRangeAxis().setLabelFont(font);
+
+            // Y 軸範圍動態調整（根據資料 min/max，類似 before 的行為，避免從 0 開始）
+            double minClose = smaList.stream().mapToDouble(SMA::sma).min().orElse(0.0); // minClose：資料中的最小收盤價
+            double maxClose = smaList.stream().mapToDouble(SMA::sma).max().orElse(0.0);  // maxClose：資料中最大收盤價
+            double padding = (maxClose - minClose) * 0.05;  // 5% 緩衝空間（padding）：Y 軸上下留白，避免線貼邊
+
+            // getRangeAxis()：Y 軸 ValueAxis，setLowerBound / setUpperBound 動態設範圍。
+            plot.getRangeAxis().setLowerBound(Math.max(0, minClose - padding));  // 下限：min - padding，但不低於 0（股票價 >0）
+            plot.getRangeAxis().setUpperBound(maxClose + padding);  // 上限：max + padding
+
+            LineAndShapeRenderer renderer = (LineAndShapeRenderer) plot.getRenderer();
+            renderer.setSeriesPaint(0, Color.ORANGE);
+            renderer.setSeriesStroke(0, new java.awt.BasicStroke(2.5f));
+
+            CategoryAxis domainAxis = (CategoryAxis) plot.getDomainAxis();
+            domainAxis.setCategoryLabelPositions(CategoryLabelPositions.UP_90);
+
+            currentChartPanel = new ChartPanel(chart);
+            currentChartPanel.setPreferredSize(new java.awt.Dimension(695, 400));
+            swingNode.setContent(currentChartPanel);
+
+            Timer timer = new Timer(200, e -> {
+                currentChartPanel.revalidate();
+                currentChartPanel.repaint();
+                ((Timer) e.getSource()).stop();
+            });
+            timer.setRepeats(false);
+            timer.start();
+        });
+
+        return swingNode;
+    }
+
+    // 創建 RSI 線圖
     private Node createRSIChart(List<RSI> rsiList) {
         SwingNode swingNode = new SwingNode();
 
@@ -1085,7 +1287,7 @@ public class MainApp extends Application {
         return swingNode;
     }
 
-    // 創建 MACD 線圖（複製自 createRSIChart 並調整為兩系列）
+    // 創建 MACD 線圖
     private Node createMACDChart(List<MACD> macdList) {
         SwingNode swingNode = new SwingNode();
 

@@ -18,7 +18,9 @@ import java.time.format.DateTimeFormatter;  // Java 時間 API 中的 DateTimeFo
 
 // 集合操作（java.util）
 import java.util.List; // Java 集合框架的 List 介面（抽象）：有序、可重複元素的集合介面。這裡用作泛型（如 List<BidAsk>），讓方法返回靈活的資料結構。ArrayList 實現它。
+import java.util.stream.Collectors;
 import java.util.ArrayList;  // Java 集合框架中的 ArrayList 類別（具體）：動態陣列實現 List 介面，用於儲存可變大小的資料。這裡用來建構 bids/asks 的 List<BidAsk>，或 fetchHistory 的 candles 清單。
+import java.util.Comparator;
 
 // RSI 記錄類別（簡潔記錄 date 和 rsi）
 record RSI(LocalDate date, double rsi) {}
@@ -132,6 +134,45 @@ public class FugleService {
         return List.of();
     }
 
+    // SMA 記錄類
+    public record SMA(LocalDate date, double sma) {}
+
+    // 取得 SMA 指標
+    public List<SMA> fetchSMA(String symbol, int days, String apiKey) {
+        try {
+            LocalDate to = LocalDate.now();
+            LocalDate from = to.minusDays(days);
+            String params = String.format("?from=%s&to=%s&timeframe=D&period=5", from.format(formatter), to.format(formatter));
+            String url = "https://api.fugle.tw/marketdata/v1.0/stock/technical/sma/" + symbol + params;
+
+            Request request = new Request.Builder()
+                    .url(url)
+                    .header("X-API-KEY", apiKey)
+                    .build();
+
+            // try-with-resources（Java 7+語法，自動關閉Response資源），所以無需再catch
+            try (Response response = client.newCall(request).execute()) {
+                if (response.isSuccessful()) {
+                    JsonNode root = mapper.readTree(response.body().string());
+                    JsonNode dataArray = root.path("data");
+                    List<SMA> smaList = new ArrayList<>();
+                    for (JsonNode node : dataArray) {
+                        smaList.add(new SMA(
+                            LocalDate.parse(node.path("date").asText(), formatter),
+                            node.path("sma").asDouble()
+                        ));
+                    }
+                    return smaList;
+                } else if (response.code() == 401 || response.code() == 404) {
+                    return List.of();  // API 失效時返回空 list，讓 UI 顯示錯誤提示
+                }
+            }
+        } catch (Exception e) {
+            return List.of();  // API 失效時返回空 list，讓 UI 顯示錯誤提示
+        }
+        return List.of();  // API 失效時返回空 list，讓 UI 顯示錯誤提示
+    }
+
     // 取得 RSI 指標
     public List<RSI> fetchRSI(String symbol, int days, String apiKey) {
         try {
@@ -165,7 +206,7 @@ public class FugleService {
         } catch (IOException e) {
             return List.of();  // API 失效時返回空 list，讓 UI 顯示錯誤提示
         }
-        return List.of();
+        return List.of();  // API 失效時返回空 list，讓 UI 顯示錯誤提示
     }
 
     // 取得 MACD 指標
@@ -200,6 +241,6 @@ public class FugleService {
         } catch (IOException e) {
             return List.of();  // API 失效時返回空 list，讓 UI 顯示錯誤提示
         }
-        return List.of();
+        return List.of();  // API 失效時返回空 list，讓 UI 顯示錯誤提示
     }
 }
