@@ -635,35 +635,43 @@ public class MainApp extends Application {
     // 標準 MACD 計算（12,26,9）
     private List<MACD> calculateStandardMACD(List<Candle> candles) {
         List<MACD> result = new ArrayList<>();
-        if (candles.size() < 26 + 9) return result;
+        if (candles.isEmpty()) return result;
 
-        int fast = 12, slow = 26, signal = 9;
         double[] close = candles.stream().mapToDouble(Candle::close).toArray();
 
-        // EMA12, EMA26
-        double emaFast = close[0];
-        double emaSlow = close[0];
-        double multiplierFast = 2.0 / (fast + 1);
-        double multiplierSlow = 2.0 / (slow + 1);
+        // 從第一筆開始初始化 EMA
+        double ema12 = close[0];
+        double ema26 = close[0];
+        double k12 = 2.0 / (12 + 1);
+        double k26 = 2.0 / (26 + 1);
+
+        double prevDea = 0.0;
+        boolean firstDea = true;
 
         for (int i = 1; i < close.length; i++) {
-            emaFast = (close[i] - emaFast) * multiplierFast + emaFast;
-            emaSlow = (close[i] - emaSlow) * multiplierSlow + emaSlow;
+            ema12 = close[i] * k12 + ema12 * (1 - k12);
+            ema26 = close[i] * k26 + ema26 * (1 - k26);
 
-            if (i >= slow - 1) {
-                double dif = emaFast - emaSlow;
+            double dif = ema12 - ema26;
 
-                // 從第 slow-1 天開始計算 DEA (Signal Line)
-                if (i == slow - 1) {
-                    result.add(new MACD(candles.get(i).date(), dif, dif)); // 第一筆 DEA = DIF
-                } else {
-                    MACD prev = result.get(result.size() - 1);
-                    double dea = (dif - prev.signalLine()) * (2.0 / (signal + 1)) + prev.signalLine();
-                    result.add(new MACD(candles.get(i).date(), dif, dea));
-                }
+            double dea;
+            if (firstDea) {
+                dea = dif;
+                firstDea = false;
+            } else {
+                dea = dif * (2.0 / (9 + 1)) + prevDea * (1 - 2.0 / (9 + 1));
             }
+            prevDea = dea;
+
+            // 每一天都加入結果（盤中也能看到最新值）
+            result.add(new MACD(candles.get(i).date(), round(dif), round(dea)));
         }
+
         return result;
+    }
+
+    private double round(double value) {
+        return Math.round(value * 100.0) / 100.0;
     }
 
     // 查外資空口數
