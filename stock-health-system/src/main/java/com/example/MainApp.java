@@ -1033,6 +1033,11 @@ public class MainApp extends Application {
 
     // 查聯準會利率
     private void queryFedRateProbability() {
+        /**
+         * 其它資訊參考
+         * https://cmegroup-tools.quikstrike.net/User/QuikStrikeView.aspx?qsid=0a56e4e3-4ae7-4af4-b828-f79eeb83f456&insid=196261620
+         * https://www.investing.com/central-banks/fed-rate-monitor
+         */
         String apiKey = keyField.getText().trim(); // API Key
         if (apiKey.isEmpty()) {
             showAlert("請輸入 FRED API Key");
