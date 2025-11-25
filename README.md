@@ -65,6 +65,11 @@ Copyright (c) .NET Foundation and contributors. All rights reserved.
   https://developer.fugle.tw/docs/data/intro  
   https://github.com/fugle-dev/fugle-marketdata-python  
 
+- FRED API Key  
+  [教學文件與TOKEN申請]  
+  https://fredaccount.stlouisfed.org/apikeys  
+  https://fred.stlouisfed.org/docs/api/fred/  
+
 ## 安裝與執行
 ### 1. 克隆專案  
 - git clone https://github.com/bau720123/JavaProjects.git  
