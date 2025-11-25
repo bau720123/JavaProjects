@@ -24,10 +24,13 @@ import org.jfree.chart.ChartPanel;
 import org.jfree.chart.JFreeChart;
 import org.jfree.chart.axis.CategoryAxis;
 import org.jfree.chart.axis.CategoryLabelPositions;
+import org.jfree.chart.labels.StandardPieSectionLabelGenerator;
 import org.jfree.chart.plot.CategoryPlot;
+import org.jfree.chart.plot.PiePlot;
 import org.jfree.chart.plot.PlotOrientation;
 import org.jfree.chart.title.TextTitle;
 import org.jfree.data.category.DefaultCategoryDataset;
+import org.jfree.data.general.DefaultPieDataset;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -39,6 +42,7 @@ import org.jfree.chart.renderer.category.LineAndShapeRenderer;
 
 import java.awt.Font;
 import java.awt.Color;  // 顏色設定用於 MACD 圖表線條
+import java.text.NumberFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.time.LocalDate;
@@ -59,9 +63,8 @@ import javafx.animation.Timeline;
 public class MainApp extends Application {
     private final FugleService service = new FugleService(); // 使用 Fugle API 做資料存取
     private TextField symbolField; // 股票代號
-    private PasswordField keyField; // Fugle API Key
+    private PasswordField keyField; // API Key
     private TextField daysField; // 天數輸入欄位（共用給歷史 K 線、RSI、MACD）
-    private TextField fredApiKeyField; // FRED API Key 輸入框（X）
     private Button queryBtn; // 查即時報價
     private Button historyBtn; // 查歷史 K 線
     private Button smaBtn; // 查簡單移動平均線
@@ -111,10 +114,10 @@ public class MainApp extends Application {
 
         // API Key 輸入
         VBox keyVBox = new VBox(5);
-        Label keyLabel = new Label("Fugle API Key：");
+        Label keyLabel = new Label("API Key：");
         keyField = new PasswordField();
         keyField.setText("");
-        keyField.setPromptText("請輸入 Fugle API Key");
+        keyField.setPromptText("請輸入 API Key");
         keyField.setPrefWidth(200);  // 設定偏好寬度
         keyVBox.getChildren().addAll(keyLabel, keyField);
 
@@ -126,14 +129,7 @@ public class MainApp extends Application {
         daysField.setPrefWidth(50); // 天數輸入欄位小寬度
         daysVBox.getChildren().addAll(daysLabel, daysField);
 
-        VBox fredKeyVBox = new VBox(5);
-        Label fredKeyLabel = new Label("FRED API Key：");
-        fredApiKeyField = new TextField();
-        fredApiKeyField.setPromptText("請輸入 FRED API Key");
-        fredApiKeyField.setPrefWidth(200);
-        fredKeyVBox.getChildren().addAll(fredKeyLabel, fredApiKeyField);
-
-        inputBox.getChildren().addAll(symbolVBox, keyVBox, daysVBox, fredKeyVBox); // 添加子節點到容器的操作
+        inputBox.getChildren().addAll(symbolVBox, keyVBox, daysVBox); // 添加子節點到容器的操作
         root.setTop(inputBox); // 將 inputBox 設定為根容器的頂部區域。結果：輸入區固定在上方視窗，無論視窗resize，BorderPane會自動拉伸中間/底部內容。
 
         /* 下方左側版面配置（功能列表），使用 VBox 垂直排列 */
@@ -262,7 +258,7 @@ public class MainApp extends Application {
     // 查詢即時報價邏輯
     private void queryQuote() {
         String symbol = symbolField.getText().trim(); // 股票代號
-        String apiKey = keyField.getText().trim(); // Fugle API Key
+        String apiKey = keyField.getText().trim(); // API Key
 
         if (symbol.isEmpty()) {
             showAlert("請輸入 股票代號");
@@ -310,7 +306,7 @@ public class MainApp extends Application {
     // 查詢歷史 K 線邏輯（使用共用 daysField）
     private void queryHistory() {
         String symbol = symbolField.getText().trim(); // 股票代號
-        String apiKey = keyField.getText().trim(); // Fugle API Key
+        String apiKey = keyField.getText().trim(); // API Key
         String daysText = daysField.getText().trim(); // 使用共用天數欄位
         int days;
 
@@ -400,9 +396,9 @@ public class MainApp extends Application {
 
     // 查詢 SMA 邏輯（使用共用 daysField）
     private void querySMA() {
-        String symbol = symbolField.getText().trim();
-        String apiKey = keyField.getText().trim();
-        String daysText = daysField.getText().trim(); // 使用共用天數欄位
+        String symbol = symbolField.getText().trim(); // 股票代號
+        String apiKey = keyField.getText().trim(); // API Key
+        String daysText = daysField.getText().trim(); // 使用共用天數欄位 
         int days;
 
         if (symbol.isEmpty()) {
@@ -504,7 +500,7 @@ public class MainApp extends Application {
     // 查詢 RSI 邏輯（使用共用 daysField）
     private void queryRSI() {
         String symbol = symbolField.getText().trim(); // 股票代號
-        String apiKey = keyField.getText().trim(); // Fugle API Key
+        String apiKey = keyField.getText().trim(); // API Key
         String daysText = daysField.getText().trim(); // 使用共用天數欄位
         int days;
 
@@ -668,7 +664,7 @@ public class MainApp extends Application {
     // 查詢 MACD 邏輯（使用共用 daysField）
     private void queryMACD() {
         String symbol = symbolField.getText().trim(); // 股票代號
-        String apiKey = keyField.getText().trim(); // Fugle API Key
+        String apiKey = keyField.getText().trim(); // API Key
         String daysText = daysField.getText().trim(); // 使用共用天數欄位
         int days;
 
@@ -1037,22 +1033,40 @@ public class MainApp extends Application {
 
     // 查聯準會利率
     private void queryFedRateProbability() {
-        String apiKey = fredApiKeyField.getText().trim();
+        String apiKey = keyField.getText().trim(); // API Key
         if (apiKey.isEmpty()) {
-            showAlert("請輸入 FRED API Key（可免費申請）");
+            showAlert("請輸入 FRED API Key");
             return;
         }
 
         resultArea.clear();
-        resultArea.appendText("【聯準會利率期貨隱含機率】\n");
-        resultArea.appendText("查詢中，請稍候...\n");
+        resultArea.appendText("【聯準會利率期貨隱含機率】\n查詢中，請稍候...\n");
 
         CompletableFuture.runAsync(() -> {
-            String result = FedWatchService.getProbability(apiKey);
+            FedWatchService.FedWatchResult data = FedWatchService.getProbability(apiKey);
+
             Platform.runLater(() -> {
                 resultArea.clear();
-                resultArea.appendText(result);
+                resultArea.appendText(data.fullText);
+
+                if (!data.labels.isEmpty() && !data.probabilities.isEmpty()) {
+                    Node pieChart = createFedRatePieChart(data);
+                    chartPane.setContent(pieChart);
+                    resizeChartProportionally();
+                    PauseTransition delay = new PauseTransition(Duration.millis(400));
+                    delay.setOnFinished(e -> chartPane.setVisible(true));
+                    delay.play();
+                } else {
+                    chartPane.setContent(createEmptyChartPanel());
+                }
             });
+        }).exceptionally(ex -> {
+            Platform.runLater(() -> {
+                resultArea.clear();
+                resultArea.appendText("【聯準會利率期貨機率】查詢失敗\n" + ex.getMessage() + "\n");
+                chartPane.setContent(createEmptyChartPanel());
+            });
+            return null;
         });
     }
 
@@ -1397,6 +1411,61 @@ public class MainApp extends Application {
             timer.start();
         });
         
+        return swingNode;
+    }
+
+    // 創建 聯準會利率 圓餅圖
+    private Node createFedRatePieChart(FedWatchService.FedWatchResult data) {
+        SwingNode swingNode = new SwingNode();
+
+        SwingUtilities.invokeLater(() -> {
+            DefaultPieDataset<String> dataset = new DefaultPieDataset<>();
+            Color[] colors = { new Color(0, 120, 0), new Color(144, 238, 144) };
+
+            for (int i = 0; i < data.labels.size(); i++) {
+                dataset.setValue(data.labels.get(i), data.probabilities.get(i));
+            }
+
+            JFreeChart chart = ChartFactory.createPieChart(
+                "聯準會利率期貨隱含機率 - " + data.meetingDate,
+                dataset,
+                true, true, false
+            );
+
+            Font chineseFont = new Font("Microsoft JhengHei", Font.BOLD, 14);
+            chart.getTitle().setFont(new Font("Microsoft JhengHei", Font.BOLD, 18));
+            chart.getLegend().setItemFont(chineseFont);
+
+            PiePlot plot = (PiePlot) chart.getPlot();
+            plot.setLabelFont(chineseFont);
+            plot.setBackgroundPaint(Color.WHITE);
+
+            for (int i = 0; i < data.labels.size(); i++) {
+                plot.setSectionPaint(data.labels.get(i), colors[i % colors.length]);
+            }
+
+            plot.setLabelGenerator(new StandardPieSectionLabelGenerator(
+                "{0}: {1} ({2})",
+                NumberFormat.getPercentInstance(),
+                NumberFormat.getPercentInstance()
+            ));
+
+            ChartPanel chartPanel = new ChartPanel(chart);
+            chartPanel.setPreferredSize(new java.awt.Dimension(695, 400));
+            chartPanel.setMouseWheelEnabled(true);
+
+            currentChartPanel = chartPanel;
+            swingNode.setContent(currentChartPanel);
+
+            Timer timer = new Timer(200, e -> {
+                currentChartPanel.revalidate();
+                currentChartPanel.repaint();
+                ((Timer) e.getSource()).stop();
+            });
+            timer.setRepeats(false);
+            timer.start();
+        });
+
         return swingNode;
     }
 
