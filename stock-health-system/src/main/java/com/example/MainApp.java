@@ -61,12 +61,14 @@ public class MainApp extends Application {
     private TextField symbolField; // 股票代號
     private PasswordField keyField; // Fugle API Key
     private TextField daysField; // 天數輸入欄位（共用給歷史 K 線、RSI、MACD）
+    private TextField fredApiKeyField; // FRED API Key 輸入框（X）
     private Button queryBtn; // 查即時報價
     private Button historyBtn; // 查歷史 K 線
     private Button smaBtn; // 查簡單移動平均線
     private Button rsiBtn; // 查相對強弱指數按鈕
     private Button macdBtn; // 查移動平均線按鈕
     private Button foreignNetBtn; // 查外資空口數按鈕
+    private Button fedRateBtn; // 查聯準會利率按鈕
     private TextArea resultArea; // 文字顯示區塊
     private ScrollPane chartPane; // 圖表顯示區塊
     private BorderPane root;  // 讓 queryHistory() 可存取
@@ -124,8 +126,15 @@ public class MainApp extends Application {
         daysField.setPrefWidth(50); // 天數輸入欄位小寬度
         daysVBox.getChildren().addAll(daysLabel, daysField);
 
-        inputBox.getChildren().addAll(symbolVBox, keyVBox, daysVBox); // 添加子節點到容器的操作，將三個VBox（symbolVBox、keyVBox、daysVBox）同時加入inputBox（HBox容器）的子節點列表中。
-        root.setTop(inputBox); // 將inputBox（已含三個VBox的HBox）設定為根容器root（BorderPane）的頂部區域。結果：輸入區固定在上方視窗，無論視窗resize，BorderPane會自動拉伸中間/底部內容。
+        VBox fredKeyVBox = new VBox(5);
+        Label fredKeyLabel = new Label("FRED API Key：");
+        fredApiKeyField = new TextField();
+        fredApiKeyField.setPromptText("請輸入 FRED API Key");
+        fredApiKeyField.setPrefWidth(200);
+        fredKeyVBox.getChildren().addAll(fredKeyLabel, fredApiKeyField);
+
+        inputBox.getChildren().addAll(symbolVBox, keyVBox, daysVBox, fredKeyVBox); // 添加子節點到容器的操作
+        root.setTop(inputBox); // 將 inputBox 設定為根容器的頂部區域。結果：輸入區固定在上方視窗，無論視窗resize，BorderPane會自動拉伸中間/底部內容。
 
         /* 下方左側版面配置（功能列表），使用 VBox 垂直排列 */
         VBox buttonBox = new VBox(10); // 每個節點「垂直」之間間隔 10 像素
@@ -163,8 +172,13 @@ public class MainApp extends Application {
         foreignNetBtn.setPrefWidth(120); // 按鈕寬度調整為120
         foreignNetBtn.setOnAction(e -> queryForeignNetPosition());
 
-        buttonBox.getChildren().addAll(queryBtn, historyBtn, smaBtn, rsiBtn, macdBtn, foreignNetBtn); // 添加子節點到容器的操作，將 queryBtn、historyBtn、smaBtn、rsiBtn、macdBtn 加入 buttonBox
-        root.setLeft(buttonBox); // 將buttonBox（已含四個元素的VBox）設定為根容器root（BorderPane）的左側區域。結果：按鈕區固定在左側視窗，寬度150px（來自setPrefWidth(150)），高度跟隨視窗拉伸，但內容不變形。
+        // 查聯準會利率 按鈕
+        fedRateBtn = new Button("查聯準會利率");
+        fedRateBtn.setPrefWidth(120); // 按鈕寬度調整為120
+        fedRateBtn.setOnAction(e -> queryFedRateProbability());
+
+        buttonBox.getChildren().addAll(queryBtn, historyBtn, smaBtn, rsiBtn, macdBtn, foreignNetBtn, fedRateBtn); // 添加子節點到容器的操作
+        root.setLeft(buttonBox); // 將 buttonBox 設定為根容器root（BorderPane）的左側區域。結果：按鈕區固定在左側視窗，寬度150px（來自setPrefWidth(150)），高度跟隨視窗拉伸，但內容不變形。
 
         /* 下方右側版面配置（文字跟圖表顯示區），使用 HBox 水平排列 */
         HBox centerBox = new HBox(10); // 每個節點「水平」之間間隔 10 像素
@@ -1019,6 +1033,27 @@ public class MainApp extends Application {
             this.dates = dates;
             this.netPositions = netPositions;
         }
+    }
+
+    // 查聯準會利率
+    private void queryFedRateProbability() {
+        String apiKey = fredApiKeyField.getText().trim();
+        if (apiKey.isEmpty()) {
+            showAlert("請輸入 FRED API Key（可免費申請）");
+            return;
+        }
+
+        resultArea.clear();
+        resultArea.appendText("【聯準會利率期貨隱含機率】\n");
+        resultArea.appendText("查詢中，請稍候...\n");
+
+        CompletableFuture.runAsync(() -> {
+            String result = FedWatchService.getProbability(apiKey);
+            Platform.runLater(() -> {
+                resultArea.clear();
+                resultArea.appendText(result);
+            });
+        });
     }
 
     // 等比例調整圖表尺寸（統一方法，避免程式碼重複）

@@ -8,16 +8,10 @@ import java.time.LocalDate;
 import java.time.Year;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.Locale;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-
-import org.jsoup.Jsoup;
-import org.jsoup.nodes.Document;
-import org.jsoup.nodes.Element;
-import org.jsoup.select.Elements;
 
 /**
  * 重大市場事件行事曆（硬編碼版 + MoneyDJ 動態抓取 + Investing.com FedWatch）
@@ -31,9 +25,6 @@ public final class MarketEventCalendar {
     private static final HttpClient httpClient = HttpClient.newHttpClient();
     private static final ObjectMapper mapper = new ObjectMapper();
     private static final DateTimeFormatter MONEYDJ_DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy/MM/dd");
-
-    // 請填入你的 FRED API Key
-    private static final String FRED_API_KEY = "a5fa7db2714e0e8b3b87bb0ae456217a";
 
     // ==================== 1. 聯準會 FOMC 利率決策日 ====================
     private static final List<LocalDate> FOMC_DATES = List.of(
@@ -213,125 +204,12 @@ public final class MarketEventCalendar {
         });
     }
 
-    // ==================== 9. 聯準會利率期貨隱含機率（Investing.com 精準版，只抓第一個 table）====================
-    private static String fedWatchMessage = null;
-    private static LocalDate lastFedWatchDate = null;
-
-    private static String getFedWatchProbability() {
-        LocalDate today = LocalDate.now();
-        if (fedWatchMessage != null && lastFedWatchDate != null && lastFedWatchDate.equals(today)) {
-            return fedWatchMessage;
-        }
-
-        StringBuilder sb = new StringBuilder("【聯準會利率期貨隱含機率】\n");
-
-        try {
-            Document doc = Jsoup.connect("https://www.investing.com/central-banks/fed-rate-monitor")
-                    .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-                    .timeout(15000)
-                    .get();
-
-            Elements fedTables = doc.select("table.genTbl.openTbl.fedRateTbl");
-            if (!fedTables.isEmpty()) {
-                Element firstTable = fedTables.first();
-                Elements rows = firstTable.select("tbody tr");
-
-                // 抓會議日期
-                Element dateElem = doc.getElementById("cardName_0");
-                String rawDate = (dateElem != null) ? dateElem.text().trim() : "2025-12-10";
-
-                // 自動轉換 "Dec 10 2025" 或 "Dec 10, 2025" → "2025-12-10"
-                String meetingDate = rawDate;
-                try {
-                    // 支援兩種格式：有逗號 "Dec 10, 2025" 和無逗號 "Dec 10 2025"
-                    String cleanDate = rawDate.replace(",", "").trim(); // 移除逗號
-                    if (cleanDate.matches("^[A-Za-z]{3} \\d{1,2} \\d{4}$")) {
-                        DateTimeFormatter inputFormatter = DateTimeFormatter.ofPattern("MMM d yyyy", Locale.ENGLISH);
-                        DateTimeFormatter outputFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-                        meetingDate = LocalDate.parse(cleanDate, inputFormatter).format(outputFormatter);
-                    }
-                } catch (Exception e) {
-                    System.err.println("會議日期解析失敗，使用原始值: " + rawDate);
-                    meetingDate = rawDate; // 失敗就顯示原始
-                }
-
-                sb.append("下次會議：").append(meetingDate).append("\n");
-
-                // 目前有效利率（FRED）
-                String currentRate = "未知";
-                try {
-                    String fredUrl = String.format(
-                        "https://api.stlouisfed.org/fred/series/observations?series_id=FEDFUNDS&api_key=%s&file_type=json&limit=1&sort_order=desc",
-                        FRED_API_KEY);
-                    HttpResponse<String> resp = httpClient.send(
-                        HttpRequest.newBuilder().uri(URI.create(fredUrl)).GET().build(),
-                        HttpResponse.BodyHandlers.ofString());
-                    if (resp.statusCode() == 200) {
-                        JsonNode obs = mapper.readTree(resp.body()).path("observations").get(0);
-                        currentRate = obs.path("value").asText();
-                        if (".".equals(currentRate)) currentRate = "未知";
-                    }
-                } catch (Exception ignored) {}
-
-                for (Element row : rows) {
-                    Elements cells = row.select("td");
-                    if (cells.size() >= 4) {
-                        String targetRate = cells.get(0).text().trim(); // e.g., "3.50 - 3.75"
-                        if (!targetRate.contains("-")) continue;
-
-                        String currentProb = cells.get(1).text().trim();
-                        String prevDayProb = cells.get(2).text().trim();
-                        String prevWeekProb = cells.get(3).text().trim();
-
-                        // 自動判斷是「維持」還是「降幾碼」
-                        String action = "未知";
-                        double lower = Double.parseDouble(targetRate.split(" - ")[0]);
-                        double upper = Double.parseDouble(targetRate.split(" - ")[1]);
-                        double midCurrent = 4.125; // 目前區間 4.00-4.25 的中點
-
-                        if (upper <= 4.00) {
-                            double diff = midCurrent - ((lower + upper) / 2);
-                            int codes = (int) Math.round(diff / 0.25);
-                            if (codes == 0) action = "維持利率";
-                            else if (codes > 0) action = "降" + codes + "碼";
-                            else action = "升" + (-codes) + "碼";
-                        } else {
-                            action = "高於目前區間";
-                        }
-
-                        sb.append("• Target Rate：").append(targetRate)
-                        .append("（").append(action).append("）\n");
-                        sb.append("  目前概率：").append(currentProb).append("\n");
-                        sb.append("  前日概率：").append(prevDayProb).append("\n");
-                        sb.append("  前週概率：").append(prevWeekProb).append("\n");
-                    }
-                }
-
-                sb.append("目前有效利率：").append(currentRate).append("%\n");
-
-                fedWatchMessage = sb.toString();
-                lastFedWatchDate = today;
-                return fedWatchMessage;
-            }
-        } catch (Exception e) {
-            System.err.println("FedWatch 抓取失敗: " + e.getMessage());
-            e.printStackTrace();
-        }
-
-        fedWatchMessage = "【聯準會利率期貨機率】請手動查詢 https://www.investing.com/central-banks/fed-rate-monitor";
-        lastFedWatchDate = today;
-        return fedWatchMessage;
-    }
-
     /**
      * 回傳今天是否有重大事件，有則回傳提醒文字，沒有則回傳 null
      */
     public static String getTodayEventMessage() {
         LocalDate today = LocalDate.now();
         StringBuilder sb = new StringBuilder("今日重大事件提醒\n\n");
-
-        // 每天最上方顯示 FedWatch
-        sb.append(getFedWatchProbability()).append("\n");
 
         boolean hasEvent = true;
 
