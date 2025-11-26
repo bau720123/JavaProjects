@@ -157,8 +157,8 @@ public class MainApp extends Application {
         macdBtn.setPrefWidth(120); // 按鈕寬度調整為120
         macdBtn.setOnAction(e -> queryMACD());
 
-        // 查外資空口數 按鈕
-        Button foreignNetBtn = new Button("查外資空口數");
+        // 查外資大盤空口數 按鈕
+        Button foreignNetBtn = new Button("查外資大盤空口數");
         foreignNetBtn.setPrefWidth(120); // 按鈕寬度調整為120
         foreignNetBtn.setOnAction(e -> queryForeignNetPosition());
 
@@ -286,7 +286,7 @@ public class MainApp extends Application {
                 .thenAccept(quote -> Platform.runLater(() -> {
                     if (quote != null) {
                         StringBuilder sb = new StringBuilder(); // 使用 StringBuilder 可多行段落顯示，並且在字串相接時比較高效，無額外開銷
-                        sb.append(String.format("股票：%s（%s）\n上個收盤價：%.0f\n開盤價：%.0f\n最高價：%.0f\n最低價：%.0f\n收盤價或現價：%.0f\n均價：%.2f\n總量：%d 股\n漲跌：%.0f\n幅度：%.2f\n",
+                        sb.append(String.format("股票：%s（%s）\n上個收盤價：%.0f\n開盤價：%.0f\n最高價：%.0f\n最低價：%.0f\n現價：%.0f\n均價：%.2f\n總量：%d 股\n漲跌：%.0f\n幅度：%.2f\n",
                                 quote.symbol(), quote.name(), quote.previousClose(), quote.openPrice(), quote.highPrice(), quote.lowPrice(), quote.closePrice(),
                                 quote.avgPrice(), quote.tradeVolume(), quote.change(), quote.changePercent()));
 
@@ -840,9 +840,23 @@ public class MainApp extends Application {
         return Math.round(value * 100.0) / 100.0;
     }
 
-    // 查外資空口數
+    // 查外資大盤空口數
     private void queryForeignNetPosition() {
-        resultArea.setText("外資空口數載入中，請稍候...");
+        String daysText = daysField.getText().trim(); // 使用共用天數欄位
+        int days;
+
+        try {
+            days = Integer.parseInt(daysText);
+            if (days < 0) {
+                showAlert("天數必須為 0 以上");
+                return;
+            }
+        } catch (NumberFormatException e) {
+            showAlert("天數必須為有效數字（0 以上）");
+            return;
+        }
+
+        resultArea.setText("查外資大盤空口數載入中，請稍候...");
         chartPane.setVisible(false);
 
         CompletableFuture.supplyAsync(() -> {
@@ -916,6 +930,15 @@ public class MainApp extends Application {
                     chartDates.remove(0);
                     changes.remove(0);
                 }
+
+                // 若天數限制，則截取最後 N 筆
+                if (days > 0 && ascendingDates.size() > days) {
+                    int startIndex = ascendingDates.size() - days;
+                    ascendingDates = ascendingDates.subList(startIndex, ascendingDates.size());
+                    ascendingNet = ascendingNet.subList(startIndex, ascendingNet.size());
+                    chartDates = chartDates.subList(startIndex, chartDates.size());
+                    changes = changes.subList(startIndex, changes.size());
+                }   
 
                 // 最大最小空口數
                 int highestNet = ascendingNet.stream().mapToInt(Integer::intValue).min().orElse(0);
