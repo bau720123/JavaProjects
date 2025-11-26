@@ -8,6 +8,7 @@ import java.time.LocalDate;
 import java.time.Year;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.function.Function;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -255,6 +256,86 @@ public final class MarketEventCalendar {
         if (isTodayInitialJoblessClaims()) {
             sb.append("今晚 20:30 美國初請失業金人數即將公布！\n");
             sb.append("勞動市場最即時指標，連續惡化就是衰退警報\n");
+        }
+
+        // === 美股休市提醒（含節日名稱顯示）===
+
+        // 整天休市
+        List<String> fullDayHolidays = List.of(
+            "元旦", "馬丁路德金紀念日", "華盛頓誕辰",
+            "耶穌受難日", "陣亡將士紀念日", "六月節", "勞動節"
+        );
+
+        // 提早休市
+        List<String> earlyCloseHolidays = List.of(
+            "獨立紀念日", "感恩節", "聖誕節"
+        );
+
+        LocalDate tomorrow = today.plusDays(1);
+
+        // 輔助方法：找出符合關鍵字的事件，並回傳節日名稱
+        Function<List<String>, String> findHolidayName = (keywordList) -> {
+            return getMoneyDJEvents().stream()
+                .filter(event -> {
+                    String details = event.path("details").asText();
+                    return keywordList.stream().anyMatch(details::contains);
+                })
+                .findFirst()
+                .map(event -> {
+                    String details = event.path("details").asText();
+                    // 從 details 提取最可能的節日名稱（取第一個匹配的關鍵字）
+                    return keywordList.stream()
+                        .filter(details::contains)
+                        .findFirst()
+                        .orElse("美股休市日");
+                })
+                .orElse("美股休市日");
+        };
+
+        // 檢查今天是否為整天休市
+        boolean todayFullHoliday = getMoneyDJEvents().stream()
+            .anyMatch(event -> {
+                String details = event.path("details").asText();
+                String dateStr = event.path("start_date").asText().split(" ")[0];
+                LocalDate eventDate = LocalDate.parse(dateStr, MONEYDJ_DATE_FORMATTER);
+                return eventDate.equals(today) && 
+                    fullDayHolidays.stream().anyMatch(details::contains);
+            });
+
+        // 檢查今天是否為提早休市
+        boolean todayEarlyClose = getMoneyDJEvents().stream()
+            .anyMatch(event -> {
+                String details = event.path("details").asText();
+                String dateStr = event.path("start_date").asText().split(" ")[0];
+                LocalDate eventDate = LocalDate.parse(dateStr, MONEYDJ_DATE_FORMATTER);
+                return eventDate.equals(today) && 
+                    earlyCloseHolidays.stream().anyMatch(details::contains);
+            });
+
+        // 檢查明天是否為整天休市
+        boolean tomorrowFullHoliday = getMoneyDJEvents().stream()
+            .anyMatch(event -> {
+                String details = event.path("details").asText();
+                String dateStr = event.path("start_date").asText().split(" ")[0];
+                LocalDate eventDate = LocalDate.parse(dateStr, MONEYDJ_DATE_FORMATTER);
+                return eventDate.equals(tomorrow) && 
+                    fullDayHolidays.stream().anyMatch(details::contains);
+            });
+
+        if (todayFullHoliday) {
+            String holidayName = findHolidayName.apply(fullDayHolidays);
+            sb.append("今天是美股「").append(holidayName).append("」整天休市！\n");
+            sb.append("台股波動通常極小，成交量萎縮，容易出現假日行情\n");
+        }
+        if (todayEarlyClose) {
+            String holidayName = findHolidayName.apply(earlyCloseHolidays);
+            sb.append("今天是「").append(holidayName).append("」美股提早休市（台灣時間凌晨 2 點收盤）\n");
+            sb.append("尾盤將極度平靜，適合觀望或減倉\n");
+        }
+        if (tomorrowFullHoliday) {
+            String holidayName = findHolidayName.apply(fullDayHolidays);
+            sb.append("明天是美股「").append(holidayName).append("」整天休市！（").append(tomorrow).append("）\n");
+            sb.append("台股通常波動極小，非常安全，適合輕鬆操作\n");
         }
 
         if (sb.length() > 0) {
