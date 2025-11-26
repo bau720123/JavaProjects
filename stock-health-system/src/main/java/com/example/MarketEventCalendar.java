@@ -209,9 +209,7 @@ public final class MarketEventCalendar {
      */
     public static String getTodayEventMessage() {
         LocalDate today = LocalDate.now();
-        StringBuilder sb = new StringBuilder("今日重大事件提醒\n\n");
-
-        boolean hasEvent = true;
+        StringBuilder sb = new StringBuilder();
 
         if (FOMC_DATES.contains(today)) {
             sb.append("今天是美國聯準會 FOMC 利率決策日！（美股尾盤易大波動）\n");
@@ -259,6 +257,10 @@ public final class MarketEventCalendar {
             sb.append("勞動市場最即時指標，連續惡化就是衰退警報\n");
         }
 
-        return hasEvent ? sb.toString() : null;
+        if (sb.length() > 0) {
+            return "今日重大事件提醒\n\n" + sb.toString();
+        } else {
+            return null;
+        }
     }
 }

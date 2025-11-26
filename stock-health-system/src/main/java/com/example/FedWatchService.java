@@ -23,19 +23,82 @@ public class FedWatchService {
     private static final HttpClient client = HttpClient.newHttpClient();
     private static final ObjectMapper mapper = new ObjectMapper();
 
-    // 回傳結果封裝（MainApp 會用到）
+    // 共用 FRED API 呼叫方法
+    private static HttpResponse<String> callFredApi(String route, String seriesId, String apiKey) {
+        try {
+            String url = String.format(
+                "https://api.stlouisfed.org/%s?series_id=%s&api_key=%s&file_type=json&limit=1&sort_order=desc",
+                route, seriesId, apiKey
+            );
+            HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .header("User-Agent", "Mozilla/5.0")
+                .GET()
+                .build();
+            return client.send(request, HttpResponse.BodyHandlers.ofString());
+        } catch (Exception e) {
+            System.err.println("FRED API 呼叫失敗 [" + seriesId + "]: " + e.getMessage());
+            return null;
+        }
+    }
+
+    // 自動計算目前區間中點（使用共用方法）
+    private static double getCurrentRateMidpoint(String fredApiKey) {
+        try {
+            // 抓上界
+            HttpResponse<String> upperResp = callFredApi("fred/series/observations", "DFEDTARU", fredApiKey);
+            double upper = 0.0;
+            if (upperResp != null && upperResp.statusCode() == 200) {
+                JsonNode obs = mapper.readTree(upperResp.body()).path("observations").get(0);
+                String val = obs.path("value").asText();
+                if (!".".equals(val)) upper = Double.parseDouble(val);
+            }
+
+            // 抓下界
+            HttpResponse<String> lowerResp = callFredApi("fred/series/observations", "DFEDTARL", fredApiKey);
+            double lower = 0.0;
+            if (lowerResp != null && lowerResp.statusCode() == 200) {
+                JsonNode obs = mapper.readTree(lowerResp.body()).path("observations").get(0);
+                String val = obs.path("value").asText();
+                if (!".".equals(val)) lower = Double.parseDouble(val);
+            }
+
+            if (upper > 0 && lower > 0) {
+                return (lower + upper) / 2.0;
+            }
+        } catch (Exception e) {
+            System.err.println("計算中點失敗，使用備援值 4.125：" + e.getMessage());
+        }
+        return 4.125;
+    }
+
+    // 判斷降幾碼
+    private static String getRateAction(String targetRate, double midCurrent) {
+        try {
+            String[] parts = targetRate.split(" - ");
+            double lower = Double.parseDouble(parts[0]);
+            double upper = Double.parseDouble(parts[1]);
+            double diff = midCurrent - ((lower + upper) / 2);
+            int codes = (int) Math.round(diff / 0.25);
+            if (codes == 0) return "維持利率";
+            return codes > 0 ? "降" + codes + "碼" : "升" + (-codes) + "碼";
+        } catch (Exception e) {
+            return "未知";
+        }
+    }
+
     public static class FedWatchResult {
         public String meetingDate = "未知";
-        public List<String> labels = new ArrayList<>();  // 顯示用標籤（含降幾碼）
-        public List<Double> probabilities = new ArrayList<>(); // 機率（純數字）
-        public double currentRate = 0.0;  // FRED 有效利率
-        public String fullText = "【聯準會利率期貨隱含機率】\n"; // 完整文字輸出
+        public List<String> labels = new ArrayList<>();
+        public List<Double> probabilities = new ArrayList<>();
+        public double currentRate = 0.0;
+        public String fullText = "【聯準會利率期貨隱含機率】\n\n";
     }
 
     public static FedWatchResult getProbability(String fredApiKey) {
         FedWatchResult result = new FedWatchResult();
 
-        // 在迴圈外先算一次 midCurrent，因為只需要呼叫一次
+        // 只算一次中點
         double midCurrent = getCurrentRateMidpoint(fredApiKey);
 
         try {
@@ -44,7 +107,7 @@ public class FedWatchService {
                     .timeout(15000)
                     .get();
 
-            // 抓會議日期
+            // 會議日期
             Element dateElem = doc.getElementById("cardName_0");
             String rawDate = (dateElem != null) ? dateElem.text().trim() : "2025-12-10";
             try {
@@ -59,9 +122,9 @@ public class FedWatchService {
             } catch (Exception e) {
                 result.meetingDate = rawDate;
             }
-            result.fullText += "下次會議：" + result.meetingDate + "\n";
+            result.fullText += "下次會議：" + result.meetingDate + "\n\n";
 
-            // 抓第一個 table（下次會議）
+            // 抓第一個 table
             Elements tables = doc.select("table.genTbl.openTbl.fedRateTbl");
             if (!tables.isEmpty()) {
                 Elements rows = tables.first().select("tbody tr");
@@ -80,31 +143,24 @@ public class FedWatchService {
                         result.labels.add(label);
                         result.probabilities.add(Double.parseDouble(curr.replace("%", "")));
 
-                        result.fullText += "• Target Rate：" + targetRate + "（" + action + "）\n";
+                        result.fullText += "  目標利率：" + targetRate + "（" + action + "）\n";
                         result.fullText += "  目前概率：" + curr + "\n";
                         result.fullText += "  前日概率：" + prevDay + "\n";
-                        result.fullText += "  前週概率：" + prevWeek + "\n";
+                        result.fullText += "  前週概率：" + prevWeek + "\n\n";
                     }
                 }
             }
 
-            // FRED 目前有效利率
-            try {
-                String url = String.format(
-                    "https://api.stlouisfed.org/fred/series/observations?series_id=FEDFUNDS&api_key=%s&file_type=json&limit=1&sort_order=desc",
-                    fredApiKey);
-                HttpResponse<String> resp = client.send(
-                    HttpRequest.newBuilder().uri(java.net.URI.create(url)).GET().build(),
-                    HttpResponse.BodyHandlers.ofString());
-                if (resp.statusCode() == 200) {
-                    JsonNode obs = mapper.readTree(resp.body()).path("observations").get(0);
-                    String rateStr = obs.path("value").asText();
-                    if (!".".equals(rateStr) && !rateStr.isEmpty()) {
-                        result.currentRate = Double.parseDouble(rateStr);
-                        result.fullText += "目前有效利率：" + rateStr + "%\n";
-                    }
+            // 有效利率（用共用方法）
+            HttpResponse<String> resp = callFredApi("fred/series/observations", "FEDFUNDS", fredApiKey);
+            if (resp != null && resp.statusCode() == 200) {
+                JsonNode obs = mapper.readTree(resp.body()).path("observations").get(0);
+                String rateStr = obs.path("value").asText();
+                if (!".".equals(rateStr) && !rateStr.isEmpty()) {
+                    result.currentRate = Double.parseDouble(rateStr);
+                    result.fullText += "目前有效利率：" + rateStr + "%\n";
                 }
-            } catch (Exception ignored) {}
+            }
 
             return result;
 
@@ -112,63 +168,5 @@ public class FedWatchService {
             result.fullText = "【聯準會利率期貨機率】抓取失敗，請稍後再試\n" + e.getMessage();
             return result;
         }
-    }
-
-    // 判斷降幾碼
-    private static String getRateAction(String targetRate, double midCurrent) {
-        try {
-            String[] parts = targetRate.split(" - ");
-            double lower = Double.parseDouble(parts[0]);
-            double upper = Double.parseDouble(parts[1]);
-            double diff = midCurrent - ((lower + upper) / 2);
-            int codes = (int) Math.round(diff / 0.25);
-            if (codes == 0) return "維持利率";
-            return codes > 0 ? "降" + codes + "碼" : "升" + (-codes) + "碼";
-        } catch (Exception e) {
-            return "未知";
-        }
-    }
-
-    // 自動計算目前區間中點（基於 DFEDTARU + DFEDTARL）
-    private static double getCurrentRateMidpoint(String fredApiKey) {
-        try {
-            // 抓上界（DFEDTARU）
-            String upperUrl = String.format(
-                "https://api.stlouisfed.org/fred/series/observations?series_id=DFEDTARU&api_key=%s&file_type=json&limit=1&sort_order=desc",
-                fredApiKey);
-            HttpResponse<String> upperResp = client.send(
-                HttpRequest.newBuilder().uri(URI.create(upperUrl)).GET().build(),
-                HttpResponse.BodyHandlers.ofString());
-            double upperBound = 0.0;
-            if (upperResp.statusCode() == 200) {
-                JsonNode upperObs = mapper.readTree(upperResp.body()).path("observations").get(0);
-                String upperStr = upperObs.path("value").asText();
-                if (!".".equals(upperStr)) upperBound = Double.parseDouble(upperStr);
-            }
-
-            // 抓下界（DFEDTARL）
-            String lowerUrl = String.format(
-                "https://api.stlouisfed.org/fred/series/observations?series_id=DFEDTARL&api_key=%s&file_type=json&limit=1&sort_order=desc",
-                fredApiKey);
-            HttpResponse<String> lowerResp = client.send(
-                HttpRequest.newBuilder().uri(URI.create(lowerUrl)).GET().build(),
-                HttpResponse.BodyHandlers.ofString());
-            double lowerBound = 0.0;
-            if (lowerResp.statusCode() == 200) {
-                JsonNode lowerObs = mapper.readTree(lowerResp.body()).path("observations").get(0);
-                String lowerStr = lowerObs.path("value").asText();
-                if (!".".equals(lowerStr)) lowerBound = Double.parseDouble(lowerStr);
-            }
-
-            // 計算中點
-            if (upperBound > 0 && lowerBound > 0) {
-                double midPoint = (lowerBound + upperBound) / 2.0;
-                return midPoint;
-            }
-        } catch (Exception e) {
-            System.err.println("自動計算中點失敗，使用備援值 4.125：" + e.getMessage());
-        }
-
-        return 4.125; // 備援：舊值
     }
 }
