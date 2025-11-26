@@ -65,13 +65,6 @@ public class MainApp extends Application {
     private TextField symbolField; // 股票代號
     private PasswordField keyField; // API Key
     private TextField daysField; // 天數輸入欄位（共用給歷史 K 線、RSI、MACD）
-    private Button queryBtn; // 查即時報價
-    private Button historyBtn; // 查歷史 K 線
-    private Button smaBtn; // 查簡單移動平均線
-    private Button rsiBtn; // 查相對強弱指數按鈕
-    private Button macdBtn; // 查移動平均線按鈕
-    private Button foreignNetBtn; // 查外資空口數按鈕
-    private Button fedRateBtn; // 查聯準會利率按鈕
     private TextArea resultArea; // 文字顯示區塊
     private ScrollPane chartPane; // 圖表顯示區塊
     private BorderPane root;  // 讓 queryHistory() 可存取
@@ -136,45 +129,63 @@ public class MainApp extends Application {
         VBox buttonBox = new VBox(10); // 每個節點「垂直」之間間隔 10 像素
         buttonBox.setAlignment(Pos.TOP_CENTER);
         buttonBox.setPrefWidth(150); // 左側固定寬度
-        buttonBox.setPadding(new Insets(0, 0, 0, 10));  // 右側 10px 內邊距，避免太貼中間區塊
+        // buttonBox.setPadding(new Insets(0, 0, 0, 10)); // 右側 10px 內邊距，避免太貼中間區塊
+        buttonBox.setPadding(new Insets(0, 0, 0, 0));
 
         // 查即時報價
-        queryBtn = new Button("查即時報價");
+        Button queryBtn = new Button("查即時報價");
         queryBtn.setPrefWidth(120); // 按鈕寬度調整為120
         queryBtn.setOnAction(e -> queryQuote());
 
         // 查歷史 K 線
-        historyBtn = new Button("查歷史 K 線");
+        Button historyBtn = new Button("查歷史 K 線");
         historyBtn.setPrefWidth(120); // 按鈕寬度調整為120
         historyBtn.setOnAction(e -> queryHistory());
 
         // 查簡單移動平均線
-        smaBtn = new Button("查簡單移動平均線");
+        Button smaBtn = new Button("查簡單移動平均線");
         smaBtn.setPrefWidth(120); // 按鈕寬度調整為120
         smaBtn.setOnAction(e -> querySMA());
 
         // 查相對強弱指數
-        rsiBtn = new Button("查相對強弱指數");
+        Button rsiBtn = new Button("查相對強弱指數");
         rsiBtn.setPrefWidth(120); // 按鈕寬度調整為120
         rsiBtn.setOnAction(e -> queryRSI());
 
         // 查移動平均線 按鈕
-        macdBtn = new Button("查移動平均線");
+        Button macdBtn = new Button("查移動平均線");
         macdBtn.setPrefWidth(120); // 按鈕寬度調整為120
         macdBtn.setOnAction(e -> queryMACD());
 
         // 查外資空口數 按鈕
-        foreignNetBtn = new Button("查外資空口數");
+        Button foreignNetBtn = new Button("查外資空口數");
         foreignNetBtn.setPrefWidth(120); // 按鈕寬度調整為120
         foreignNetBtn.setOnAction(e -> queryForeignNetPosition());
 
         // 查聯準會利率 按鈕
-        fedRateBtn = new Button("查聯準會利率");
+        Button fedRateBtn = new Button("查聯準會利率");
         fedRateBtn.setPrefWidth(120); // 按鈕寬度調整為120
         fedRateBtn.setOnAction(e -> queryFedRateProbability());
 
         buttonBox.getChildren().addAll(queryBtn, historyBtn, smaBtn, rsiBtn, macdBtn, foreignNetBtn, fedRateBtn); // 添加子節點到容器的操作
-        root.setLeft(buttonBox); // 將 buttonBox 設定為根容器root（BorderPane）的左側區域。結果：按鈕區固定在左側視窗，寬度150px（來自setPrefWidth(150)），高度跟隨視窗拉伸，但內容不變形。
+
+        // 用 ScrollPane 包住 buttonBox
+        ScrollPane buttonScrollPane = new ScrollPane(buttonBox);
+        buttonScrollPane.setFitToWidth(true);  // 讓內容寬度自動適應 ScrollPane
+        buttonScrollPane.setFitToHeight(false); // 不要強制填滿高度
+        buttonScrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);  // 垂直滾輪：需要時出現
+        buttonScrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);  // 水平永不顯示（按鈕不需要）
+
+        buttonScrollPane.setStyle(
+            "-fx-background-color: transparent; " +
+            "-fx-padding: 0; " +
+            "-fx-border-color: transparent;"
+        );
+
+        buttonScrollPane.setMaxHeight(Double.MAX_VALUE);  // 允許垂直拉伸到父容器上限
+
+        // 最後把 ScrollPane 放進 BorderPane.left
+        root.setLeft(buttonScrollPane);
 
         /* 下方右側版面配置（文字跟圖表顯示區），使用 HBox 水平排列 */
         HBox centerBox = new HBox(10); // 每個節點「水平」之間間隔 10 像素
