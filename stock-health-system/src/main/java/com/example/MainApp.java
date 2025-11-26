@@ -38,6 +38,7 @@ import org.jsoup.select.Elements;
 
 import com.example.FugleService.SMA;
 
+import org.jfree.chart.renderer.category.BarRenderer;
 import org.jfree.chart.renderer.category.LineAndShapeRenderer;
 
 import java.awt.Font;
@@ -303,6 +304,13 @@ public class MainApp extends Application {
                         }
 
                         resultArea.setText(sb.toString());
+
+                        // 柱狀圖
+                        chartPane.setContent(createQuoteBarChart(quote));
+                        resizeChartProportionally();
+                        PauseTransition delay = new PauseTransition(Duration.millis(400));
+                        delay.setOnFinished(e -> chartPane.setVisible(true));
+                        delay.play();
                     } else {
                         resultArea.setText("查詢失敗，請稍後再試\n若 API 不可用，請稍後再使用。");
                     }
@@ -312,6 +320,66 @@ public class MainApp extends Application {
                     Platform.runLater(() -> showAlert("系統異常，請稍後再試：" + ex.getMessage()));
                     return null;
                 });
+    }
+
+    // 即時報價專用柱狀圖
+    private Node createQuoteBarChart(Quote quote) {
+        SwingNode swingNode = new SwingNode();
+
+        SwingUtilities.invokeLater(() -> {
+            DefaultCategoryDataset dataset = new DefaultCategoryDataset();
+
+            // 取整數
+            int open = (int) Math.round(quote.openPrice());
+            int high = (int) Math.round(quote.highPrice());
+            int low = (int) Math.round(quote.lowPrice());
+            int close = (int) Math.round(quote.closePrice());
+            int avg = (int) Math.round(quote.avgPrice());
+
+            dataset.addValue(open, "價格", "開盤價");
+            dataset.addValue(high, "價格", "最高價");
+            dataset.addValue(close, "價格", "現價");
+            dataset.addValue(avg, "價格", "均價");
+
+            JFreeChart chart = ChartFactory.createBarChart(
+                "股票：" + quote.symbol() + "（" + quote.name() + "）今日價格結構",
+                "",
+                "價格",
+                dataset,
+                PlotOrientation.VERTICAL,
+                false, true, false
+            );
+
+            CategoryPlot plot = chart.getCategoryPlot();
+
+            double max = Math.max(high, Math.max(close, avg));
+            double min = Math.min(low, Math.min(open, avg));
+            plot.getRangeAxis().setRange(min, max);
+
+            Font font = new Font("Microsoft YaHei", Font.BOLD, 16);
+            chart.getTitle().setFont(font);
+            plot.getDomainAxis().setTickLabelFont(font);
+            plot.getDomainAxis().setLabelFont(font);
+            plot.getRangeAxis().setLabelFont(font);
+
+            BarRenderer renderer = (BarRenderer) plot.getRenderer();
+            renderer.setSeriesPaint(0, new Color(30, 144, 255)); // 經典藍
+            renderer.setMaximumBarWidth(0.15);
+
+            currentChartPanel = new ChartPanel(chart);
+            currentChartPanel.setPreferredSize(new java.awt.Dimension(695, 400));
+            swingNode.setContent(currentChartPanel);
+
+            Timer timer = new Timer(200, e -> {
+                currentChartPanel.revalidate();
+                currentChartPanel.repaint();
+                ((Timer) e.getSource()).stop();
+            });
+            timer.setRepeats(false);
+            timer.start();
+        });
+
+        return swingNode;
     }
 
     // 查詢歷史 K 線邏輯（使用共用 daysField）
