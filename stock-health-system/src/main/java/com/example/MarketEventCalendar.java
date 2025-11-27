@@ -273,9 +273,9 @@ public final class MarketEventCalendar {
 
         LocalDate tomorrow = today.plusDays(1);
 
-        // 輔助方法：找出符合關鍵字的事件，並回傳節日名稱
-        Function<List<String>, String> findHolidayName = (keywordList) -> {
-            return getMoneyDJEvents().stream()
+        // 輔助方法：從 details 中「真正出現的關鍵字」回傳
+        Function<List<String>, String> findHolidayName = (keywordList) -> 
+            getMoneyDJEvents().stream()
                 .filter(event -> {
                     String details = event.path("details").asText();
                     return keywordList.stream().anyMatch(details::contains);
@@ -283,14 +283,14 @@ public final class MarketEventCalendar {
                 .findFirst()
                 .map(event -> {
                     String details = event.path("details").asText();
-                    // 從 details 提取最可能的節日名稱（取第一個匹配的關鍵字）
+                    // 關鍵修正：從 details 找「最長的匹配關鍵字」
                     return keywordList.stream()
-                        .filter(details::contains)
+                        .filter(k -> details.contains(k))
+                        .sorted((a, b) -> Integer.compare(b.length(), a.length())) // 最長優先
                         .findFirst()
                         .orElse("美股休市日");
                 })
                 .orElse("美股休市日");
-        };
 
         // 檢查今天是否為整天休市
         boolean todayFullHoliday = getMoneyDJEvents().stream()
