@@ -8,7 +8,7 @@ import java.time.LocalDate;
 import java.time.Year;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.function.Function;
+import java.util.function.BiFunction;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -26,6 +26,7 @@ public final class MarketEventCalendar {
     private static final HttpClient httpClient = HttpClient.newHttpClient();
     private static final ObjectMapper mapper = new ObjectMapper();
     private static final DateTimeFormatter MONEYDJ_DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy/MM/dd");
+    private static List<JsonNode> Events = null;
 
     // ==================== 1. 聯準會 FOMC 利率決策日 ====================
     private static final List<LocalDate> FOMC_DATES = List.of(
@@ -101,11 +102,7 @@ public final class MarketEventCalendar {
     }
 
     // ==================== 7. MoneyDJ 動態經濟事件（全域快取，只抓一次）====================
-    private static List<JsonNode> cachedEvents = null;
-
     private static List<JsonNode> getMoneyDJEvents() {
-        if (cachedEvents != null) return cachedEvents;
-
         int currentYear = Year.now().getValue();
         String url = String.format("https://www.moneydj.com/us/rest/eventlist?from=%d-01-01&to=%d-12-31", currentYear, currentYear);
 
@@ -119,15 +116,14 @@ public final class MarketEventCalendar {
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() == 200) {
                 JsonNode root = mapper.readTree(response.body());
-                cachedEvents = mapper.convertValue(root, new TypeReference<List<JsonNode>>() {});
-                return cachedEvents;
+                Events = mapper.convertValue(root, new TypeReference<List<JsonNode>>() {});
+                return Events;
             }
         } catch (Exception e) {
             System.err.println("MoneyDJ 經濟事件 API 抓取失敗，將停用動態提醒：" + e.getMessage());
         }
 
-        cachedEvents = List.of();
-        return cachedEvents;
+        return List.of();
     }
 
     private static boolean containsDetails(JsonNode event, String keyword) {
@@ -232,6 +228,9 @@ public final class MarketEventCalendar {
             sb.append("明天台股開盤可能大幅波動，請特別注意！\n");
         }
 
+        // 只取一次日曆的資料
+        List<JsonNode> events = getMoneyDJEvents();
+
         // === 美國經濟數據動態提醒（MoneyDJ）===
         if (isTodayUSNonFarmPayroll()) {
             sb.append("今晚 21:30 美國非農就業數據 (NFP) 即將公布！\n");
@@ -273,67 +272,69 @@ public final class MarketEventCalendar {
 
         LocalDate tomorrow = today.plusDays(1);
 
-        // 輔助方法：從 details 中「真正出現的關鍵字」回傳
-        Function<List<String>, String> findHolidayName = (keywordList) -> 
-            getMoneyDJEvents().stream()
+        // 輔助方法：傳入 keywordList 和日期，回傳「真正匹配的節日名稱」
+        BiFunction<List<String>, LocalDate, String> findHolidayNameByDate = (keywordList, targetDate) -> {
+            return events.stream()
                 .filter(event -> {
                     String details = event.path("details").asText();
-                    return keywordList.stream().anyMatch(details::contains);
+                    String dateStr = event.path("start_date").asText().split(" ")[0];
+                    LocalDate eventDate = LocalDate.parse(dateStr, MONEYDJ_DATE_FORMATTER);
+                    return eventDate.equals(targetDate) && 
+                        keywordList.stream().anyMatch(details::contains);
                 })
                 .findFirst()
                 .map(event -> {
                     String details = event.path("details").asText();
-                    // 關鍵修正：從 details 找「最長的匹配關鍵字」
-                    return keywordList.stream()
-                        .filter(k -> details.contains(k))
-                        .sorted((a, b) -> Integer.compare(b.length(), a.length())) // 最長優先
-                        .findFirst()
-                        .orElse("美股休市日");
+                    // 直接從 details 找「哪個關鍵字真的出現了」
+                    for (String keyword : keywordList) {
+                        if (details.contains(keyword)) {
+                            return keyword;
+                        }
+                    }
+                    return "美股休市日";
                 })
                 .orElse("美股休市日");
+        };
 
         // 檢查今天是否為整天休市
-        boolean todayFullHoliday = getMoneyDJEvents().stream()
+        boolean todayFullHoliday = events.stream()
             .anyMatch(event -> {
                 String details = event.path("details").asText();
                 String dateStr = event.path("start_date").asText().split(" ")[0];
                 LocalDate eventDate = LocalDate.parse(dateStr, MONEYDJ_DATE_FORMATTER);
-                return eventDate.equals(today) && 
-                    fullDayHolidays.stream().anyMatch(details::contains);
+                return eventDate.equals(today) && fullDayHolidays.stream().anyMatch(details::contains);
             });
 
         // 檢查今天是否為提早休市
-        boolean todayEarlyClose = getMoneyDJEvents().stream()
+        boolean todayEarlyClose = events.stream()
             .anyMatch(event -> {
                 String details = event.path("details").asText();
                 String dateStr = event.path("start_date").asText().split(" ")[0];
                 LocalDate eventDate = LocalDate.parse(dateStr, MONEYDJ_DATE_FORMATTER);
-                return eventDate.equals(today) && 
-                    earlyCloseHolidays.stream().anyMatch(details::contains);
+                return eventDate.equals(today) && earlyCloseHolidays.stream().anyMatch(details::contains);
             });
 
         // 檢查明天是否為整天休市
-        boolean tomorrowFullHoliday = getMoneyDJEvents().stream()
+        boolean tomorrowFullHoliday = events.stream()
             .anyMatch(event -> {
                 String details = event.path("details").asText();
                 String dateStr = event.path("start_date").asText().split(" ")[0];
                 LocalDate eventDate = LocalDate.parse(dateStr, MONEYDJ_DATE_FORMATTER);
-                return eventDate.equals(tomorrow) && 
-                    fullDayHolidays.stream().anyMatch(details::contains);
+                return eventDate.equals(tomorrow) && fullDayHolidays.stream().anyMatch(details::contains);
             });
 
         if (todayFullHoliday) {
-            String holidayName = findHolidayName.apply(fullDayHolidays);
+            String holidayName = findHolidayNameByDate.apply(fullDayHolidays, today);
             sb.append("今天是美股「").append(holidayName).append("」整天休市！\n");
             sb.append("台股波動通常極小，成交量萎縮，容易出現假日行情\n");
         }
         if (todayEarlyClose) {
-            String holidayName = findHolidayName.apply(earlyCloseHolidays);
+            String holidayName = findHolidayNameByDate.apply(earlyCloseHolidays, today);
             sb.append("今天是「").append(holidayName).append("」美股提早休市（台灣時間凌晨 2 點收盤）\n");
             sb.append("尾盤將極度平靜，適合觀望或減倉\n");
         }
         if (tomorrowFullHoliday) {
-            String holidayName = findHolidayName.apply(fullDayHolidays);
+            String holidayName = findHolidayNameByDate.apply(fullDayHolidays, tomorrow);
             sb.append("明天是美股「").append(holidayName).append("」整天休市！（").append(tomorrow).append("）\n");
             sb.append("台股通常波動極小，非常安全，適合輕鬆操作\n");
         }
