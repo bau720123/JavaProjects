@@ -1884,7 +1884,7 @@ public class MainApp extends Application {
         SwingNode swingNode = new SwingNode();
 
         SwingUtilities.invokeLater(() -> {
-            // Step 1: 手動建立 K 線用的 DefaultHighLowDataset
+            // Step 1: 建立 K 線 Dataset
             Date[] dates = new Date[candles.size()];
             double[] opens = new double[candles.size()];
             double[] highs = new double[candles.size()];
@@ -1906,10 +1906,10 @@ public class MainApp extends Application {
                 "股價", dates, highs, lows, opens, closes, volumes
             );
 
-            // Step 2: 建立布林通道三條線
-            TimeSeries upperSeries   = new TimeSeries("上軌");
-            TimeSeries middleSeries  = new TimeSeries("中軌");
-            TimeSeries lowerSeries   = new TimeSeries("下軌");
+            // Step 2: 建立布林通道三條線（加入清晰名稱）
+            TimeSeries upperSeries   = new TimeSeries("上軌（壓力線）");
+            TimeSeries middleSeries  = new TimeSeries("中軌（20日均線）");
+            TimeSeries lowerSeries   = new TimeSeries("下軌（支撐線）");
 
             for (Bollinger b : bbList) {
                 Day day = new Day(Date.from(b.date().atStartOfDay(ZoneId.systemDefault()).toInstant()));
@@ -1923,13 +1923,13 @@ public class MainApp extends Application {
             lineDataset.addSeries(middleSeries);
             lineDataset.addSeries(lowerSeries);
 
-            // Step 3: 建立 K 線圖當底圖
+            // Step 3: 建立複合圖表
             JFreeChart chart = ChartFactory.createCandlestickChart(
                 "布林通道 + K線圖（近 " + candles.size() + " 日）",
                 "日期",
                 "股價",
                 candleDataset,
-                false
+                true
             );
 
             XYPlot plot = chart.getXYPlot();
@@ -1943,7 +1943,7 @@ public class MainApp extends Application {
             candleRenderer.setAutoWidthMethod(CandlestickRenderer.WIDTHMETHOD_SMALLEST);
             plot.setRenderer(0, candleRenderer);
 
-            // 布林通道三線樣式
+            // 布林三線樣式 + 超清楚圖例
             XYLineAndShapeRenderer lineRenderer = new XYLineAndShapeRenderer(true, false);
             lineRenderer.setSeriesPaint(0, new Color(255, 80, 80));    // 上軌：亮紅
             lineRenderer.setSeriesPaint(1, new Color(70, 130, 255));   // 中軌：寶藍
@@ -1953,37 +1953,33 @@ public class MainApp extends Application {
             lineRenderer.setSeriesStroke(2, new BasicStroke(2.2f));
             plot.setRenderer(1, lineRenderer);
 
-            // ──────────────────────────────────────────────────
-            // 【重點 1】Y軸自動擴展 ±10%（跟你 queryHistory 一模一樣）
-            // ──────────────────────────────────────────────────
+            // Y軸自動擴展 ±10%
             double maxPrice = candles.stream().mapToDouble(Candle::high).max().orElse(1000);
             double minPrice = candles.stream().mapToDouble(Candle::low).min().orElse(0);
-
-            // 加入布林上軌當作最高價參考
             double bbMax = bbList.stream().mapToDouble(Bollinger::upper).max().orElse(maxPrice);
             maxPrice = Math.max(maxPrice, bbMax);
 
             double range = maxPrice - minPrice;
-            if (range == 0) range = maxPrice * 0.1; // 避免除以0
+            if (range == 0) range = maxPrice * 0.1;
 
             double upperBound = maxPrice + range * 0.1;
             double lowerBound = minPrice - range * 0.1;
-
             plot.getRangeAxis().setRange(lowerBound, upperBound);
 
-            // ──────────────────────────────────────────────────
-            // 【重點 2】X軸日期顯示為 yyyy-MM-dd（解決亂碼問題）
-            // ──────────────────────────────────────────────────
+            // X軸日期格式：yyyy-MM-dd（不再亂碼）
             SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
             DateAxis domainAxis = (DateAxis) plot.getDomainAxis();
             domainAxis.setDateFormatOverride(dateFormat);
-            domainAxis.setVerticalTickLabels(false); // 日期不要歪掉
+            domainAxis.setVerticalTickLabels(false);
 
-            // 中文顯示
+            // 中文 + 圖例字體放大
             Font chineseFont = new Font("Microsoft JhengHei", Font.BOLD, 14);
+            Font legendFont = new Font("Microsoft JhengHei", Font.BOLD, 15);  // 圖例特別放大
+
             chart.getTitle().setFont(new Font("Microsoft JhengHei", Font.BOLD, 18));
             plot.getDomainAxis().setLabelFont(chineseFont);
             plot.getRangeAxis().setLabelFont(chineseFont);
+            chart.getLegend().setItemFont(legendFont);  // 圖例文字放大、清楚
 
             // 建立 ChartPanel
             ChartPanel chartPanel = new ChartPanel(chart);
@@ -1994,7 +1990,7 @@ public class MainApp extends Application {
             currentChartPanel = chartPanel;
             swingNode.setContent(chartPanel);
 
-            // 解決 SwingNode 延遲顯示問題
+            // 解決 SwingNode 延遲
             Timer timer = new Timer(180, e -> {
                 chartPanel.revalidate();
                 chartPanel.repaint();

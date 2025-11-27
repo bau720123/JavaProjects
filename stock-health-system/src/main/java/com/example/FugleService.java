@@ -255,7 +255,6 @@ public class FugleService {
             String params = String.format("?from=%s&to=%s&timeframe=D&period=20", 
                     from.format(formatter), to.format(formatter));
             String url = "https://api.fugle.tw/marketdata/v1.0/stock/technical/bb/" + symbol + params;
-            System.err.println("url：" + url);
 
             Request request = new Request.Builder()
                     .url(url)
