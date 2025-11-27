@@ -243,4 +243,44 @@ public class FugleService {
         }
         return List.of();  // API 失效時返回空 list，讓 UI 顯示錯誤提示
     }
+
+    // Bollinger Bands 記錄類
+    public record Bollinger(LocalDate date, double upper, double middle, double lower) {}
+
+    // 取得布林通道指標
+    public List<Bollinger> fetchBollinger(String symbol, int days, String apiKey) {
+        try {
+            LocalDate to = LocalDate.now();
+            LocalDate from = to.minusDays(days);
+            String params = String.format("?from=%s&to=%s&timeframe=D&period=20", 
+                    from.format(formatter), to.format(formatter));
+            String url = "https://api.fugle.tw/marketdata/v1.0/stock/technical/bb/" + symbol + params;
+            System.err.println("url：" + url);
+
+            Request request = new Request.Builder()
+                    .url(url)
+                    .header("X-API-KEY", apiKey)
+                    .build();
+
+            try (Response response = client.newCall(request).execute()) {
+                if (response.isSuccessful()) {
+                    JsonNode root = mapper.readTree(response.body().string());
+                    JsonNode dataArray = root.path("data");
+                    List<Bollinger> bbList = new ArrayList<>();
+                    for (JsonNode node : dataArray) {
+                        bbList.add(new Bollinger(
+                            LocalDate.parse(node.path("date").asText(), formatter),
+                            node.path("upper").asDouble(),
+                            node.path("middle").asDouble(),
+                            node.path("lower").asDouble()
+                        ));
+                    }
+                    return bbList;
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("布林通道資料抓取失敗: " + e.getMessage());
+        }
+        return List.of();
+    }
 }

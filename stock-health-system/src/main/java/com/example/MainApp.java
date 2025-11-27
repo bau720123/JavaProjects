@@ -24,22 +24,31 @@ import org.jfree.chart.ChartPanel;
 import org.jfree.chart.JFreeChart;
 import org.jfree.chart.axis.CategoryAxis;
 import org.jfree.chart.axis.CategoryLabelPositions;
+import org.jfree.chart.axis.DateAxis;
 import org.jfree.chart.labels.StandardPieSectionLabelGenerator;
 import org.jfree.chart.plot.CategoryPlot;
 import org.jfree.chart.plot.PiePlot;
 import org.jfree.chart.plot.PlotOrientation;
+import org.jfree.chart.plot.XYPlot;
 import org.jfree.chart.title.TextTitle;
 import org.jfree.data.category.DefaultCategoryDataset;
 import org.jfree.data.general.DefaultPieDataset;
+import org.jfree.data.time.Day;
+import org.jfree.data.time.TimeSeries;
+import org.jfree.data.time.TimeSeriesCollection;
+import org.jfree.data.xy.DefaultHighLowDataset;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 
+import com.example.FugleService.Bollinger;
 import com.example.FugleService.SMA;
 
 import org.jfree.chart.renderer.category.BarRenderer;
 import org.jfree.chart.renderer.category.LineAndShapeRenderer;
+import org.jfree.chart.renderer.xy.CandlestickRenderer;
+import org.jfree.chart.renderer.xy.XYLineAndShapeRenderer;
 
 import java.awt.Font;
 import java.awt.Color;  // 顏色設定用於 MACD 圖表線條
@@ -60,6 +69,8 @@ import java.io.InputStream;
 import java.util.Properties;
 
 import javafx.animation.Timeline;
+
+import java.awt.BasicStroke;
 
 public class MainApp extends Application {
     private final FugleService service = new FugleService(); // 使用 Fugle API 做資料存取
@@ -158,6 +169,11 @@ public class MainApp extends Application {
         macdBtn.setPrefWidth(120); // 按鈕寬度調整為120
         macdBtn.setOnAction(e -> queryMACD());
 
+        // 查布林通道 按鈕
+        Button bollingerBtn = new Button("查布林通道");
+        bollingerBtn.setPrefWidth(120);
+        bollingerBtn.setOnAction(e -> queryBollinger());
+
         // 查三大法人買賣超 按鈕
         Button institutionalBtn = new Button("查三大法人買賣超");
         institutionalBtn.setPrefWidth(120);
@@ -173,7 +189,7 @@ public class MainApp extends Application {
         fedRateBtn.setPrefWidth(120); // 按鈕寬度調整為120
         fedRateBtn.setOnAction(e -> queryFedRateProbability());
 
-        buttonBox.getChildren().addAll(queryBtn, historyBtn, smaBtn, rsiBtn, macdBtn, institutionalBtn, foreignNetBtn, fedRateBtn); // 添加子節點到容器的操作
+        buttonBox.getChildren().addAll(queryBtn, historyBtn, smaBtn, rsiBtn, macdBtn, bollingerBtn, institutionalBtn, foreignNetBtn, fedRateBtn); // 添加子節點到容器的操作
 
         // 用 ScrollPane 包住 buttonBox
         ScrollPane buttonScrollPane = new ScrollPane(buttonBox);
@@ -934,6 +950,99 @@ public class MainApp extends Application {
 
     private double round(double value) {
         return Math.round(value * 100.0) / 100.0;
+    }
+
+    // 查詢 Bollinger 邏輯（使用共用 daysField）
+    private void queryBollinger() {
+        String symbol = symbolField.getText().trim(); // 股票代號
+        String apiKey = keyField.getText().trim(); // API Key
+        String daysText = daysField.getText().trim(); // 使用共用天數欄位 
+        int days;
+
+        if (symbol.isEmpty()) {
+            showAlert("請輸入 股票代號");
+            return;
+        }
+        if (apiKey.isEmpty()) {
+            showAlert("請輸入 Fugle API Key");
+            return;
+        }
+
+        try {
+            days = Integer.parseInt(daysText);
+            if (days < 1) {
+                showAlert("天數必須為 1 以上");
+                return;
+            }
+        } catch (NumberFormatException e) {
+            showAlert("天數必須為有效數字（1 以上）");
+            return;
+        }
+
+        resultArea.setText("正在載入布林通道，請稍候…");
+        chartPane.setVisible(false);
+
+        CompletableFuture
+            .supplyAsync(() -> service.fetchBollinger(symbol, days, apiKey))
+            .thenAccept(bbList -> Platform.runLater(() -> {
+                if (!bbList.isEmpty()) {
+                    // Bollinger 盤中預估（基於資料歸檔，Fugle 的 API最其碼要在今天收盤之後，才會進行歸檔，在那之前，是不會有今天的資料的）
+                    LocalDate today = LocalDate.now();
+                    List<Candle> candles = service.fetchHistory(symbol, days, apiKey);
+                    boolean hasToday = candles.stream().anyMatch(c -> c.date().equals(today));
+
+                    if (!hasToday) {
+                        Quote quote = service.fetchQuote(symbol, apiKey);
+                        Candle todayCandle = new Candle(
+                            LocalDate.now(),
+                            quote.openPrice(),
+                            quote.highPrice(),
+                            quote.lowPrice(),
+                            quote.closePrice(),
+                            quote.tradeVolume(),
+                            quote.change()
+                        );
+                        candles.add(todayCandle);
+                    }
+
+                    // === 文字區塊 ===
+                    StringBuilder sb = new StringBuilder();
+                    sb.append(String.format("布林通道 （Bollinger Bands）已載入（近 %d 日走勢）。\n\n", bbList.size()));
+                    sb.append("布林通道指數如下：\n\n");
+
+                    SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+                    for (Bollinger b : bbList) {
+                        String dateStr = sdf.format(Date.from(b.date().atStartOfDay(ZoneId.systemDefault()).toInstant()));
+                        sb.append(String.format("日期：%s\n", dateStr));
+                        sb.append(String.format("   上軌：%.4f\n", b.upper()));
+                        sb.append(String.format("   中軌：%.4f\n", b.middle()));
+                        sb.append(String.format("   下軌：%.4f\n\n", b.lower()));
+                    }
+
+                    sb.append("* 買入訊號：當股價觸及下軌並有反彈跡象時，可能是一個買入訊號\n");
+                    sb.append("* 賣出訊號：當股價觸及上軌並有回落跡象時，可能是一個賣出訊號。");
+
+                    resultArea.setText(sb.toString());
+
+                    // === 畫圖 ===
+                    Node chartNode = createBollingerWithCandlesChart(candles, bbList);
+                    chartPane.setContent(chartNode);
+
+                    // 跟 queryMACD 一樣優雅處理圖表顯示
+                    resizeChartProportionally();
+
+                    PauseTransition delayVisible = new PauseTransition(Duration.millis(400));
+                    delayVisible.setOnFinished(e -> chartPane.setVisible(true));
+                    delayVisible.play();
+                } else {
+                    resultArea.setText("布林通道資料載入失敗，請稍後再試\n若 API 不可用，請確認 API key 有效。");
+                }
+            }))
+            .exceptionally(ex -> {
+                // exceptionally 像是 "非同步catch"，上游supplyAsync拋錯（如Fugle Key無效）時，自動恢復null並秀Alert—避免整個CompletableFuture崩潰，若直接showAlert，會造成整個應用程式crash
+                Platform.runLater(() -> showAlert("系統異常，請稍後再試：" + ex.getMessage()));
+                return null;
+            });
     }
 
     // 查三大法人買賣超
@@ -1767,6 +1876,135 @@ public class MainApp extends Application {
             timer.start();
         });
         
+        return swingNode;
+    }
+
+    // 布林通道 + K線 複合圖表
+    private Node createBollingerWithCandlesChart(List<Candle> candles, List<Bollinger> bbList) {
+        SwingNode swingNode = new SwingNode();
+
+        SwingUtilities.invokeLater(() -> {
+            // Step 1: 手動建立 K 線用的 DefaultHighLowDataset
+            Date[] dates = new Date[candles.size()];
+            double[] opens = new double[candles.size()];
+            double[] highs = new double[candles.size()];
+            double[] lows = new double[candles.size()];
+            double[] closes = new double[candles.size()];
+            double[] volumes = new double[candles.size()];
+
+            for (int i = 0; i < candles.size(); i++) {
+                Candle c = candles.get(i);
+                dates[i] = Date.from(c.date().atStartOfDay(ZoneId.systemDefault()).toInstant());
+                opens[i] = c.open();
+                highs[i] = c.high();
+                lows[i] = c.low();
+                closes[i] = c.close();
+                volumes[i] = c.volume();
+            }
+
+            DefaultHighLowDataset candleDataset = new DefaultHighLowDataset(
+                "股價", dates, highs, lows, opens, closes, volumes
+            );
+
+            // Step 2: 建立布林通道三條線
+            TimeSeries upperSeries   = new TimeSeries("上軌");
+            TimeSeries middleSeries  = new TimeSeries("中軌");
+            TimeSeries lowerSeries   = new TimeSeries("下軌");
+
+            for (Bollinger b : bbList) {
+                Day day = new Day(Date.from(b.date().atStartOfDay(ZoneId.systemDefault()).toInstant()));
+                upperSeries.addOrUpdate(day, b.upper());
+                middleSeries.addOrUpdate(day, b.middle());
+                lowerSeries.addOrUpdate(day, b.lower());
+            }
+
+            TimeSeriesCollection lineDataset = new TimeSeriesCollection();
+            lineDataset.addSeries(upperSeries);
+            lineDataset.addSeries(middleSeries);
+            lineDataset.addSeries(lowerSeries);
+
+            // Step 3: 建立 K 線圖當底圖
+            JFreeChart chart = ChartFactory.createCandlestickChart(
+                "布林通道 + K線圖（近 " + candles.size() + " 日）",
+                "日期",
+                "股價",
+                candleDataset,
+                false
+            );
+
+            XYPlot plot = chart.getXYPlot();
+            plot.setDataset(1, lineDataset);
+
+            // K線樣式
+            CandlestickRenderer candleRenderer = new CandlestickRenderer();
+            candleRenderer.setUpPaint(Color.GREEN);
+            candleRenderer.setDownPaint(Color.RED);
+            candleRenderer.setDrawVolume(false);
+            candleRenderer.setAutoWidthMethod(CandlestickRenderer.WIDTHMETHOD_SMALLEST);
+            plot.setRenderer(0, candleRenderer);
+
+            // 布林通道三線樣式
+            XYLineAndShapeRenderer lineRenderer = new XYLineAndShapeRenderer(true, false);
+            lineRenderer.setSeriesPaint(0, new Color(255, 80, 80));    // 上軌：亮紅
+            lineRenderer.setSeriesPaint(1, new Color(70, 130, 255));   // 中軌：寶藍
+            lineRenderer.setSeriesPaint(2, new Color(80, 200, 120));   // 下軌：翠綠
+            lineRenderer.setSeriesStroke(0, new BasicStroke(2.2f));
+            lineRenderer.setSeriesStroke(1, new BasicStroke(2.5f));
+            lineRenderer.setSeriesStroke(2, new BasicStroke(2.2f));
+            plot.setRenderer(1, lineRenderer);
+
+            // ──────────────────────────────────────────────────
+            // 【重點 1】Y軸自動擴展 ±10%（跟你 queryHistory 一模一樣）
+            // ──────────────────────────────────────────────────
+            double maxPrice = candles.stream().mapToDouble(Candle::high).max().orElse(1000);
+            double minPrice = candles.stream().mapToDouble(Candle::low).min().orElse(0);
+
+            // 加入布林上軌當作最高價參考
+            double bbMax = bbList.stream().mapToDouble(Bollinger::upper).max().orElse(maxPrice);
+            maxPrice = Math.max(maxPrice, bbMax);
+
+            double range = maxPrice - minPrice;
+            if (range == 0) range = maxPrice * 0.1; // 避免除以0
+
+            double upperBound = maxPrice + range * 0.1;
+            double lowerBound = minPrice - range * 0.1;
+
+            plot.getRangeAxis().setRange(lowerBound, upperBound);
+
+            // ──────────────────────────────────────────────────
+            // 【重點 2】X軸日期顯示為 yyyy-MM-dd（解決亂碼問題）
+            // ──────────────────────────────────────────────────
+            SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
+            DateAxis domainAxis = (DateAxis) plot.getDomainAxis();
+            domainAxis.setDateFormatOverride(dateFormat);
+            domainAxis.setVerticalTickLabels(false); // 日期不要歪掉
+
+            // 中文顯示
+            Font chineseFont = new Font("Microsoft JhengHei", Font.BOLD, 14);
+            chart.getTitle().setFont(new Font("Microsoft JhengHei", Font.BOLD, 18));
+            plot.getDomainAxis().setLabelFont(chineseFont);
+            plot.getRangeAxis().setLabelFont(chineseFont);
+
+            // 建立 ChartPanel
+            ChartPanel chartPanel = new ChartPanel(chart);
+            chartPanel.setPreferredSize(new java.awt.Dimension(695, 420));
+            chartPanel.setMouseWheelEnabled(true);
+            chartPanel.setRangeZoomable(false);
+
+            currentChartPanel = chartPanel;
+            swingNode.setContent(chartPanel);
+
+            // 解決 SwingNode 延遲顯示問題
+            Timer timer = new Timer(180, e -> {
+                chartPanel.revalidate();
+                chartPanel.repaint();
+                ((Timer) e.getSource()).stop();
+            });
+            timer.setRepeats(false);
+            timer.start();
+
+        });
+
         return swingNode;
     }
 
