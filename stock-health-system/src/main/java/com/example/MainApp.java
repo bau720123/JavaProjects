@@ -432,7 +432,7 @@ public class MainApp extends Application {
                         delayVisible.play();
                         
                         // 原文字 + 歷史股價列表
-                        StringBuilder sb = new StringBuilder(String.format("歷史 K 線圖已載入（近 %d 日收盤價走勢）。\n\n歷史股價如下：\n\n", days)); // 使用 StringBuilder 可多行段落顯示，並且在字串相接時比較高效，無額外開銷
+                        StringBuilder sb = new StringBuilder(String.format("歷史 K 線圖已載入（近 %d 日走勢）。\n\n", days)); // 使用 StringBuilder 可多行段落顯示，並且在字串相接時比較高效，無額外開銷
                         for (Candle c : candles) {
                             sb.append(String.format("日期：%s\n開盤價：%.1f\n最高價：%.1f\n最低價：%.1f\n收盤價：%.1f\n成交量：%d\n漲跌：%.1f\n\n",
                                 c.date(), c.open(), c.high(), c.low(), c.close(), c.volume(), c.change()));
@@ -551,7 +551,7 @@ public class MainApp extends Application {
                         delayVisible.play();
 
                         // SMA 文字列表
-                        StringBuilder sb = new StringBuilder(String.format("簡單移動平均線（SMA）已載入（近 %d 日 SMA(5) 走勢）\n\n", days));
+                        StringBuilder sb = new StringBuilder(String.format("簡單移動平均線（SMA）已載入（近 %d 日走勢）\n\n", days));
                         for (SMA s : smaList) {
                             String tag = s.date().equals(today) && !hasToday ? "（盤中預估）" : "";
                             sb.append(String.format("日期：%s%s\nSMA：%.2f\n\n", s.date(), tag, s.sma()));
@@ -654,7 +654,7 @@ public class MainApp extends Application {
                         delayVisible.play();
                         
                         // RSI 文字列表
-                        StringBuilder sb = new StringBuilder(String.format("相對強弱指標 （RSI）已載入（近 %d 日 RSI 走勢）。\n\n強弱指數如下：\n\n", days)); // 使用 StringBuilder 可多行段落顯示，並且在字串相接時比較高效，無額外開銷
+                        StringBuilder sb = new StringBuilder(String.format("相對強弱指標 （RSI）已載入（近 %d 日走勢）。\n\n強弱指數如下：\n\n", days)); // 使用 StringBuilder 可多行段落顯示，並且在字串相接時比較高效，無額外開銷
                         for (RSI r : rsiList) {
                             String tag = r.date().equals(today) && !hasToday ? "（盤中預估）" : "";
                             sb.append(String.format("日期：%s%s\n指數：%.2f\n\n",
@@ -818,7 +818,7 @@ public class MainApp extends Application {
                         delayVisible.play();
                         
                         // MACD 文字列表
-                        StringBuilder sb = new StringBuilder(String.format("移動平均指標 （MACD）已載入（近 %d 日MACD走勢）。\n\n移動平均指數如下：\n\n", days)); // 使用 StringBuilder 可多行段落顯示，並且在字串相接時比較高效，無額外開銷
+                        StringBuilder sb = new StringBuilder(String.format("移動平均指標 （MACD）已載入（近 %d 日走勢）。\n\n移動平均指數如下：\n\n", days)); // 使用 StringBuilder 可多行段落顯示，並且在字串相接時比較高效，無額外開銷
                         for (MACD m : macdList) {
                             String tag = m.date().equals(today) && !hasToday ? "（盤中預估）" : "";
                             sb.append(String.format("日期：%s%s\nMACD 線：%.2f\n信號線：%.2f\n\n",
