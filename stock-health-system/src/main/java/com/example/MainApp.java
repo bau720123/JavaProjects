@@ -24,6 +24,7 @@ import org.jfree.chart.ChartPanel;
 import org.jfree.chart.JFreeChart;
 import org.jfree.chart.axis.CategoryAxis;
 import org.jfree.chart.axis.CategoryLabelPositions;
+import org.jfree.chart.axis.SymbolAxis;
 import org.jfree.chart.labels.StandardPieSectionLabelGenerator;
 import org.jfree.chart.plot.CategoryPlot;
 import org.jfree.chart.plot.PiePlot;
@@ -41,6 +42,8 @@ import org.jsoup.select.Elements;
 
 import com.example.FugleService.Bollinger;
 import com.example.FugleService.SMA;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import org.jfree.chart.renderer.category.BarRenderer;
 import org.jfree.chart.renderer.category.LineAndShapeRenderer;
@@ -53,6 +56,7 @@ import java.text.NumberFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.LinkedHashMap;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
@@ -71,6 +75,12 @@ import java.util.Properties;
 import javafx.animation.Timeline;
 
 import java.awt.BasicStroke;
+
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
+
+import org.jfree.chart.axis.NumberAxis;
 
 public class MainApp extends Application {
     private final FugleService service = new FugleService(); // 使用 Fugle API 做資料存取
@@ -97,6 +107,9 @@ public class MainApp extends Application {
             System.err.println("無法載入版本資訊: " + e.getMessage());
         }
     }
+
+    private final OkHttpClient client = new OkHttpClient();
+    private final ObjectMapper mapper = new ObjectMapper();
 
     @Override
     public void start(Stage stage) {
@@ -189,7 +202,12 @@ public class MainApp extends Application {
         fedRateBtn.setPrefWidth(120); // 按鈕寬度調整為120
         fedRateBtn.setOnAction(e -> queryFedRateProbability());
 
-        buttonBox.getChildren().addAll(queryBtn, historyBtn, smaBtn, rsiBtn, macdBtn, bollingerBtn, institutionalBtn, foreignNetBtn, fedRateBtn); // 添加子節點到容器的操作
+        // 查 VIX 恐慌指數 按鈕
+        Button vixBtn = new Button("查 VIX 恐慌指數");
+        vixBtn.setPrefWidth(120);
+        vixBtn.setOnAction(e -> queryVix());
+
+        buttonBox.getChildren().addAll(queryBtn, historyBtn, smaBtn, rsiBtn, macdBtn, bollingerBtn, institutionalBtn, foreignNetBtn, fedRateBtn, vixBtn); // 添加子節點到容器的操作
 
         // 用 ScrollPane 包住 buttonBox
         ScrollPane buttonScrollPane = new ScrollPane(buttonBox);
@@ -1535,6 +1553,137 @@ public class MainApp extends Application {
         });
     }
 
+    // 查 VIX 恐慌指數
+    private void queryVix() {
+        String daysText = daysField.getText().trim(); // 使用共用天數欄位
+        int days;
+
+        try {
+            days = Integer.parseInt(daysText);
+            if (days < 1) {
+                showAlert("天數必須為 1 以上");
+                return;
+            }
+        } catch (NumberFormatException e) {
+            showAlert("天數必須為有效數字（1 以上）");
+            return;
+        }
+
+        CompletableFuture.supplyAsync(() -> {
+            try {
+                LocalDate today = LocalDate.now();
+                LocalDate startDate = today.minusDays(days + 10);  // 多抓一點確保交易日足夠
+
+                long period1 = startDate.atStartOfDay(ZoneId.of("UTC")).toEpochSecond();
+                long period2 = today.plusDays(1).atStartOfDay(ZoneId.of("UTC")).toEpochSecond();
+
+                String url = String.format(
+                    "https://query1.finance.yahoo.com/v8/finance/chart/%%5EVIX" +
+                    "?period1=%d&period2=%d&interval=1d&events=history&includeAdjustedClose=true",
+                    period1, period2
+                );
+
+                Request request = new Request.Builder()
+                        .url(url)
+                        .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
+                        .build();
+
+                try (Response response = client.newCall(request).execute()) {
+                    if (!response.isSuccessful()) throw new RuntimeException("HTTP " + response.code());
+
+                    JsonNode root = mapper.readTree(response.body().string());
+                    JsonNode result = root.path("chart").path("result").get(0);
+                    JsonNode timestamps = result.path("timestamp");
+                    JsonNode meta = result.path("meta");
+                    JsonNode opens = result.path("indicators").path("quote").get(0).path("open");
+                    JsonNode highs = result.path("indicators").path("quote").get(0).path("high");
+                    JsonNode lows = result.path("indicators").path("quote").get(0).path("low");
+                    JsonNode closes = result.path("indicators").path("quote").get(0).path("close");
+
+                    List<VixCandle> candles = new ArrayList<>();
+                    double maxClose = Double.MIN_VALUE;
+                    double minClose = Double.MAX_VALUE;
+                    LocalDate maxDate = null, minDate = null;
+
+                    for (int i = 0; i < timestamps.size(); i++) {
+                        long ts = timestamps.get(i).asLong();
+                        LocalDate date = LocalDate.ofInstant(Instant.ofEpochSecond(ts), ZoneId.of("UTC"));
+
+                        double o = opens.get(i).asDouble(0);
+                        double h = highs.get(i).asDouble(0);
+                        double l = lows.get(i).asDouble(0);
+                        double c = closes.get(i).asDouble(0);
+
+                        if (o > 0 && h > 0 && l > 0 && c > 0 && date.isBefore(today.plusDays(1))) {
+                            candles.add(new VixCandle(date, o, h, l, c));
+                            if (c > maxClose) { maxClose = c; maxDate = date; }
+                            if (c < minClose) { minClose = c; minDate = date; }
+                        }
+                    }
+
+                    // 補今日即時價（若無收盤）
+                    double realtime = meta.path("regularMarketPrice").asDouble();
+                    if (realtime > 0 && (candles.isEmpty() || !candles.get(candles.size()-1).date().equals(today))) {
+                        candles.add(new VixCandle(today, realtime, realtime, realtime, realtime));
+                        if (realtime > maxClose) { maxClose = realtime; maxDate = today; }
+                        if (realtime < minClose) { minClose = realtime; minDate = today; }
+                    }
+
+                    return new VixResult(candles, maxClose, minClose, maxDate, minDate);
+
+                } catch (Exception e) {
+                    throw new RuntimeException("VIX API 失敗: " + e.getMessage());
+                }
+            } catch (Exception e) {
+                throw new RuntimeException("VIX 資料解析錯誤: " + e.getMessage());
+            }
+        }).thenAcceptAsync(vix -> Platform.runLater(() -> {
+            if (vix.candles().isEmpty()) {
+                showAlert("無法取得 VIX 資料，請檢查網路");
+                return;
+            }
+
+            // === 文字區塊顯示 ===
+            StringBuilder sb = new StringBuilder();
+            sb.append("歷史 K 線圖已載入（近 ").append(vix.candles().size()).append(" 日走勢）。\n\n");
+
+            for (VixCandle c : vix.candles()) {
+                sb.append(String.format("日期：%s\n", c.date()))
+                .append(String.format("開盤指數：%.2f\n", c.open()))
+                .append(String.format("最高指數：%.2f\n", c.high()))
+                .append(String.format("最低指數：%.2f\n", c.low()))
+                .append(String.format("收盤指數：%.2f\n\n", c.close()));
+            }
+
+            sb.append(String.format("區間最高指數：%.2f（%s）\n", vix.maxClose(), vix.maxDate()))
+            .append(String.format("區間最低指數：%.2f（%s）\n", vix.minClose(), vix.minDate()));
+
+            sb.append("\n* 恐慌指數：\n");
+            sb.append("  是衡量市場對未來30天標準普爾500指數波動性預期的指標。它被廣泛認為是市場恐慌和不確定性的指標，並提供了關於市場風險的有力信號。\n\n");
+            sb.append("* 常態區間：\n");
+            sb.append("  通常保持在10-20之間。\n\n");
+            sb.append("* 警戒區間：\n");
+            sb.append("  當超過20時，投資者應注意市場可能出現較大波動。\n\n");
+            sb.append("* 恐慌區間：\n");
+            sb.append("  當超過30，尤其是40以上，市場已經進入高度恐慌階段，並可能伴隨大規模拋售和市場崩盤風險。");
+
+            resultArea.setText(sb.toString());
+
+            // === 圖表區塊顯示 ===
+            chartPane.setVisible(true);
+            chartPane.setContent(createVixChart(vix.candles()));
+            resizeChartProportionally(); // 改用統一的等比例縮放方法
+
+        }), Platform::runLater).exceptionally(ex -> {
+            Platform.runLater(() -> showAlert(ex.getMessage()));
+            return null;
+        });
+    }
+
+    // 輔助 record
+    record VixCandle(LocalDate date, double open, double high, double low, double close) {}
+    record VixResult(List<VixCandle> candles, double maxClose, double minClose, LocalDate maxDate, LocalDate minDate) {}
+
     // 等比例調整圖表尺寸（統一方法，避免程式碼重複）
     // 參數：無（自動從 scene 和 chartPane 讀取當前尺寸）
     // 目的：根據視窗寬度計算等比例的圖表高度，並觸發 Swing 組件重繪
@@ -2096,6 +2245,117 @@ public class MainApp extends Application {
             Timer timer = new Timer(200, e -> {
                 currentChartPanel.revalidate();
                 currentChartPanel.repaint();
+                ((Timer) e.getSource()).stop();
+            });
+            timer.setRepeats(false);
+            timer.start();
+        });
+
+        return swingNode;
+    }
+
+    // 繪製 VIX 收盤走勢圖
+    private Node createVixChart(List<VixCandle> candles) {
+        SwingNode swingNode = new SwingNode();
+        SwingUtilities.invokeLater(() -> {
+            XYSeries closeSeries = new XYSeries("VIX 收盤指數");
+            XYSeries line20 = new XYSeries("20 - 安全區");
+            XYSeries line30 = new XYSeries("30 - 警戒區");
+            XYSeries line40 = new XYSeries("40 - 恐慌區");
+
+            String[] dateLabels = new String[candles.size()];
+            double maxClose = Double.MIN_VALUE;
+            double minClose = Double.MAX_VALUE;
+
+            for (int i = 0; i < candles.size(); i++) {
+                VixCandle c = candles.get(i);
+                double x = i;
+                closeSeries.add(x, c.close());
+                dateLabels[i] = c.date().format(java.time.format.DateTimeFormatter.ofPattern("MM-dd"));
+
+                if (c.close() > maxClose) maxClose = c.close();
+                if (c.close() < minClose) minClose = c.close();
+
+                // 為每條警戒線補滿點（讓它橫跨整個圖表）
+                line20.add(x, 20.0);
+                line30.add(x, 30.0);
+                line40.add(x, 40.0);
+            }
+
+            XYSeriesCollection dataset = new XYSeriesCollection();
+            dataset.addSeries(closeSeries);
+            dataset.addSeries(line20);
+            dataset.addSeries(line30);
+            dataset.addSeries(line40);
+
+            JFreeChart chart = ChartFactory.createXYLineChart(
+                    "VIX 恐慌指數走勢圖（近 " + candles.size() + " 日）",
+                    "日期",
+                    "收盤指數",
+                    dataset,
+                    PlotOrientation.VERTICAL,
+                    true, true, false
+            );
+
+            XYPlot plot = chart.getXYPlot();
+            plot.setBackgroundPaint(Color.WHITE);
+            plot.setDomainGridlinePaint(Color.LIGHT_GRAY);
+            plot.setRangeGridlinePaint(Color.LIGHT_GRAY);
+
+            // === X 軸：日期標籤 ===
+            SymbolAxis domainAxis = new SymbolAxis("日期", dateLabels);
+            domainAxis.setTickLabelFont(new Font("Microsoft JhengHei", Font.PLAIN, 11));
+            domainAxis.setVerticalTickLabels(true);
+            plot.setDomainAxis(domainAxis);
+
+            // === Y 軸：自動範圍 + 10% 留白 ===
+            NumberAxis rangeAxis = new NumberAxis("收盤指數");
+            double range = maxClose - minClose;
+            if (range == 0) range = maxClose * 0.2;
+            double padding = range * 0.1;
+            rangeAxis.setRange(Math.max(0, minClose - padding), maxClose + padding);
+            rangeAxis.setTickLabelFont(new Font("Microsoft JhengHei", Font.PLAIN, 12));
+            plot.setRangeAxis(rangeAxis);
+
+            // === 渲染器設定 ===
+            XYLineAndShapeRenderer renderer = new XYLineAndShapeRenderer();
+            
+            // 主走勢線（藍色粗線 + 圓點）
+            renderer.setSeriesPaint(0, new Color(0, 80, 255));
+            renderer.setSeriesStroke(0, new BasicStroke(3.0f));
+            renderer.setSeriesShape(0, new java.awt.geom.Ellipse2D.Double(-4, -4, 8, 8));
+            
+            // 20 線 - 翠綠色
+            renderer.setSeriesPaint(1, new Color(0, 180, 0));
+            renderer.setSeriesStroke(1, new BasicStroke(2.5f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_BEVEL, 0, new float[]{6, 4}, 0));
+            
+            // 30 線 - 亮黃色
+            renderer.setSeriesPaint(2, new Color(255, 200, 0));
+            renderer.setSeriesStroke(2, new BasicStroke(2.5f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_BEVEL, 0, new float[]{6, 4}, 0));
+            
+            // 40 線 - 鮮紅色
+            renderer.setSeriesPaint(3, new Color(220, 20, 60));
+            renderer.setSeriesStroke(3, new BasicStroke(2.5f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_BEVEL, 0, new float[]{6, 4}, 0));
+
+            plot.setRenderer(renderer);
+
+            // === 中文標題與圖例 ===
+            Font titleFont = new Font("Microsoft JhengHei", Font.BOLD, 18);
+            Font legendFont = new Font("Microsoft JhengHei", Font.BOLD, 14);
+            chart.getTitle().setFont(titleFont);
+            chart.getLegend().setItemFont(legendFont);
+
+            ChartPanel chartPanel = new ChartPanel(chart);
+            chartPanel.setPreferredSize(new java.awt.Dimension(695, 420));
+            chartPanel.setMouseWheelEnabled(true);
+
+            currentChartPanel = chartPanel;
+            swingNode.setContent(chartPanel);
+
+            // 修復延遲
+            Timer timer = new Timer(150, e -> {
+                chartPanel.revalidate();
+                chartPanel.repaint();
                 ((Timer) e.getSource()).stop();
             });
             timer.setRepeats(false);
