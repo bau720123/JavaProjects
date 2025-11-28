@@ -24,7 +24,6 @@ import org.jfree.chart.ChartPanel;
 import org.jfree.chart.JFreeChart;
 import org.jfree.chart.axis.CategoryAxis;
 import org.jfree.chart.axis.CategoryLabelPositions;
-import org.jfree.chart.axis.DateAxis;
 import org.jfree.chart.labels.StandardPieSectionLabelGenerator;
 import org.jfree.chart.plot.CategoryPlot;
 import org.jfree.chart.plot.PiePlot;
@@ -33,10 +32,8 @@ import org.jfree.chart.plot.XYPlot;
 import org.jfree.chart.title.TextTitle;
 import org.jfree.data.category.DefaultCategoryDataset;
 import org.jfree.data.general.DefaultPieDataset;
-import org.jfree.data.time.Day;
-import org.jfree.data.time.TimeSeries;
-import org.jfree.data.time.TimeSeriesCollection;
-import org.jfree.data.xy.DefaultHighLowDataset;
+import org.jfree.data.xy.XYSeries;
+import org.jfree.data.xy.XYSeriesCollection;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -55,10 +52,13 @@ import java.awt.Color;  // 顏色設定用於 MACD 圖表線條
 import java.text.NumberFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.LinkedHashMap;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Map;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.stream.Collectors;
@@ -71,6 +71,9 @@ import java.util.Properties;
 import javafx.animation.Timeline;
 
 import java.awt.BasicStroke;
+
+import org.jfree.chart.axis.SymbolAxis;
+import org.jfree.data.xy.AbstractXYDataset;
 
 public class MainApp extends Application {
     private final FugleService service = new FugleService(); // 使用 Fugle API 做資料存取
@@ -1884,17 +1887,20 @@ public class MainApp extends Application {
         SwingNode swingNode = new SwingNode();
 
         SwingUtilities.invokeLater(() -> {
-            // Step 1: 建立 K 線 Dataset
-            Date[] dates = new Date[candles.size()];
-            double[] opens = new double[candles.size()];
-            double[] highs = new double[candles.size()];
-            double[] lows = new double[candles.size()];
-            double[] closes = new double[candles.size()];
-            double[] volumes = new double[candles.size()];
+            // 1) 準備索引化資料（x = index；labels = yyyy-MM-dd）
+            final int n = candles.size();
+            final String[] labels = new String[n];
+            final double[] xIndex = new double[n];
+            final double[] opens = new double[n];
+            final double[] highs = new double[n];
+            final double[] lows = new double[n];
+            final double[] closes = new double[n];
+            final double[] volumes = new double[n];
 
-            for (int i = 0; i < candles.size(); i++) {
+            for (int i = 0; i < n; i++) {
                 Candle c = candles.get(i);
-                dates[i] = Date.from(c.date().atStartOfDay(ZoneId.systemDefault()).toInstant());
+                labels[i] = c.date().toString();  // yyyy-MM-dd
+                xIndex[i] = i;                    // 用索引作為 x
                 opens[i] = c.open();
                 highs[i] = c.high();
                 lows[i] = c.low();
@@ -1902,40 +1908,87 @@ public class MainApp extends Application {
                 volumes[i] = c.volume();
             }
 
-            DefaultHighLowDataset candleDataset = new DefaultHighLowDataset(
-                "股價", dates, highs, lows, opens, closes, volumes
-            );
+            // 本地類別：索引化 OHLCDataset（避免 DateAxis）
+            class IndexedOHLCDataset extends org.jfree.data.xy.AbstractXYDataset implements org.jfree.data.xy.OHLCDataset {
+                private final Comparable seriesKey = "股價";
 
-            // Step 2: 建立布林通道三條線（加入清晰名稱）
-            TimeSeries upperSeries   = new TimeSeries("上軌（壓力線）");
-            TimeSeries middleSeries  = new TimeSeries("中軌（20日均線）");
-            TimeSeries lowerSeries   = new TimeSeries("下軌（支撐線）");
+                @Override public int getSeriesCount() { return 1; }
+                @Override public Comparable getSeriesKey(int series) { return seriesKey; }
+                @Override public int getItemCount(int series) { return n; }
 
-            for (Bollinger b : bbList) {
-                Day day = new Day(Date.from(b.date().atStartOfDay(ZoneId.systemDefault()).toInstant()));
-                upperSeries.addOrUpdate(day, b.upper());
-                middleSeries.addOrUpdate(day, b.middle());
-                lowerSeries.addOrUpdate(day, b.lower());
+                // X/Y as Number
+                @Override public Number getX(int series, int item) { return xIndex[item]; }
+                @Override public Number getY(int series, int item) { return closes[item]; }
+
+                // X/Y as primitive double (some renderers use these)
+                @Override public double getXValue(int series, int item) { return xIndex[item]; }
+                @Override public double getYValue(int series, int item) { return closes[item]; }
+
+                // OHLC as Number
+                @Override public Number getOpen(int series, int item)   { return opens[item]; }
+                @Override public Number getHigh(int series, int item)   { return highs[item]; }
+                @Override public Number getLow(int series, int item)    { return lows[item]; }
+                @Override public Number getClose(int series, int item)  { return closes[item]; }
+                @Override public Number getVolume(int series, int item) { return volumes[item]; }
+
+                // OHLC as primitive double
+                @Override public double getOpenValue(int series, int item)   { return opens[item]; }
+                @Override public double getHighValue(int series, int item)   { return highs[item]; }
+                @Override public double getLowValue(int series, int item)    { return lows[item]; }
+                @Override public double getCloseValue(int series, int item)  { return closes[item]; }
+                @Override public double getVolumeValue(int series, int item) { return volumes[item]; }
             }
 
-            TimeSeriesCollection lineDataset = new TimeSeriesCollection();
+            org.jfree.data.xy.OHLCDataset candleDataset = new IndexedOHLCDataset();
+
+            // 2) 建 Bollinger 線（同樣使用索引 x）
+            XYSeries upperSeries = new XYSeries("上軌（壓力線）");
+            XYSeries middleSeries = new XYSeries("中軌（20日均線）");
+            XYSeries lowerSeries = new XYSeries("下軌（支撐線）");
+
+            // 建立日期→索引對應，確保只畫存在的日期
+            Map<String, Integer> indexByDate = new LinkedHashMap<>();
+            for (int i = 0; i < n; i++) indexByDate.put(labels[i], i);
+
+            for (Bollinger b : bbList) {
+                String d = b.date().toString();
+                Integer idx = indexByDate.get(d);
+                if (idx != null) {
+                    upperSeries.add(idx.doubleValue(), b.upper());
+                    middleSeries.add(idx.doubleValue(), b.middle());
+                    lowerSeries.add(idx.doubleValue(), b.lower());
+                }
+            }
+
+            XYSeriesCollection lineDataset = new XYSeriesCollection();
             lineDataset.addSeries(upperSeries);
             lineDataset.addSeries(middleSeries);
             lineDataset.addSeries(lowerSeries);
 
-            // Step 3: 建立複合圖表
-            JFreeChart chart = ChartFactory.createCandlestickChart(
-                "布林通道 + K線圖（近 " + candles.size() + " 日）",
-                "日期",
-                "股價",
-                candleDataset,
-                true
-            );
-
-            XYPlot plot = chart.getXYPlot();
+            // 3) 建圖：使用 XYPlot + CandlestickRenderer（支援 OHLCDataset）
+            XYPlot plot = new XYPlot();
+            plot.setDataset(0, candleDataset);
             plot.setDataset(1, lineDataset);
 
-            // K線樣式
+            // Y 軸
+            org.jfree.chart.axis.NumberAxis rangeAxis = new org.jfree.chart.axis.NumberAxis("股價");
+            rangeAxis.setAutoRangeIncludesZero(false);
+            plot.setRangeAxis(rangeAxis);
+
+            // X 軸：SymbolAxis（強制顯示所有日期，垂直排列）
+            org.jfree.chart.axis.SymbolAxis domainAxis = new org.jfree.chart.axis.SymbolAxis("日期", labels);
+            domainAxis.setGridBandsVisible(false);
+            domainAxis.setLowerMargin(0.0);
+            domainAxis.setUpperMargin(0.0);
+
+            // 顯示所有標籤並垂直排列（UP_90）
+            domainAxis.setTickLabelsVisible(true);
+            domainAxis.setVerticalTickLabels(true);
+            domainAxis.setTickLabelFont(new Font("Microsoft JhengHei", Font.PLAIN, 12));
+
+            plot.setDomainAxis(domainAxis);
+
+            // Renderers
             CandlestickRenderer candleRenderer = new CandlestickRenderer();
             candleRenderer.setUpPaint(Color.GREEN);
             candleRenderer.setDownPaint(Color.RED);
@@ -1943,7 +1996,6 @@ public class MainApp extends Application {
             candleRenderer.setAutoWidthMethod(CandlestickRenderer.WIDTHMETHOD_SMALLEST);
             plot.setRenderer(0, candleRenderer);
 
-            // 布林三線樣式 + 超清楚圖例
             XYLineAndShapeRenderer lineRenderer = new XYLineAndShapeRenderer(true, false);
             lineRenderer.setSeriesPaint(0, new Color(255, 80, 80));    // 上軌：亮紅
             lineRenderer.setSeriesPaint(1, new Color(70, 130, 255));   // 中軌：寶藍
@@ -1953,35 +2005,33 @@ public class MainApp extends Application {
             lineRenderer.setSeriesStroke(2, new BasicStroke(2.2f));
             plot.setRenderer(1, lineRenderer);
 
-            // Y軸自動擴展 ±10%
-            double maxPrice = candles.stream().mapToDouble(Candle::high).max().orElse(1000);
-            double minPrice = candles.stream().mapToDouble(Candle::low).min().orElse(0);
+            // 4) 設定 Y 軸範圍（含布林上軌，用於視覺留白）
+            double maxPrice = Arrays.stream(highs).max().orElse(1000);
+            double minPrice = Arrays.stream(lows).min().orElse(0);
             double bbMax = bbList.stream().mapToDouble(Bollinger::upper).max().orElse(maxPrice);
             maxPrice = Math.max(maxPrice, bbMax);
-
             double range = maxPrice - minPrice;
-            if (range == 0) range = maxPrice * 0.1;
-
+            if (range == 0) range = Math.max(1.0, maxPrice * 0.1);
             double upperBound = maxPrice + range * 0.1;
             double lowerBound = minPrice - range * 0.1;
             plot.getRangeAxis().setRange(lowerBound, upperBound);
 
-            // X軸日期格式：yyyy-MM-dd（不再亂碼）
-            SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
-            DateAxis domainAxis = (DateAxis) plot.getDomainAxis();
-            domainAxis.setDateFormatOverride(dateFormat);
-            domainAxis.setVerticalTickLabels(false);
+            // 5) 組成 JFreeChart
+            JFreeChart chart = new JFreeChart(
+                    "布林通道 + K線圖（近 " + candles.size() + " 日）",
+                    new Font("Microsoft JhengHei", Font.BOLD, 18),
+                    plot,
+                    true
+            );
 
-            // 中文 + 圖例字體放大
+            // 字體
             Font chineseFont = new Font("Microsoft JhengHei", Font.BOLD, 14);
-            Font legendFont = new Font("Microsoft JhengHei", Font.BOLD, 15);  // 圖例特別放大
-
-            chart.getTitle().setFont(new Font("Microsoft JhengHei", Font.BOLD, 18));
+            Font legendFont = new Font("Microsoft JhengHei", Font.BOLD, 15);
             plot.getDomainAxis().setLabelFont(chineseFont);
             plot.getRangeAxis().setLabelFont(chineseFont);
-            chart.getLegend().setItemFont(legendFont);  // 圖例文字放大、清楚
+            chart.getLegend().setItemFont(legendFont);
 
-            // 建立 ChartPanel
+            // ChartPanel
             ChartPanel chartPanel = new ChartPanel(chart);
             chartPanel.setPreferredSize(new java.awt.Dimension(695, 420));
             chartPanel.setMouseWheelEnabled(true);
@@ -1998,7 +2048,6 @@ public class MainApp extends Application {
             });
             timer.setRepeats(false);
             timer.start();
-
         });
 
         return swingNode;
