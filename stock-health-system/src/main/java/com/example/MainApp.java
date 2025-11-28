@@ -72,9 +72,6 @@ import javafx.animation.Timeline;
 
 import java.awt.BasicStroke;
 
-import org.jfree.chart.axis.SymbolAxis;
-import org.jfree.data.xy.AbstractXYDataset;
-
 public class MainApp extends Application {
     private final FugleService service = new FugleService(); // 使用 Fugle API 做資料存取
     private TextField symbolField; // 股票代號
