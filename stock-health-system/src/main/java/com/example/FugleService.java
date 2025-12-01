@@ -70,11 +70,14 @@ public class FugleService {
                         data.path("lowPrice").asDouble(), // 最低價
                         data.path("closePrice").asDouble(), // 收盤價
                         data.path("avgPrice").asDouble(), // 均價
-                        data.path("total").path("tradeVolume").asLong(0L), // 總量
                         data.path("change").asDouble(), // 漲跌
-                        data.path("changePercent").asDouble(), // 幅度
+                        data.path("changePercent").asDouble(), // 漲跌幅度
                         bids, // 委買價
-                        asks  // 委賣價
+                        asks,  // 委賣價
+                        data.path("total").path("tradeVolume").asLong(0L), // 累計成交量
+                        data.path("total").path("tradeVolumeAtBid").asLong(0L), // 累計內盤成交量
+                        data.path("total").path("tradeVolumeAtAsk").asLong(0L), // 累計外盤成交量
+                        data.path("total").path("transaction").asLong(0L) // 累計成交筆數
                     );
                 } else if (response.code() == 401 || response.code() == 403 || response.code() == 404) {
                     // 401 Unauthorized：需要用戶端進行身分驗證。

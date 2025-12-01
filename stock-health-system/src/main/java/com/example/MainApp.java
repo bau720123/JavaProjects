@@ -322,9 +322,9 @@ public class MainApp extends Application {
                 .thenAccept(quote -> Platform.runLater(() -> {
                     if (quote != null) {
                         StringBuilder sb = new StringBuilder();
-                        sb.append(String.format("股票代碼：%s\n股票名稱：%s\n\n上個收盤價：%.0f\n開盤價：%.0f\n最高價：%.0f\n最低價：%.0f\n現價：%.0f\n均價：%.2f\n總量：%d 股\n漲跌：%.0f\n幅度：%.2f\n",
+                        sb.append(String.format("股票代碼：%s\n股票名稱：%s\n\n上個收盤價：%.0f\n開盤價：%.0f\n最高價：%.0f\n最低價：%.0f\n現價：%.0f\n均價：%.2f\n漲跌：%.0f\n幅度：%.2f\n累計成交量：%d \n累計內盤成交量：%d \n累計外盤成交量：%d \n累計成交筆數：%d \n",
                                 quote.symbol(), quote.name(), quote.previousClose(), quote.openPrice(), quote.highPrice(), quote.lowPrice(), quote.closePrice(),
-                                quote.avgPrice(), quote.tradeVolume(), quote.change(), quote.changePercent()));
+                                quote.avgPrice(), quote.change(), quote.changePercent(), quote.tradeVolume(), quote.tradeVolumeAtBid(), quote.tradeVolumeAtAsk(), quote.transaction()));
 
                         // 委買價區段內容
                         sb.append("\n【委買價】\n\n");
@@ -474,7 +474,7 @@ public class MainApp extends Application {
                                 quote.highPrice(),
                                 quote.lowPrice(),
                                 quote.closePrice(), // 目前成交價當作「收盤價」
-                                quote.tradeVolume(),
+                                0, // 今日成交量暫設為0，因為歷史K線的volume是整日總量，無法從即時報價取得
                                 quote.change()
                             );
 
@@ -1014,8 +1014,8 @@ public class MainApp extends Application {
                             quote.openPrice(),
                             quote.highPrice(),
                             quote.lowPrice(),
-                            quote.closePrice(),
-                            quote.tradeVolume(),
+                            quote.closePrice(), // 目前成交價當作「收盤價」
+                            0, // 今日成交量暫設為0，因為歷史K線的volume是整日總量，無法從即時報價取得
                             quote.change()
                         );
                         candles.add(todayCandle);
