@@ -90,8 +90,8 @@ public class MainApp extends Application {
     private TextArea resultArea; // 文字顯示區塊
     private ScrollPane chartPane; // 圖表顯示區塊
     private BorderPane root;  // 讓 queryHistory() 可存取
-    private ChartPanel currentChartPanel;  // 存取 ChartPanel 成員，允許多次 repaint（解決 SwingNode 延遲）
-    private Stage primaryStage;  // 將 stage 升級為類別成員變數，讓 createLineChart 可存取（修 stage cannot find symbol）
+    private ChartPanel currentChartPanel;  // 存取 ChartPanel 成員，允許多次 repaint
+    private Stage primaryStage;  // 將 stage 升級為類別成員變數，讓 createLineChart 可存取
 
     // 在類別載入時讀取版本號
     private static String APP_VERSION = "Unknown";
@@ -127,7 +127,7 @@ public class MainApp extends Application {
         Label symbolLabel = new Label("股票代號：");
         symbolField = new TextField("");
         symbolField.setPromptText("請輸入股票代號");
-        symbolField.setPrefWidth(155);  // 設定偏好寬度
+        symbolField.setPrefWidth(155);
         symbolVBox.getChildren().addAll(symbolLabel, symbolField);
 
         // API Key 輸入
@@ -136,7 +136,7 @@ public class MainApp extends Application {
         keyField = new PasswordField();
         keyField.setText("");
         keyField.setPromptText("請輸入 API Key");
-        keyField.setPrefWidth(200);  // 設定偏好寬度
+        keyField.setPrefWidth(200);
         keyVBox.getChildren().addAll(keyLabel, keyField);
 
         // 天數輸入
@@ -144,7 +144,7 @@ public class MainApp extends Application {
         Label daysLabel = new Label("天數：");
         daysField = new TextField("");
         daysField.setPromptText("天數");
-        daysField.setPrefWidth(50); // 天數輸入欄位小寬度
+        daysField.setPrefWidth(50);
         daysVBox.getChildren().addAll(daysLabel, daysField);
 
         inputBox.getChildren().addAll(symbolVBox, keyVBox, daysVBox); // 添加子節點到容器的操作
@@ -153,33 +153,33 @@ public class MainApp extends Application {
         /* 下方左側版面配置（功能列表），使用 VBox 垂直排列 */
         VBox buttonBox = new VBox(10); // 每個節點「垂直」之間間隔 10 像素
         buttonBox.setAlignment(Pos.TOP_CENTER);
-        buttonBox.setPrefWidth(150); // 左側固定寬度
+        buttonBox.setPrefWidth(150);
         // buttonBox.setPadding(new Insets(0, 0, 0, 10)); // 右側 10px 內邊距，避免太貼中間區塊
         buttonBox.setPadding(new Insets(0, 0, 0, 0));
 
         // 查即時報價
         Button queryBtn = new Button("查即時報價");
-        queryBtn.setPrefWidth(120); // 按鈕寬度調整為120
+        queryBtn.setPrefWidth(120);
         queryBtn.setOnAction(e -> queryQuote());
 
         // 查歷史 K 線
         Button historyBtn = new Button("查歷史 K 線");
-        historyBtn.setPrefWidth(120); // 按鈕寬度調整為120
+        historyBtn.setPrefWidth(120);
         historyBtn.setOnAction(e -> queryHistory());
 
         // 查簡單移動平均線
         Button smaBtn = new Button("查簡單移動平均線");
-        smaBtn.setPrefWidth(120); // 按鈕寬度調整為120
+        smaBtn.setPrefWidth(120);
         smaBtn.setOnAction(e -> querySMA());
 
         // 查相對強弱指數
         Button rsiBtn = new Button("查相對強弱指數");
-        rsiBtn.setPrefWidth(120); // 按鈕寬度調整為120
+        rsiBtn.setPrefWidth(120);
         rsiBtn.setOnAction(e -> queryRSI());
 
         // 查移動平均線 按鈕
         Button macdBtn = new Button("查移動平均線");
-        macdBtn.setPrefWidth(120); // 按鈕寬度調整為120
+        macdBtn.setPrefWidth(120);
         macdBtn.setOnAction(e -> queryMACD());
 
         // 查布林通道 按鈕
@@ -194,12 +194,12 @@ public class MainApp extends Application {
 
         // 查外資大盤空單數 按鈕
         Button foreignNetBtn = new Button("查外資大盤空單數");
-        foreignNetBtn.setPrefWidth(120); // 按鈕寬度調整為120
+        foreignNetBtn.setPrefWidth(120);
         foreignNetBtn.setOnAction(e -> queryForeignNetPosition());
 
         // 查聯準會利率 按鈕
         Button fedRateBtn = new Button("查聯準會利率");
-        fedRateBtn.setPrefWidth(120); // 按鈕寬度調整為120
+        fedRateBtn.setPrefWidth(120);
         fedRateBtn.setOnAction(e -> queryFedRateProbability());
 
         // 查 VIX 恐慌指數 按鈕
@@ -211,18 +211,18 @@ public class MainApp extends Application {
 
         // 用 ScrollPane 包住 buttonBox
         ScrollPane buttonScrollPane = new ScrollPane(buttonBox);
-        buttonScrollPane.setFitToWidth(true);  // 讓內容寬度自動適應 ScrollPane
+        buttonScrollPane.setFitToWidth(true); // 讓內容寬度自動適應 ScrollPane
         buttonScrollPane.setFitToHeight(false); // 不要強制填滿高度
-        buttonScrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);  // 垂直滾輪：需要時出現
-        buttonScrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);  // 水平永不顯示（按鈕不需要）
+        buttonScrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED); // 垂直滾輪：需要時出現
+        buttonScrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER); // 水平滾輪：永不顯示
 
+        // 美化 ScrollPane 背景與邊框
         buttonScrollPane.setStyle(
             "-fx-background-color: transparent; " +
             "-fx-padding: 0; " +
             "-fx-border-color: transparent;"
         );
-
-        buttonScrollPane.setMaxHeight(Double.MAX_VALUE);  // 允許垂直拉伸到父容器上限
+        buttonScrollPane.setMaxHeight(Double.MAX_VALUE); // 允許垂直拉伸到父容器上限
 
         // 最後把 ScrollPane 放進 BorderPane.left
         root.setLeft(buttonScrollPane);
@@ -245,7 +245,7 @@ public class MainApp extends Application {
         chartPane.setPrefWidth(700); // 寬度維持 700px
         chartPane.setFitToWidth(true); // 啟用內容自動fit容器寬（Content Scaling，響應式延展/壓縮），當視窗窄時，內容壓縮（不水平滾動）；寬時，內容延展（但不超過原圖）
 
-        centerBox.getChildren().addAll(resultArea, chartPane); // 添加子節點到容器的操作，將TextArea（resultArea）和ScrollPane（chartPane）同時加入centerBox（HBox容器）的子節點列表中。結果：中間內容水平排列（左：文字區200px，右：圖表區700px），間距10px（來自new HBox(10)）。
+        centerBox.getChildren().addAll(resultArea, chartPane); // 添加子節點到容器的操作
         root.setCenter(centerBox); // 將centerBox（已含TextArea和ScrollPane的HBox）設定為根容器root（BorderPane）的中間區域。結果：中間內容填滿剩餘視窗空間（寬=視窗寬 - left 150px - padding，高=視窗高 - top），無論視窗resize，BorderPane會自動拉伸中間區內容。
 
         // 桌面視窗的設定
@@ -254,8 +254,7 @@ public class MainApp extends Application {
         stage.setTitle("台股股票健診系統（版本號：" + APP_VERSION + "）");
         stage.setMaximized(false); // 初始視窗最大化
         stage.setResizable(true); // 允許調整大小
-        this.primaryStage = stage;  // 初始化成員變數
-
+        this.primaryStage = stage; // 初始化成員變數
 
         // 使用 getClass().getResourceAsStream() 從 resources 資料夾讀取圖標
         InputStream iconStream = getClass().getResourceAsStream("/icon.png");
@@ -282,25 +281,22 @@ public class MainApp extends Application {
         Platform.runLater(() -> {
             String eventMsg = MarketEventCalendar.getTodayEventMessage();
             if (eventMsg != null) {
-                // 把原來的歡迎訊息保留在下面
-                String original = resultArea.getText();
-                resultArea.setText(eventMsg +
-                        "────────────────────────────────────\n" +
-                        original);
+                // String original = resultArea.getText();
+                resultArea.setText(eventMsg);
 
-                // 紅字 + 粗體 + 淡橘底色 + 閃爍動畫（可選）
+                // 套用紅色警示風格
                 resultArea.setStyle("-fx-font-weight: bold; " +
                         "-fx-text-fill: #d32f2f; " +
                         "-fx-background-color: #ffebee; " +
                         "-fx-font-size: 14px;");
 
-                // 閃爍效果（可自行決定要不要）
+                // 閃爍效果
                 Timeline blink = new Timeline(
                         new KeyFrame(Duration.seconds(0),   new KeyValue(resultArea.opacityProperty(), 1)),
                         new KeyFrame(Duration.seconds(0.5), new KeyValue(resultArea.opacityProperty(), 0.6)),
                         new KeyFrame(Duration.seconds(1),   new KeyValue(resultArea.opacityProperty(), 1))
                 );
-                blink.setCycleCount(6);   // 閃 3 次
+                blink.setCycleCount(6);
                 blink.play();
             }
         });
@@ -325,8 +321,8 @@ public class MainApp extends Application {
         CompletableFuture.supplyAsync(() -> service.fetchQuote(symbol, apiKey))
                 .thenAccept(quote -> Platform.runLater(() -> {
                     if (quote != null) {
-                        StringBuilder sb = new StringBuilder(); // 使用 StringBuilder 可多行段落顯示，並且在字串相接時比較高效，無額外開銷
-                        sb.append(String.format("股票：%s（%s）\n上個收盤價：%.0f\n開盤價：%.0f\n最高價：%.0f\n最低價：%.0f\n現價：%.0f\n均價：%.2f\n總量：%d 股\n漲跌：%.0f\n幅度：%.2f\n",
+                        StringBuilder sb = new StringBuilder();
+                        sb.append(String.format("股票代碼：%s\n股票名稱：%s\n\n上個收盤價：%.0f\n開盤價：%.0f\n最高價：%.0f\n最低價：%.0f\n現價：%.0f\n均價：%.2f\n總量：%d 股\n漲跌：%.0f\n幅度：%.2f\n",
                                 quote.symbol(), quote.name(), quote.previousClose(), quote.openPrice(), quote.highPrice(), quote.lowPrice(), quote.closePrice(),
                                 quote.avgPrice(), quote.tradeVolume(), quote.change(), quote.changePercent()));
 
@@ -346,10 +342,7 @@ public class MainApp extends Application {
 
                         // 柱狀圖
                         chartPane.setContent(createQuoteBarChart(quote));
-                        resizeChartProportionally();
-                        PauseTransition delay = new PauseTransition(Duration.millis(400));
-                        delay.setOnFinished(e -> chartPane.setVisible(true));
-                        delay.play();
+                        resizeChartProportionally(); // 改用統一的等比例縮放方法
                     } else {
                         resultArea.setText("查詢失敗，請稍後再試\n若 API 不可用，請稍後再使用。");
                     }
@@ -366,6 +359,8 @@ public class MainApp extends Application {
         SwingNode swingNode = new SwingNode();
 
         SwingUtilities.invokeLater(() -> {
+            // DefaultCategoryDataset：JFreeChart 的資料集類別，用於類別型資料（如 X=日期字符串，Y=數值），支援多系列。
+            // 日期是離散類別（非連續時間），CategoryAxis 只顯示有資料的點，解決假日空白問題。
             DefaultCategoryDataset dataset = new DefaultCategoryDataset();
 
             // 取整數
@@ -375,13 +370,14 @@ public class MainApp extends Application {
             int close = (int) Math.round(quote.closePrice());
             int avg = (int) Math.round(quote.avgPrice());
 
+            // X 軸類別標籤名稱
             dataset.addValue(open, "價格", "開盤價");
             dataset.addValue(high, "價格", "最高價");
             dataset.addValue(close, "價格", "現價");
             dataset.addValue(avg, "價格", "均價");
 
             JFreeChart chart = ChartFactory.createBarChart(
-                "股票：" + quote.symbol() + "（" + quote.name() + "）今日價格結構",
+                quote.name() + "（" + quote.symbol() + "）今日價格結構",
                 "",
                 "價格",
                 dataset,
@@ -389,26 +385,32 @@ public class MainApp extends Application {
                 false, true, false
             );
 
+            // CategoryPlot：JFreeChart 繪圖區域，處理 CategoryDataset 的線圖。
             CategoryPlot plot = chart.getCategoryPlot();
 
+            // 設定 Y 軸範圍，給予適當邊界
             double max = Math.max(high, Math.max(close, avg));
             double min = Math.min(low, Math.min(open, avg));
             plot.getRangeAxis().setRange(min, max);
 
+            // 字型設定並且解決亂碼問題
             Font font = new Font("Microsoft YaHei", Font.BOLD, 16);
             chart.getTitle().setFont(font);
             plot.getDomainAxis().setTickLabelFont(font);
             plot.getDomainAxis().setLabelFont(font);
             plot.getRangeAxis().setLabelFont(font);
 
+            // 柱狀圖顏色設定
             BarRenderer renderer = (BarRenderer) plot.getRenderer();
             renderer.setSeriesPaint(0, new Color(30, 144, 255)); // 經典藍
             renderer.setMaximumBarWidth(0.15);
 
+            // 建立 ChartPanel 並設定大小
             currentChartPanel = new ChartPanel(chart);
             currentChartPanel.setPreferredSize(new java.awt.Dimension(695, 400));
             swingNode.setContent(currentChartPanel);
 
+            // 延遲 repaint，確保圖表正確顯示
             Timer timer = new Timer(200, e -> {
                 currentChartPanel.revalidate();
                 currentChartPanel.repaint();
@@ -418,10 +420,15 @@ public class MainApp extends Application {
             timer.start();
         });
 
+        // 延遲 setVisible，給 Swing 初始化時間
+        PauseTransition delay = new PauseTransition(Duration.millis(400));
+        delay.setOnFinished(e -> chartPane.setVisible(true));
+        delay.play();
+
         return swingNode;
     }
 
-    // 查詢歷史 K 線邏輯（使用共用 daysField）
+    // 查詢歷史 K 線邏輯
     private void queryHistory() {
         String symbol = symbolField.getText().trim(); // 股票代號
         String apiKey = keyField.getText().trim(); // API Key
@@ -458,7 +465,7 @@ public class MainApp extends Application {
                         boolean hasToday = candles.stream().anyMatch(c -> c.date().equals(today));
 
                         if (!hasToday) {
-                            Quote quote = service.fetchQuote(symbol, apiKey);  // 即時報價
+                            Quote quote = service.fetchQuote(symbol, apiKey); // 即時報價
 
                             // 建立今日虛擬K棒
                             Candle todayCandle = new Candle(
@@ -466,7 +473,7 @@ public class MainApp extends Application {
                                 quote.openPrice(),
                                 quote.highPrice(),
                                 quote.lowPrice(),
-                                quote.closePrice(),           // 目前成交價當作「收盤價」
+                                quote.closePrice(), // 目前成交價當作「收盤價」
                                 quote.tradeVolume(),
                                 quote.change()
                             );
@@ -475,20 +482,7 @@ public class MainApp extends Application {
                             candles.sort(Comparator.comparing(Candle::date));
                         }
 
-                        chartPane.setContent(createLineChart(candles));
-                        // chartPane.setFitToWidth(false);  // 關閉自動壓縮，讓 ChartPanel 自然寬度，溢出時滾動
-                        // chartPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);  // 水平滾動條自動出現（當寬度溢出時），確保用戶拖曳查看全圖，不切斷日期
-                        resizeChartProportionally(); // 改用統一的等比例縮放方法
-
-                        // 延遲 setVisible，給 Swing 初始化時間
-                        PauseTransition delayVisible = new PauseTransition(Duration.millis(400));
-                        delayVisible.setOnFinished(e -> {
-                            chartPane.setVisible(true);
-                        });
-                        delayVisible.play();
-                        
-                        // 原文字 + 歷史股價列表
-                        StringBuilder sb = new StringBuilder(String.format("歷史 K 線圖已載入（近 %d 日走勢）。\n\n", candles.size())); // 使用 StringBuilder 可多行段落顯示，並且在字串相接時比較高效，無額外開銷
+                        StringBuilder sb = new StringBuilder(String.format("歷史 K 線圖已載入（近 %d 日走勢）。\n\n", candles.size()));
                         for (Candle c : candles) {
                             String tag = c.date().equals(today) && !hasToday ? "（盤中預估）" : "";
                             sb.append(String.format("日期：%s%s\n開盤價：%.1f\n最高價：%.1f\n最低價：%.1f\n收盤價：%.1f\n成交量：%d\n漲跌：%.1f\n\n",
@@ -520,10 +514,14 @@ public class MainApp extends Application {
                                 .map(LocalDate::toString)
                                 .collect(Collectors.joining("、"));
 
-                        sb.append(String.format("區間最高價：%.1f（%s）\n", maxHigh, maxHighDateStr));  // 格式化添加（%.1f 保留1位小數）
-                        sb.append(String.format("區間最低價：%.1f（%s）\n", minLow, minLowDateStr));  // 格式化添加（%.1f 保留1位小數）
+                        sb.append(String.format("區間最高價：%.1f（%s）\n", maxHigh, maxHighDateStr)); // 格式化添加（%.1f 保留1位小數）
+                        sb.append(String.format("區間最低價：%.1f（%s）\n", minLow, minLowDateStr)); // 格式化添加（%.1f 保留1位小數）
 
                         resultArea.setText(sb.toString());  // 設定完整文字
+
+                        // K 線圖表
+                        chartPane.setContent(createLineChart(candles));
+                        resizeChartProportionally(); // 改用統一的等比例縮放方法
                     } else {
                         resultArea.setText("歷史資料載入失敗，請稍後再試\n若 API 不可用，請確認 API key 有效。");
                     }
@@ -1572,7 +1570,7 @@ public class MainApp extends Application {
         CompletableFuture.supplyAsync(() -> {
             try {
                 LocalDate today = LocalDate.now();
-                LocalDate startDate = today.minusDays(days + 10);  // 多抓一點確保交易日足夠
+                LocalDate startDate = today.minusDays(days);
 
                 long period1 = startDate.atStartOfDay(ZoneId.of("UTC")).toEpochSecond();
                 long period2 = today.plusDays(1).atStartOfDay(ZoneId.of("UTC")).toEpochSecond();
@@ -1741,34 +1739,33 @@ public class MainApp extends Application {
             // 迴圈填充 dataset：從 candles List 迭代，每個 Candle 轉日期字符串 + 收盤價。
             // 目的：建 X=日期類別，Y=close 數值系列 "收盤價走勢"。
             for (int i = 0; i < candles.size(); i++) {
-                Candle c = candles.get(i);  // 取得單日 Candle 記錄（從 Fugle API 解析）
-                LocalDate localDate = c.date();  // Candle date() 返回 LocalDate - Java 時間 API，不可變日期
+                Candle c = candles.get(i); // 取得單日 Candle 記錄
 
-                // Date.from(Instant)：橋接 LocalDate 到舊 Date API（JFreeChart 需 Date 格式化）。
+                LocalDate localDate = c.date(); // Candle date() 返回 LocalDate - Java 時間 API，沒法直接串改，所以用 localDate 來替代改變
+
+                // JFreeChart 需 Date 格式化。
                 // atStartOfDay(ZoneId.systemDefault())：加時區轉 Instant（台灣時間）。
                 String dateStr = sdf.format(Date.from(localDate.atStartOfDay(ZoneId.systemDefault()).toInstant()));
 
-                dataset.addValue(c.close(), "收盤價走勢", dateStr);  // 用日期字符串作為類別（X 軸標籤），Y 為 close 收盤價
+                dataset.addValue(c.close(), "收盤價走勢", dateStr);
             }
 
             // JFreeChart 核心工廠，生成線圖（CategoryPlot 類型）。
             JFreeChart chart = ChartFactory.createLineChart("近 " + candles.size() + " 日 K 線 (收盤價)", "日期", "價格（元）", dataset, PlotOrientation.VERTICAL, true, true, false);
-            
-            // 切換字型以利解決亂碼問題
-            Font font = new Font("Microsoft YaHei", Font.BOLD, 14);  // "Microsoft YaHei"：Windows 中文字體，BOLD 加粗，14pt 大小
-
-            // TextTitle：JFreeChart 標題類別，取得並自訂圖表標題字體。
-            TextTitle title = chart.getTitle();
-            title.setFont(font);
 
             // CategoryPlot：JFreeChart 繪圖區域，處理 CategoryDataset 的線圖。
-            // chart.getPlot()：強轉 plot 為 CategoryPlot。
-            CategoryPlot plot = (CategoryPlot) chart.getPlot();  // [新增]：取得 CategoryPlot
+            CategoryPlot plot = chart.getCategoryPlot();
+            
+            // 切換字型以利解決亂碼問題
+            Font font = new Font("Microsoft YaHei", Font.BOLD, 14);
+            chart.getTitle().setFont(font);
+            chart.getLegend().setItemFont(font);
             plot.getDomainAxis().setLabelFont(font);  // X 軸字體（"日期"）
             plot.getRangeAxis().setLabelFont(font);  // Y 軸字體（"價格（元）"）
             
             // Y 軸範圍動態調整（根據資料 min/max，類似 before 的行為，避免從 0 開始）
             // candles.stream().mapToDouble(Candle::close).min().orElse(0.0)：Stream API 計算收盤價最小值（method reference Candle::close）。
+
             double minClose = candles.stream().mapToDouble(Candle::close).min().orElse(0.0); // minClose：資料中的最小收盤價
             double maxClose = candles.stream().mapToDouble(Candle::close).max().orElse(0.0);  // maxClose：資料中最大收盤價
             double padding = (maxClose - minClose) * 0.05;  // 5% 緩衝空間（padding）：Y 軸上下留白，避免線貼邊
@@ -1776,31 +1773,14 @@ public class MainApp extends Application {
             // getRangeAxis()：Y 軸 ValueAxis，setLowerBound / setUpperBound 動態設範圍。
             plot.getRangeAxis().setLowerBound(Math.max(0, minClose - padding));  // 下限：min - padding，但不低於 0（股票價 >0）
             plot.getRangeAxis().setUpperBound(maxClose + padding);  // 上限：max + padding
-
-            // LineAndShapeRenderer：CategoryPlot 的渲染器，控制線條/點/標籤樣式。
-            LineAndShapeRenderer renderer = (LineAndShapeRenderer) plot.getRenderer();  // 強轉 renderer 為線圖類型
-            renderer.setSeriesItemLabelFont(0, font);  // （"收盤價走勢"）套中文字體
-
-            // setSeriesToolTipGenerator(int series, CategoryToolTipGenerator generator)：為系列設定 tooltip 生成器（hover 提示）。
-            // CategoryToolTipGenerator：介面，generateToolTip(CategoryDataset dataset, int row, int column) 返回字符串。
-            // 目的：hover 點時顯示 "日期: 價格"，用完整日期避免年份歧義。
-            renderer.setSeriesToolTipGenerator(0, (dataset1, row, column) -> {  // [修改]：tooltip 顯示日期/價格（CategoryDataset 版本）
-                String category = (String) dataset1.getColumnKey(column);
-                double y = dataset1.getValue(row, column).doubleValue();
-                return category + ": " + y;  // 格式化 tooltip "2025-11-03: 1510.0"
-            });
-            
-            // 系列名稱 "收盤價走勢" 字體防亂碼（JFreeChart 系列名稱在圖例顯示）
-            // getLegend()：圖表圖例，setItemFont 套字體到所有項目。
-            chart.getLegend().setItemFont(font);  // [新增]：將中文字體套用到圖例所有項目，解決系列名稱亂碼
             
             // CategoryAxis：X 軸類別軸，處理日期標籤位置。
             CategoryAxis domainAxis = (CategoryAxis) plot.getDomainAxis();
             domainAxis.setCategoryLabelPositions(CategoryLabelPositions.UP_90);  // 日期標籤垂直顯示（UP_90），避免擁擠（依需調整為 STANDARD 或 DOWN_90）
 
-            currentChartPanel = new ChartPanel(chart);  // ChartPanel：JFreeChart 的 Swing 面板容器，包裝 chart 支援互動（zoom、tooltip）。
-            int dynamicWidth = Math.max(800, candles.size() * 160);  // 加大倍率到 160 px/點（你的測試 160 勉強OK），10 日 ~1600px、20 日 ~3200px 自適應（確保最後日期全顯示，無切斷）
-            currentChartPanel.setPreferredSize(new java.awt.Dimension(695, 400));  // 寬動態，高固定 400px
+            // 建立 ChartPanel 並設定大小
+            currentChartPanel = new ChartPanel(chart);
+            currentChartPanel.setPreferredSize(new java.awt.Dimension(695, 400));
             swingNode.setContent(currentChartPanel);
 
             // Timer：Swing 的計時器，單次延遲 200ms 觸發 ActionListener。
@@ -1813,6 +1793,11 @@ public class MainApp extends Application {
             timer.setRepeats(false);
             timer.start();
         });
+
+        // 延遲 setVisible，給 Swing 初始化時間
+        PauseTransition delay = new PauseTransition(Duration.millis(400));
+        delay.setOnFinished(e -> chartPane.setVisible(true));
+        delay.play();
         
         return swingNode;
     }
@@ -2271,7 +2256,7 @@ public class MainApp extends Application {
                 VixCandle c = candles.get(i);
                 double x = i;
                 closeSeries.add(x, c.close());
-                dateLabels[i] = c.date().format(java.time.format.DateTimeFormatter.ofPattern("MM-dd"));
+                dateLabels[i] = c.date().format(java.time.format.DateTimeFormatter.ofPattern("YYYY-MM-dd"));
 
                 if (c.close() > maxClose) maxClose = c.close();
                 if (c.close() < minClose) minClose = c.close();
@@ -2312,7 +2297,8 @@ public class MainApp extends Application {
             NumberAxis rangeAxis = new NumberAxis("收盤指數");
             double range = maxClose - minClose;
             if (range == 0) range = maxClose * 0.2;
-            double padding = range * 0.1;
+            // double padding = range * 0.1;
+            double padding = (maxClose - minClose) * 0.05;  // 5% 緩衝空間（padding）：Y 軸上下留白，避免線貼邊
             rangeAxis.setRange(Math.max(0, minClose - padding), maxClose + padding);
             rangeAxis.setTickLabelFont(new Font("Microsoft JhengHei", Font.PLAIN, 12));
             plot.setRangeAxis(rangeAxis);
