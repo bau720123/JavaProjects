@@ -59,6 +59,7 @@ import java.util.LinkedHashMap;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 import java.util.ArrayList;
@@ -428,6 +429,121 @@ public class MainApp extends Application {
         return swingNode;
     }
 
+    // 通用圖表
+    private Node createCommonLineChart(
+            List<?> data, // 實際資料面
+            String titlePrefix, // 標題前綴
+            String yPrefix, // Y軸說明
+            Color lineColor, // 線條顏色
+            ToDoubleFunction<Object> valueExtractor, // 提取數值
+            ToLocalDateFunction<Object> dateExtractor // 提取日期字串
+    ) {
+        SwingNode swingNode = new SwingNode();
+
+        SwingUtilities.invokeLater(() -> {
+            // DefaultCategoryDataset：JFreeChart 的資料集類別，用於類別型資料（如 X=日期字符串，Y=數值），支援多系列。
+            // 日期是離散類別（非連續時間），CategoryAxis 只顯示有資料的點，解決假日空白問題。
+            DefaultCategoryDataset dataset = new DefaultCategoryDataset();
+
+            // SimpleDateFormat：Java 文字處理 API，用來格式化 LocalDate 為字符串（X 軸標籤）。
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+
+            double minValue = Double.MAX_VALUE;
+            double maxValue = Double.MIN_VALUE;
+
+            // 迴圈填充 dataset：從 data List 迭代，每個 data 轉日期字符串 + 收盤價。
+            // 目的：建 X=日期類別，Y=close 數值系列 "收盤價走勢"。
+            for (int i = 0; i < data.size(); i++) {
+                Object item = data.get(i); // 取得單日資料記錄
+                double value = valueExtractor.applyAsDouble(item);
+                LocalDate localDate = dateExtractor.apply(item); // 取出 LocalDate
+
+                // 強制轉成統一格式的字串！
+                String dateStr = sdf.format(Date.from(
+                    localDate.atStartOfDay(ZoneId.systemDefault()).toInstant()
+                ));
+
+                dataset.addValue(value, titlePrefix, dateStr); // 用日期字符串作為類別（X 軸標籤），Y 為 value 值
+
+                minValue = Math.min(minValue, value);
+                maxValue = Math.max(maxValue, value);
+            }
+
+            // JFreeChart 核心工廠，生成線圖（CategoryPlot 類型）。
+            JFreeChart chart = ChartFactory.createLineChart(
+                " 近 " + data.size() + " 日",
+                "日期", yPrefix,
+                dataset,
+                PlotOrientation.VERTICAL,
+                true, true, false
+            );
+
+            // CategoryPlot：JFreeChart 繪圖區域，處理 CategoryDataset 的線圖。
+            CategoryPlot plot = chart.getCategoryPlot();
+
+            // 設定字型以利解決亂碼問題
+            Font font = new Font("Microsoft YaHei", Font.BOLD, 14);
+            chart.getTitle().setFont(font);
+            chart.getLegend().setItemFont(font);
+            plot.getDomainAxis().setLabelFont(font);
+            plot.getRangeAxis().setLabelFont(font);
+
+            // Y 軸範圍動態調整，給予適當邊界
+            double padding = (maxValue - minValue) * 0.05;
+            if (padding == 0) padding = maxValue * 0.1;
+
+            // if (titlePrefix.contains("RSI")) {
+            if ("RSI 指標" .equals(titlePrefix)) {
+                minValue = 0;
+                maxValue = 100;
+            }
+
+            plot.getRangeAxis().setLowerBound(Math.max(0, minValue - padding)); // 下限
+            plot.getRangeAxis().setUpperBound(maxValue + padding); // 上限
+
+            // 線條樣式設定
+            LineAndShapeRenderer renderer = (LineAndShapeRenderer) plot.getRenderer();
+            renderer.setSeriesPaint(0, lineColor);
+            renderer.setSeriesStroke(0, new BasicStroke(2.5f));
+
+            // CategoryAxis：X 軸類別軸，處理日期標籤位置。
+            CategoryAxis domainAxis = (CategoryAxis) plot.getDomainAxis();
+            domainAxis.setCategoryLabelPositions(CategoryLabelPositions.UP_90); // 日期標籤垂直顯示（UP_90），避免擁擠（依需調整為 STANDARD 或 DOWN_90）
+
+            // 建立 ChartPanel 並設定大小
+            currentChartPanel = new ChartPanel(chart);
+            currentChartPanel.setPreferredSize(new java.awt.Dimension(695, 400));
+            swingNode.setContent(currentChartPanel);
+
+            // Timer：Swing 的計時器，單次延遲 200ms 觸發 ActionListener。
+            // 目的：解決 SwingNode 嵌入 JavaFX 時的初始渲染延遲（社區常見 bug，JFreeChart 需要時間初始化 plot）。
+            Timer timer = new Timer(200, e -> {
+                currentChartPanel.revalidate();
+                currentChartPanel.repaint();
+                ((Timer) e.getSource()).stop();
+            });
+            timer.setRepeats(false);
+            timer.start();
+        });
+
+        // 延遲 setVisible，給 Swing 初始化時間
+        PauseTransition delay = new PauseTransition(Duration.millis(400));
+        delay.setOnFinished(e -> chartPane.setVisible(true));
+        delay.play();
+
+        return swingNode;
+    }
+
+    @FunctionalInterface
+    interface ToDoubleFunction<T> { 
+        double applyAsDouble(T value); 
+    }
+
+    @FunctionalInterface
+    interface ToLocalDateFunction<T> { 
+        LocalDate apply(T value); 
+    }
+
     // 查詢歷史 K 線邏輯
     private void queryHistory() {
         String symbol = symbolField.getText().trim(); // 股票代號
@@ -519,7 +635,14 @@ public class MainApp extends Application {
                         resultArea.setText(sb.toString()); // 設定完整文字
 
                         // K 線圖表
-                        chartPane.setContent(createLineChart(candles));
+                        chartPane.setContent(createCommonLineChart(
+                            candles,
+                            "收盤價走勢",
+                            "價格",
+                            Color.RED,
+                            obj -> ((Candle) obj).close(),
+                            obj -> ((Candle) obj).date() // 直接回傳 LocalDate
+                        ));
                         resizeChartProportionally(); // 改用統一的等比例縮放方法
                     } else {
                         resultArea.setText("歷史資料載入失敗，請稍後再試\n若 API 不可用，請確認 API key 有效。");
@@ -629,102 +752,19 @@ public class MainApp extends Application {
                         resultArea.setText(sb.toString()); // 設定完整文字
 
                         // SMA 圖表
-                        chartPane.setContent(createSMAChart(smaList));
+                        chartPane.setContent(createCommonLineChart(
+                            smaList,
+                            "SMA 指標",
+                            "價格",
+                            Color.ORANGE,
+                            obj -> ((SMA) obj).sma(),
+                            obj -> ((SMA) obj).date() // 直接回傳 LocalDate
+                        ));
                         resizeChartProportionally(); // 改用統一的等比例縮放方法
                     } else {
                         resultArea.setText("SMA 資料載入失敗，請稍後再試\n若 API 不可用，請確認 API key 有效。");
                     }
                 }));
-    }
-
-    private Node createSMAChart(List<SMA> smaList) {
-        SwingNode swingNode = new SwingNode();
-
-        SwingUtilities.invokeLater(() -> {
-            // DefaultCategoryDataset：JFreeChart 的資料集類別，用於類別型資料（如 X=日期字符串，Y=數值），支援多系列。
-            // 日期是離散類別（非連續時間），CategoryAxis 只顯示有資料的點，解決假日空白問題。
-            DefaultCategoryDataset dataset = new DefaultCategoryDataset();
-
-            // SimpleDateFormat：Java 文字處理 API，用來格式化 LocalDate 為字符串（X 軸標籤）。
-            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
-
-            // 迴圈填充 dataset：從 smaList List 迭代，每個 SMA 轉日期字符串。
-            // 目的：建 X=日期類別，Y=close 數值系列 "收盤價走勢"。
-            for (int i = 0; i < smaList.size(); i++) {
-                SMA s = smaList.get(i); // 取得單日 SMA 記錄
-
-                LocalDate localDate = s.date(); // SMA date() 返回 LocalDate - Java 時間 API，沒法直接串改，所以用 localDate 來替代改變
-
-                // JFreeChart 需 Date 格式化。
-                // atStartOfDay(ZoneId.systemDefault())：加時區轉 Instant（台灣時間）。
-                String dateStr = sdf.format(Date.from(localDate.atStartOfDay(ZoneId.systemDefault()).toInstant()));
-
-                dataset.addValue(s.sma(), "SMA 指標", dateStr); // 用日期字符串作為類別（X 軸標籤），Y 為 sma 值
-            }
-
-            // JFreeChart 核心工廠，生成線圖（CategoryPlot 類型）。
-            JFreeChart chart = ChartFactory.createLineChart(
-                "簡單移動平均線 SMA(5)",
-                "日期", "價格",
-                dataset,
-                PlotOrientation.VERTICAL,
-                true,
-                true,
-                false
-            );
-
-            // CategoryPlot：JFreeChart 繪圖區域，處理 CategoryDataset 的線圖。
-            CategoryPlot plot = chart.getCategoryPlot();
-
-            // 設定字型以利解決亂碼問題
-            Font font = new Font("Microsoft YaHei", Font.BOLD, 14);
-            chart.getTitle().setFont(font);
-            chart.getLegend().setItemFont(font);
-            plot.getDomainAxis().setLabelFont(font);
-            plot.getRangeAxis().setLabelFont(font);
-
-            // Y 軸範圍動態調整（根據資料 min/max，類似 before 的行為，避免從 0 開始）
-            // smaList.stream().mapToDouble(SMA::close).min().orElse(0.0)：Stream API 計算收盤價最小值（method reference SMA::close）。
-
-            double minClose = smaList.stream().mapToDouble(SMA::sma).min().orElse(0.0); // minClose：資料中的最小收盤價
-            double maxClose = smaList.stream().mapToDouble(SMA::sma).max().orElse(0.0);  // maxClose：資料中最大收盤價
-            double padding = (maxClose - minClose) * 0.05; // 5% 緩衝空間（padding）：Y 軸上下留白，避免線貼邊
-
-            // getRangeAxis()：Y 軸 ValueAxis，setLowerBound / setUpperBound 動態設範圍。
-            plot.getRangeAxis().setLowerBound(Math.max(0, minClose - padding));  // 下限：min - padding，但不低於 0（股票價 >0）
-            plot.getRangeAxis().setUpperBound(maxClose + padding);  // 上限：max + padding
-
-            // 線條樣式設定
-            LineAndShapeRenderer renderer = (LineAndShapeRenderer) plot.getRenderer();
-            renderer.setSeriesPaint(0, Color.ORANGE);
-            renderer.setSeriesStroke(0, new java.awt.BasicStroke(2.5f));
-
-            // CategoryAxis：X 軸類別軸，處理日期標籤位置。
-            CategoryAxis domainAxis = (CategoryAxis) plot.getDomainAxis();
-            domainAxis.setCategoryLabelPositions(CategoryLabelPositions.UP_90); // 日期標籤垂直顯示（UP_90），避免擁擠（依需調整為 STANDARD 或 DOWN_90）
-
-            // 建立 ChartPanel 並設定大小
-            currentChartPanel = new ChartPanel(chart);
-            currentChartPanel.setPreferredSize(new java.awt.Dimension(695, 400));
-            swingNode.setContent(currentChartPanel);
-
-            // Timer：Swing 的計時器，單次延遲 200ms 觸發 ActionListener。
-            // 目的：解決 SwingNode 嵌入 JavaFX 時的初始渲染延遲（社區常見 bug，JFreeChart 需要時間初始化 plot）。
-            Timer timer = new Timer(200, e -> {
-                currentChartPanel.revalidate();
-                currentChartPanel.repaint();
-                ((Timer) e.getSource()).stop();
-            });
-            timer.setRepeats(false);
-            timer.start();
-        });
-
-        // 延遲 setVisible，給 Swing 初始化時間
-        PauseTransition delay = new PauseTransition(Duration.millis(400));
-        delay.setOnFinished(e -> chartPane.setVisible(true));
-        delay.play();
-
-        return swingNode;
     }
 
     // 查詢 RSI 邏輯（使用共用 daysField）
@@ -787,19 +827,6 @@ public class MainApp extends Application {
                             }
                         }
 
-                        chartPane.setContent(createRSIChart(rsiList));
-                        // chartPane.setFitToWidth(true);  // 關閉自動壓縮，讓 ChartPanel 自然寬度，溢出時滾動
-                        // chartPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);  // 水平滾動條自動出現（當寬度溢出時），確保用戶拖曳查看全圖，不切斷日期
-                        resizeChartProportionally(); // 改用統一的等比例縮放方法
-
-                        // 延遲 setVisible，給 Swing 初始化時間
-                        PauseTransition delayVisible = new PauseTransition(Duration.millis(400));
-                        delayVisible.setOnFinished(e -> {
-                            chartPane.setVisible(true);
-                        });
-                        delayVisible.play();
-                        
-                        // RSI 文字列表
                         StringBuilder sb = new StringBuilder(String.format("相對強弱指標 （RSI）已載入（近 %d 日走勢）。\n\n強弱指數如下：\n\n", rsiList.size())); // 使用 StringBuilder 可多行段落顯示，並且在字串相接時比較高效，無額外開銷
                         for (RSI r : rsiList) {
                             String tag = r.date().equals(today) && !hasToday ? "（盤中預估）" : "";
@@ -841,6 +868,16 @@ public class MainApp extends Application {
                         sb.append("  RSI 值越高，表示過去一段期間的上漲機率較大；值越小，則下跌機率較大。");
 
                         resultArea.setText(sb.toString());  // 設定完整文字
+
+                        chartPane.setContent(createCommonLineChart(
+                            rsiList,
+                            "RSI 指標",
+                            "RSI（0-100）",
+                            Color.MAGENTA,
+                            obj -> ((RSI) obj).rsi(),
+                            obj -> ((RSI) obj).date() // 直接回傳 LocalDate
+                        ));
+                        resizeChartProportionally(); // 改用統一的等比例縮放方法
                     } else {
                         resultArea.setText("RSI 資料載入失敗，請稍後再試\n若 API 不可用，請確認 API key 有效。");
                     }
@@ -1814,163 +1851,6 @@ public class MainApp extends Application {
                 timer.start();
             });
         }
-    }
-
-    private Node createLineChart(List<Candle> candles) {
-        SwingNode swingNode = new SwingNode();
-
-        SwingUtilities.invokeLater(() -> {
-            // DefaultCategoryDataset：JFreeChart 的資料集類別，用於類別型資料（如 X=日期字符串，Y=數值），支援多系列。
-            // 日期是離散類別（非連續時間），CategoryAxis 只顯示有資料的點，解決假日空白問題。
-            DefaultCategoryDataset dataset = new DefaultCategoryDataset();
-
-            // SimpleDateFormat：Java 文字處理 API，用來格式化 LocalDate 為字符串（X 軸標籤）。
-            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
-
-            // 迴圈填充 dataset：從 candles List 迭代，每個 Candle 轉日期字符串 + 收盤價。
-            // 目的：建 X=日期類別，Y=close 數值系列 "收盤價走勢"。
-            for (int i = 0; i < candles.size(); i++) {
-                Candle c = candles.get(i); // 取得單日 Candle 記錄
-
-                LocalDate localDate = c.date(); // Candle date() 返回 LocalDate - Java 時間 API，沒法直接串改，所以用 localDate 來替代改變
-
-                // JFreeChart 需 Date 格式化。
-                // atStartOfDay(ZoneId.systemDefault())：加時區轉 Instant（台灣時間）。
-                String dateStr = sdf.format(Date.from(localDate.atStartOfDay(ZoneId.systemDefault()).toInstant()));
-
-                dataset.addValue(c.close(), "收盤價走勢", dateStr); // 用日期字符串作為類別（X 軸標籤），Y 為 close 值
-            }
-
-            // JFreeChart 核心工廠，生成線圖（CategoryPlot 類型）。
-            JFreeChart chart = ChartFactory.createLineChart(
-                "近 " + candles.size() + " 日 K 線 (收盤價)",
-                "日期", "價格",
-                dataset,
-                PlotOrientation.VERTICAL,
-                true,
-                true,
-                false
-            );
-
-            // CategoryPlot：JFreeChart 繪圖區域，處理 CategoryDataset 的線圖。
-            CategoryPlot plot = chart.getCategoryPlot();
-            
-            // 設定字型以利解決亂碼問題
-            Font font = new Font("Microsoft YaHei", Font.BOLD, 14);
-            chart.getTitle().setFont(font);
-            chart.getLegend().setItemFont(font);
-            plot.getDomainAxis().setLabelFont(font);
-            plot.getRangeAxis().setLabelFont(font);
-            
-            // Y 軸範圍動態調整（根據資料 min/max，類似 before 的行為，避免從 0 開始）
-            // candles.stream().mapToDouble(Candle::close).min().orElse(0.0)：Stream API 計算收盤價最小值（method reference Candle::close）。
-
-            double minClose = candles.stream().mapToDouble(Candle::close).min().orElse(0.0); // minClose：資料中的最小收盤價
-            double maxClose = candles.stream().mapToDouble(Candle::close).max().orElse(0.0);  // maxClose：資料中最大收盤價
-            double padding = (maxClose - minClose) * 0.05; // 5% 緩衝空間（padding）：Y 軸上下留白，避免線貼邊
-
-            // getRangeAxis()：Y 軸 ValueAxis，setLowerBound / setUpperBound 動態設範圍。
-            plot.getRangeAxis().setLowerBound(Math.max(0, minClose - padding)); // 下限：min - padding，但不低於 0（股票價 >0）
-            plot.getRangeAxis().setUpperBound(maxClose + padding); // 上限：max + padding
-
-            // 線條樣式設定
-            LineAndShapeRenderer renderer = (LineAndShapeRenderer) plot.getRenderer();
-            renderer.setSeriesPaint(0, Color.RED);
-            renderer.setSeriesStroke(0, new java.awt.BasicStroke(2.5f));
-            
-            // CategoryAxis：X 軸類別軸，處理日期標籤位置。
-            CategoryAxis domainAxis = (CategoryAxis) plot.getDomainAxis();
-            domainAxis.setCategoryLabelPositions(CategoryLabelPositions.UP_90); // 日期標籤垂直顯示（UP_90），避免擁擠（依需調整為 STANDARD 或 DOWN_90）
-
-            // 建立 ChartPanel 並設定大小
-            currentChartPanel = new ChartPanel(chart);
-            currentChartPanel.setPreferredSize(new java.awt.Dimension(695, 400));
-            swingNode.setContent(currentChartPanel);
-
-            // Timer：Swing 的計時器，單次延遲 200ms 觸發 ActionListener。
-            // 目的：解決 SwingNode 嵌入 JavaFX 時的初始渲染延遲（社區常見 bug，JFreeChart 需要時間初始化 plot）。
-            Timer timer = new Timer(200, e -> {
-                currentChartPanel.revalidate();
-                currentChartPanel.repaint();
-                ((Timer) e.getSource()).stop();
-            });
-            timer.setRepeats(false);
-            timer.start();
-        });
-
-        // 延遲 setVisible，給 Swing 初始化時間
-        PauseTransition delay = new PauseTransition(Duration.millis(400));
-        delay.setOnFinished(e -> chartPane.setVisible(true));
-        delay.play();
-        
-        return swingNode;
-    }
-
-    // 創建 RSI 線圖
-    private Node createRSIChart(List<RSI> rsiList) {
-        SwingNode swingNode = new SwingNode();
-
-        SwingUtilities.invokeLater(() -> {
-            DefaultCategoryDataset dataset = new DefaultCategoryDataset();
-
-            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
-
-            for (int i = 0; i < rsiList.size(); i++) {
-                RSI r = rsiList.get(i);
-                LocalDate localDate = r.date();
-
-                String dateStr = sdf.format(Date.from(localDate.atStartOfDay(ZoneId.systemDefault()).toInstant()));
-
-                dataset.addValue(r.rsi(), "RSI 指標", dateStr);  // 用日期字符串作為類別（X 軸標籤），Y 為 rsi 值
-            }
-
-            JFreeChart chart = ChartFactory.createLineChart("近 " + rsiList.size() + " 日 RSI 指標", "日期", "RSI 值 (0-100)", dataset, PlotOrientation.VERTICAL, true, true, false);
-            
-            Font font = new Font("Microsoft YaHei", Font.BOLD, 14);
-
-            TextTitle title = chart.getTitle();
-            title.setFont(font);
-
-            CategoryPlot plot = (CategoryPlot) chart.getPlot();
-            plot.getDomainAxis().setLabelFont(font);
-            plot.getRangeAxis().setLabelFont(font);
-            
-            // Y 軸範圍動態調整（RSI 通常 0-100，padding 5%）
-            double minRsi = rsiList.stream().mapToDouble(RSI::rsi).min().orElse(0.0);
-            double maxRsi = rsiList.stream().mapToDouble(RSI::rsi).max().orElse(100.0);
-            double padding = (maxRsi - minRsi) * 0.05;
-
-            plot.getRangeAxis().setLowerBound(Math.max(0, minRsi - padding));
-            plot.getRangeAxis().setUpperBound(Math.min(100, maxRsi + padding));
-
-            LineAndShapeRenderer renderer = (LineAndShapeRenderer) plot.getRenderer();
-            renderer.setSeriesItemLabelFont(0, font);
-
-            renderer.setSeriesToolTipGenerator(0, (dataset1, row, column) -> {
-                String category = (String) dataset1.getColumnKey(column);
-                double y = dataset1.getValue(row, column).doubleValue();
-                return category + ": " + y;
-            });
-            
-            chart.getLegend().setItemFont(font);
-            
-            CategoryAxis domainAxis = (CategoryAxis) plot.getDomainAxis();
-            domainAxis.setCategoryLabelPositions(CategoryLabelPositions.UP_90);
-
-            currentChartPanel = new ChartPanel(chart);
-            currentChartPanel.setPreferredSize(new java.awt.Dimension(695, 400));
-            swingNode.setContent(currentChartPanel);
-
-            Timer timer = new Timer(200, e -> {
-                currentChartPanel.revalidate();
-                currentChartPanel.repaint();
-                ((Timer) e.getSource()).stop();
-            });
-            timer.setRepeats(false);
-            timer.start();
-        });
-        
-        return swingNode;
     }
 
     // 創建 MACD 線圖
