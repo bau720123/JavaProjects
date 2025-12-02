@@ -59,7 +59,6 @@ import java.util.LinkedHashMap;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 import java.util.ArrayList;
@@ -458,7 +457,7 @@ public class MainApp extends Application {
                 double value = valueExtractor.applyAsDouble(item);
                 LocalDate localDate = dateExtractor.apply(item); // 取出 LocalDate
 
-                // 強制轉成統一格式的字串！
+                // 強制轉成統一格式的字串
                 String dateStr = sdf.format(Date.from(
                     localDate.atStartOfDay(ZoneId.systemDefault()).toInstant()
                 ));
@@ -475,11 +474,13 @@ public class MainApp extends Application {
                 "日期", yPrefix,
                 dataset,
                 PlotOrientation.VERTICAL,
-                true, true, false
+                true,
+                true,
+                false
             );
 
             // CategoryPlot：JFreeChart 繪圖區域，處理 CategoryDataset 的線圖。
-            CategoryPlot plot = chart.getCategoryPlot();
+            CategoryPlot plot = (CategoryPlot) chart.getPlot();
 
             // 設定字型以利解決亂碼問題
             Font font = new Font("Microsoft YaHei", Font.BOLD, 14);
@@ -960,7 +961,6 @@ public class MainApp extends Application {
         CompletableFuture.supplyAsync(() -> service.fetchMACD(symbol, days, apiKey))
                 .thenAccept(macdList -> Platform.runLater(() -> {
                     if (!macdList.isEmpty()) {
-                        // MACD 盤中預估（基於資料歸檔，Fugle 的 API最其碼要在今天收盤之後，才會進行歸檔，在那之前，是不會有今天的資料的）
                         LocalDate today = LocalDate.now();
                         boolean hasToday = macdList.stream().anyMatch(m -> m.date().equals(today));
 
@@ -971,7 +971,12 @@ public class MainApp extends Application {
                             // 建立今日虛擬K棒
                             Candle todayCandle = new Candle(
                                 today,
-                                0, 0, 0, quote.closePrice(), 0L, 0.0
+                                quote.openPrice(),
+                                quote.highPrice(),
+                                quote.lowPrice(),
+                                quote.closePrice(), // 目前成交價當作「收盤價」
+                                0, // 今日成交量暫設為0，因為歷史K線的volume是整日總量，無法從即時報價取得
+                                quote.change()
                             );
 
                             List<Candle> fullCandles = new ArrayList<>(history);
@@ -988,20 +993,7 @@ public class MainApp extends Application {
                             }
                         }
 
-                        chartPane.setContent(createMACDChart(macdList));
-                        // chartPane.setFitToWidth(true);  // 關閉自動壓縮，讓 ChartPanel 自然寬度，溢出時滾動
-                        // chartPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);  // 水平滾動條自動出現（當寬度溢出時），確保用戶拖曳查看全圖，不切斷日期
-                        resizeChartProportionally(); // 改用統一的等比例縮放方法
-
-                        // 延遲 setVisible，給 Swing 初始化時間
-                        PauseTransition delayVisible = new PauseTransition(Duration.millis(400));
-                        delayVisible.setOnFinished(e -> {
-                            chartPane.setVisible(true);
-                        });
-                        delayVisible.play();
-                        
-                        // MACD 文字列表
-                        StringBuilder sb = new StringBuilder(String.format("移動平均指標 （MACD）已載入（近 %d 日走勢）。\n\n移動平均指數如下：\n\n", macdList.size())); // 使用 StringBuilder 可多行段落顯示，並且在字串相接時比較高效，無額外開銷
+                        StringBuilder sb = new StringBuilder(String.format("移動平均指標 （MACD）已載入（近 %d 日走勢）。\n\n", macdList.size()));
                         for (MACD m : macdList) {
                             String tag = m.date().equals(today) && !hasToday ? "（盤中預估）" : "";
                             sb.append(String.format("日期：%s%s\nMACD 線：%.2f\n信號線：%.2f\n\n",
@@ -1010,8 +1002,8 @@ public class MainApp extends Application {
 
                         // 計算區間最強勢（所有 macdLine 的 max）和最弱勢（所有 macdLine 的 min）
                         // 用 Stream API：mapToDouble(MACD::macdLine).max().orElse(0.0) - 高效 O(n)，method reference 簡潔
-                        double maxMacd = macdList.stream().mapToDouble(MACD::macdLine).max().orElse(0.0);  // 區間最強勢
-                        double minMacd = macdList.stream().mapToDouble(MACD::macdLine).min().orElse(0.0);  // 區間最弱勢
+                        double maxMacd = macdList.stream().mapToDouble(MACD::macdLine).max().orElse(0.0);
+                        double minMacd = macdList.stream().mapToDouble(MACD::macdLine).min().orElse(0.0);
 
                         // 找出達到最高 MACD 的所有日期，並按遞減（從最新到最舊）排序
                         List<LocalDate> maxMacdDates = macdList.stream()
@@ -1036,13 +1028,24 @@ public class MainApp extends Application {
                         sb.append(String.format("區間最強勢：%.2f（%s）\n", maxMacd, maxMacdDateStr));  // 格式化添加（%.2f 保留2位小數）
                         sb.append(String.format("區間最弱勢：%.2f（%s）\n", minMacd, minMacdDateStr));  // 格式化添加（%.2f 保留2位小數）
 
-                        // 新增：MACD 解釋文字（修正死亡交叉為賣出訊號）
                         sb.append("\n* 黃金交叉：\n");
                         sb.append("  當移動平均線（MACD）慢慢往上交叉信號線（signalLine）時發生。這通常被視為一個買進訊號，表示上漲趨勢可能增強。\n\n");
                         sb.append("* 死亡交叉：\n");
                         sb.append("  當移動平均線（MACD）慢慢往下交叉信號線（signalLine）時發生。這通常被視為一個賣出訊號，表示下跌趨勢可能增強。");
 
                         resultArea.setText(sb.toString());  // 設定完整文字
+
+                        // MACD 圖表
+                        chartPane.setContent(createMACDChart(macdList));
+                        /*chartPane.setContent(createCommonLineChart(
+                            macdList,
+                            "MACD 指標",
+                            "MACD",
+                            Color.RED,
+                            obj -> ((MACD) obj).macdLine(),
+                            obj -> ((MACD) obj).date() // 直接回傳 LocalDate
+                        ));*/
+                        resizeChartProportionally(); // 改用統一的等比例縮放方法
                     } else {
                         resultArea.setText("MACD 資料載入失敗，請稍後再試\n若 API 不可用，請確認 API key 有效。");
                     }
@@ -1094,6 +1097,98 @@ public class MainApp extends Application {
 
     private double round(double value) {
         return Math.round(value * 100.0) / 100.0;
+    }
+
+    // 創建 MACD 線圖
+    private Node createMACDChart(List<MACD> macdList) {
+        SwingNode swingNode = new SwingNode();
+
+        SwingUtilities.invokeLater(() -> {
+            // DefaultCategoryDataset：JFreeChart 的資料集類別，用於類別型資料（如 X=日期字符串，Y=數值），支援多系列。
+            // 日期是離散類別（非連續時間），CategoryAxis 只顯示有資料的點，解決假日空白問題。
+            DefaultCategoryDataset dataset = new DefaultCategoryDataset();
+
+            // SimpleDateFormat：Java 文字處理 API，用來格式化 LocalDate 為字符串（X 軸標籤）。
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+
+            // 迴圈填充 dataset：從 macdList List 迭代，每個 macdList 轉日期字符串。
+            // 目的：建 X=日期類別，Y=close 數值系列 "MACD"。
+            for (int i = 0; i < macdList.size(); i++) {
+                MACD m = macdList.get(i);
+                LocalDate localDate = m.date(); // 取出 LocalDate
+
+                // 強制轉成統一格式的字串
+                String dateStr = sdf.format(Date.from(localDate.atStartOfDay(ZoneId.systemDefault()).toInstant()));
+
+                dataset.addValue(m.macdLine(), "MACD 線", dateStr);  // 系列 0：MACD 線
+                dataset.addValue(m.signalLine(), "信號線", dateStr);  // 系列 1：信號線
+            }
+
+            // JFreeChart 核心工廠，生成線圖（CategoryPlot 類型）。
+            JFreeChart chart = ChartFactory.createLineChart(
+                "近 " + macdList.size() + " 日 MACD 指標",
+                "日期",
+                "MACD 值",
+                dataset,
+                PlotOrientation.VERTICAL,
+                true,
+                true,
+                false
+            );
+
+            // CategoryPlot：JFreeChart 繪圖區域，處理 CategoryDataset 的線圖。
+            CategoryPlot plot = (CategoryPlot) chart.getPlot();
+
+            // 設定字型以利解決亂碼問題
+            Font font = new Font("Microsoft YaHei", Font.BOLD, 14);
+            chart.getTitle().setFont(font);
+            chart.getLegend().setItemFont(font);
+            plot.getDomainAxis().setLabelFont(font);
+            plot.getRangeAxis().setLabelFont(font);
+            
+            // Y 軸範圍動態調整，給予適當邊界
+            double minMacd = macdList.stream().mapToDouble(MACD::macdLine).min().orElse(0.0);
+            double maxMacd = macdList.stream().mapToDouble(MACD::macdLine).max().orElse(0.0);
+            double padding = (maxMacd - minMacd) * 0.05;
+
+            plot.getRangeAxis().setLowerBound(minMacd - padding); // 下限
+            plot.getRangeAxis().setUpperBound(maxMacd + padding); // 上限
+
+            // 線條樣式設定
+            LineAndShapeRenderer renderer = (LineAndShapeRenderer) plot.getRenderer();
+            renderer.setSeriesItemLabelFont(0, font); // MACD 線字體
+            renderer.setSeriesItemLabelFont(1, font); // 信號線字體
+            renderer.setSeriesPaint(0, Color.RED);
+            renderer.setSeriesPaint(1, Color.BLUE);
+
+            // CategoryAxis：X 軸類別軸，處理日期標籤位置。
+            CategoryAxis domainAxis = (CategoryAxis) plot.getDomainAxis();
+            domainAxis.setCategoryLabelPositions(CategoryLabelPositions.UP_90); // 日期標籤垂直顯示（UP_90），避免擁擠（依需調整為 STANDARD 或 DOWN_90）
+
+            // 建立 ChartPanel 並設定大小
+            currentChartPanel = new ChartPanel(chart);
+            currentChartPanel.setPreferredSize(new java.awt.Dimension(695, 400));
+            swingNode.setContent(currentChartPanel);
+
+            // Timer：Swing 的計時器，單次延遲 200ms 觸發 ActionListener。
+            // 目的：解決 SwingNode 嵌入 JavaFX 時的初始渲染延遲（社區常見 bug，JFreeChart 需要時間初始化 plot）。
+            Timer timer = new Timer(200, e -> {
+                currentChartPanel.revalidate();
+                currentChartPanel.repaint();
+                ((Timer) e.getSource()).stop();
+            });
+            timer.setRepeats(false);
+            timer.start();
+        });
+
+        // 延遲 setVisible，給 Swing 初始化時間
+        PauseTransition delayVisible = new PauseTransition(Duration.millis(400));
+        delayVisible.setOnFinished(e -> {
+            chartPane.setVisible(true);
+        });
+        delayVisible.play();
+        
+        return swingNode;
     }
 
     // 查詢 Bollinger 邏輯（使用共用 daysField）
@@ -1851,88 +1946,6 @@ public class MainApp extends Application {
                 timer.start();
             });
         }
-    }
-
-    // 創建 MACD 線圖
-    private Node createMACDChart(List<MACD> macdList) {
-        SwingNode swingNode = new SwingNode();
-
-        SwingUtilities.invokeLater(() -> {
-            DefaultCategoryDataset dataset = new DefaultCategoryDataset();
-
-            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
-
-            for (int i = 0; i < macdList.size(); i++) {
-                MACD m = macdList.get(i);
-                LocalDate localDate = m.date();
-
-                String dateStr = sdf.format(Date.from(localDate.atStartOfDay(ZoneId.systemDefault()).toInstant()));
-
-                dataset.addValue(m.macdLine(), "MACD 線", dateStr);  // 系列 0：MACD 線
-                dataset.addValue(m.signalLine(), "信號線", dateStr);  // 系列 1：信號線
-            }
-
-            JFreeChart chart = ChartFactory.createLineChart("近 " + macdList.size() + " 日 MACD 指標", "日期", "MACD 值", dataset, PlotOrientation.VERTICAL, true, true, false);
-            
-            Font font = new Font("Microsoft YaHei", Font.BOLD, 14);
-
-            TextTitle title = chart.getTitle();
-            title.setFont(font);
-
-            CategoryPlot plot = (CategoryPlot) chart.getPlot();
-            plot.getDomainAxis().setLabelFont(font);
-            plot.getRangeAxis().setLabelFont(font);
-            
-            // Y 軸範圍動態調整（基於 MACD 線 min/max，padding 5%）
-            double minMacd = macdList.stream().mapToDouble(MACD::macdLine).min().orElse(0.0);
-            double maxMacd = macdList.stream().mapToDouble(MACD::macdLine).max().orElse(0.0);
-            double padding = (maxMacd - minMacd) * 0.05;
-
-            plot.getRangeAxis().setLowerBound(minMacd - padding);
-            plot.getRangeAxis().setUpperBound(maxMacd + padding);
-
-            LineAndShapeRenderer renderer = (LineAndShapeRenderer) plot.getRenderer();
-            renderer.setSeriesItemLabelFont(0, font);  // MACD 線字體
-            renderer.setSeriesItemLabelFont(1, font);  // 信號線字體
-
-            // 設定線條顏色：系列 0 (MACD) 紅色，系列 1 (信號線) 藍色
-            renderer.setSeriesPaint(0, Color.RED);
-            renderer.setSeriesPaint(1, Color.BLUE);
-
-            // Tooltip：顯示日期 + 各系列值
-            renderer.setSeriesToolTipGenerator(0, (dataset1, row, column) -> {
-                String category = (String) dataset1.getColumnKey(column);
-                double macdVal = dataset1.getValue(0, column).doubleValue();  // 系列 0
-                double signalVal = dataset1.getValue(1, column).doubleValue();  // 系列 1
-                return String.format("%s: MACD=%.2f, Signal=%.2f", category, macdVal, signalVal);
-            });
-            renderer.setSeriesToolTipGenerator(1, (dataset1, row, column) -> {
-                // 信號線 tooltip 同上（避免重複）
-                String category = (String) dataset1.getColumnKey(column);
-                double macdVal = dataset1.getValue(0, column).doubleValue();
-                double signalVal = dataset1.getValue(1, column).doubleValue();
-                return String.format("%s: MACD=%.2f, Signal=%.2f", category, macdVal, signalVal);
-            });
-            
-            chart.getLegend().setItemFont(font);
-            
-            CategoryAxis domainAxis = (CategoryAxis) plot.getDomainAxis();
-            domainAxis.setCategoryLabelPositions(CategoryLabelPositions.UP_90);
-
-            currentChartPanel = new ChartPanel(chart);
-            currentChartPanel.setPreferredSize(new java.awt.Dimension(695, 400));
-            swingNode.setContent(currentChartPanel);
-
-            Timer timer = new Timer(200, e -> {
-                currentChartPanel.revalidate();
-                currentChartPanel.repaint();
-                ((Timer) e.getSource()).stop();
-            });
-            timer.setRepeats(false);
-            timer.start();
-        });
-        
-        return swingNode;
     }
 
     // 布林通道 + K線 複合圖表
