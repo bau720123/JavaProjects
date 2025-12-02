@@ -629,7 +629,7 @@ public class MainApp extends Application {
                         resultArea.setText(sb.toString()); // 設定完整文字
 
                         // SMA 圖表
-                        chartPane.setContent(createLineChart(smaList));
+                        chartPane.setContent(createSMAChart(smaList));
                         resizeChartProportionally(); // 改用統一的等比例縮放方法
                     } else {
                         resultArea.setText("SMA 資料載入失敗，請稍後再試\n若 API 不可用，請確認 API key 有效。");
