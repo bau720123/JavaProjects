@@ -435,7 +435,10 @@ public class MainApp extends Application {
             String yPrefix, // Y軸說明
             Color lineColor, // 線條顏色
             ToDoubleFunction<Object> valueExtractor, // 提取數值
-            ToLocalDateFunction<Object> dateExtractor // 提取日期字串
+            ToLocalDateFunction<Object> dateExtractor, // 提取日期字串
+            ToDoubleFunction<Object> secondaryValueExtractor,
+            String secondarySeriesName,
+            Color secondaryColor
     ) {
         SwingNode swingNode = new SwingNode();
 
@@ -463,6 +466,12 @@ public class MainApp extends Application {
                 ));
 
                 dataset.addValue(value, titlePrefix, dateStr); // 用日期字符串作為類別（X 軸標籤），Y 為 value 值
+
+                // 第二條線
+                if (secondaryValueExtractor != null && secondarySeriesName != null && secondaryColor != null) {
+                    double secondaryValue = secondaryValueExtractor.applyAsDouble(item);
+                    dataset.addValue(secondaryValue, secondarySeriesName, dateStr);
+                }
 
                 minValue = Math.min(minValue, value);
                 maxValue = Math.max(maxValue, value);
@@ -499,13 +508,19 @@ public class MainApp extends Application {
                 maxValue = 100;
             }
 
-            plot.getRangeAxis().setLowerBound(Math.max(0, minValue - padding)); // 下限
+            plot.getRangeAxis().setLowerBound(minValue - padding); // 下限
             plot.getRangeAxis().setUpperBound(maxValue + padding); // 上限
 
             // 線條樣式設定
             LineAndShapeRenderer renderer = (LineAndShapeRenderer) plot.getRenderer();
             renderer.setSeriesPaint(0, lineColor);
             renderer.setSeriesStroke(0, new BasicStroke(2.5f));
+
+            // 設定第二條線的樣式（如果存在）
+            if (secondarySeriesName != null) {
+                renderer.setSeriesPaint(1, secondaryColor);
+                renderer.setSeriesStroke(1, new BasicStroke(2.0f));  // 信號線細一點
+            }
 
             // CategoryAxis：X 軸類別軸，處理日期標籤位置。
             CategoryAxis domainAxis = (CategoryAxis) plot.getDomainAxis();
@@ -533,6 +548,28 @@ public class MainApp extends Application {
         delay.play();
 
         return swingNode;
+    }
+
+    // 重載
+    private Node createCommonLineChart(
+            List<?> data,
+            String titlePrefix,
+            String yPrefix,
+            Color lineColor,
+            ToDoubleFunction<Object> valueExtractor,
+			ToLocalDateFunction<Object> dateExtractor
+    ) {
+        return createCommonLineChart(
+            data,
+            titlePrefix,
+            yPrefix,
+            lineColor,
+            valueExtractor,
+            dateExtractor,
+            null,
+            null,
+            null
+        );
     }
 
     @FunctionalInterface
@@ -870,6 +907,7 @@ public class MainApp extends Application {
 
                         resultArea.setText(sb.toString());  // 設定完整文字
 
+                        // MRSI 圖表
                         chartPane.setContent(createCommonLineChart(
                             rsiList,
                             "RSI 指標",
@@ -1036,15 +1074,17 @@ public class MainApp extends Application {
                         resultArea.setText(sb.toString());  // 設定完整文字
 
                         // MACD 圖表
-                        chartPane.setContent(createMACDChart(macdList));
-                        /*chartPane.setContent(createCommonLineChart(
+                        chartPane.setContent(createCommonLineChart(
                             macdList,
-                            "MACD 指標",
+                            "MACD 線",
                             "MACD",
                             Color.RED,
                             obj -> ((MACD) obj).macdLine(),
-                            obj -> ((MACD) obj).date() // 直接回傳 LocalDate
-                        ));*/
+                            obj -> ((MACD) obj).date(), // 直接回傳 LocalDate
+                            obj -> ((MACD) obj).signalLine(),
+                            "信號線",
+                            Color.BLUE
+                        ));
                         resizeChartProportionally(); // 改用統一的等比例縮放方法
                     } else {
                         resultArea.setText("MACD 資料載入失敗，請稍後再試\n若 API 不可用，請確認 API key 有效。");
@@ -1097,98 +1137,6 @@ public class MainApp extends Application {
 
     private double round(double value) {
         return Math.round(value * 100.0) / 100.0;
-    }
-
-    // 創建 MACD 線圖
-    private Node createMACDChart(List<MACD> macdList) {
-        SwingNode swingNode = new SwingNode();
-
-        SwingUtilities.invokeLater(() -> {
-            // DefaultCategoryDataset：JFreeChart 的資料集類別，用於類別型資料（如 X=日期字符串，Y=數值），支援多系列。
-            // 日期是離散類別（非連續時間），CategoryAxis 只顯示有資料的點，解決假日空白問題。
-            DefaultCategoryDataset dataset = new DefaultCategoryDataset();
-
-            // SimpleDateFormat：Java 文字處理 API，用來格式化 LocalDate 為字符串（X 軸標籤）。
-            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
-
-            // 迴圈填充 dataset：從 macdList List 迭代，每個 macdList 轉日期字符串。
-            // 目的：建 X=日期類別，Y=close 數值系列 "MACD"。
-            for (int i = 0; i < macdList.size(); i++) {
-                MACD m = macdList.get(i);
-                LocalDate localDate = m.date(); // 取出 LocalDate
-
-                // 強制轉成統一格式的字串
-                String dateStr = sdf.format(Date.from(localDate.atStartOfDay(ZoneId.systemDefault()).toInstant()));
-
-                dataset.addValue(m.macdLine(), "MACD 線", dateStr);  // 系列 0：MACD 線
-                dataset.addValue(m.signalLine(), "信號線", dateStr);  // 系列 1：信號線
-            }
-
-            // JFreeChart 核心工廠，生成線圖（CategoryPlot 類型）。
-            JFreeChart chart = ChartFactory.createLineChart(
-                "近 " + macdList.size() + " 日 MACD 指標",
-                "日期",
-                "MACD 值",
-                dataset,
-                PlotOrientation.VERTICAL,
-                true,
-                true,
-                false
-            );
-
-            // CategoryPlot：JFreeChart 繪圖區域，處理 CategoryDataset 的線圖。
-            CategoryPlot plot = (CategoryPlot) chart.getPlot();
-
-            // 設定字型以利解決亂碼問題
-            Font font = new Font("Microsoft YaHei", Font.BOLD, 14);
-            chart.getTitle().setFont(font);
-            chart.getLegend().setItemFont(font);
-            plot.getDomainAxis().setLabelFont(font);
-            plot.getRangeAxis().setLabelFont(font);
-            
-            // Y 軸範圍動態調整，給予適當邊界
-            double minMacd = macdList.stream().mapToDouble(MACD::macdLine).min().orElse(0.0);
-            double maxMacd = macdList.stream().mapToDouble(MACD::macdLine).max().orElse(0.0);
-            double padding = (maxMacd - minMacd) * 0.05;
-
-            plot.getRangeAxis().setLowerBound(minMacd - padding); // 下限
-            plot.getRangeAxis().setUpperBound(maxMacd + padding); // 上限
-
-            // 線條樣式設定
-            LineAndShapeRenderer renderer = (LineAndShapeRenderer) plot.getRenderer();
-            renderer.setSeriesItemLabelFont(0, font); // MACD 線字體
-            renderer.setSeriesItemLabelFont(1, font); // 信號線字體
-            renderer.setSeriesPaint(0, Color.RED);
-            renderer.setSeriesPaint(1, Color.BLUE);
-
-            // CategoryAxis：X 軸類別軸，處理日期標籤位置。
-            CategoryAxis domainAxis = (CategoryAxis) plot.getDomainAxis();
-            domainAxis.setCategoryLabelPositions(CategoryLabelPositions.UP_90); // 日期標籤垂直顯示（UP_90），避免擁擠（依需調整為 STANDARD 或 DOWN_90）
-
-            // 建立 ChartPanel 並設定大小
-            currentChartPanel = new ChartPanel(chart);
-            currentChartPanel.setPreferredSize(new java.awt.Dimension(695, 400));
-            swingNode.setContent(currentChartPanel);
-
-            // Timer：Swing 的計時器，單次延遲 200ms 觸發 ActionListener。
-            // 目的：解決 SwingNode 嵌入 JavaFX 時的初始渲染延遲（社區常見 bug，JFreeChart 需要時間初始化 plot）。
-            Timer timer = new Timer(200, e -> {
-                currentChartPanel.revalidate();
-                currentChartPanel.repaint();
-                ((Timer) e.getSource()).stop();
-            });
-            timer.setRepeats(false);
-            timer.start();
-        });
-
-        // 延遲 setVisible，給 Swing 初始化時間
-        PauseTransition delayVisible = new PauseTransition(Duration.millis(400));
-        delayVisible.setOnFinished(e -> {
-            chartPane.setVisible(true);
-        });
-        delayVisible.play();
-        
-        return swingNode;
     }
 
     // 查詢 Bollinger 邏輯（使用共用 daysField）
