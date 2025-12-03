@@ -66,7 +66,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 import java.util.concurrent.CompletableFuture;
 
 import java.io.IOException;
@@ -317,6 +316,10 @@ public class MainApp extends Application {
             showAlert("請輸入 Fugle API Key");
             return;
         }
+
+        resultArea.clear();
+        resultArea.setText("載入中，請稍候...");
+        chartPane.setVisible(false);
 
         // 處裡非同步的操作，有點像是jQuery中的$.ajax(...)
         CompletableFuture.supplyAsync(() -> service.fetchQuote(symbol, apiKey))
@@ -617,6 +620,10 @@ public class MainApp extends Application {
             return;
         }
 
+        resultArea.clear();
+        resultArea.setText("載入中，請稍候...");
+        chartPane.setVisible(false);
+
         // 處裡非同步的操作，有點像是jQuery中的$.ajax(...)
         CompletableFuture.supplyAsync(() -> service.fetchHistory(symbol, days, apiKey))
                 .thenAccept(candles -> Platform.runLater(() -> {
@@ -726,6 +733,10 @@ public class MainApp extends Application {
             showAlert("天數必須為有效數字（1 以上）");
             return;
         }
+
+        resultArea.clear();
+        resultArea.setText("載入中，請稍候...");
+        chartPane.setVisible(false);
 
         // 處裡非同步的操作，有點像是jQuery中的$.ajax(...)
         CompletableFuture.supplyAsync(() -> service.fetchSMA(symbol, days, apiKey))
@@ -839,6 +850,10 @@ public class MainApp extends Application {
             showAlert("天數必須為有效數字（1 以上）");
             return;
         }
+
+        resultArea.clear();
+        resultArea.setText("載入中，請稍候...");
+        chartPane.setVisible(false);
 
         // 處裡非同步的操作，有點像是jQuery中的$.ajax(...)
         CompletableFuture.supplyAsync(() -> service.fetchRSI(symbol, days, apiKey))
@@ -1001,6 +1016,10 @@ public class MainApp extends Application {
             showAlert("天數必須為有效數字（1 以上）");
             return;
         }
+
+        resultArea.clear();
+        resultArea.setText("載入中，請稍候...");
+        chartPane.setVisible(false);
 
         // 處裡非同步的操作，有點像是jQuery中的$.ajax(...)
         CompletableFuture.supplyAsync(() -> service.fetchMACD(symbol, days, apiKey))
@@ -1173,7 +1192,8 @@ public class MainApp extends Application {
             return;
         }
 
-        resultArea.setText("正在載入布林通道，請稍候…");
+        resultArea.clear();
+        resultArea.setText("載入中，請稍候...");
         chartPane.setVisible(false);
 
         CompletableFuture
@@ -1262,7 +1282,7 @@ public class MainApp extends Application {
         }
 
         resultArea.clear();
-        resultArea.setText("查三大法人買賣超數，載入中，請稍候...");
+        resultArea.setText("載入中，請稍候...");
         chartPane.setVisible(false);
 
         CompletableFuture.runAsync(() -> {
@@ -1477,7 +1497,8 @@ public class MainApp extends Application {
             return;
         }
 
-        resultArea.setText("查外資大盤空單數，載入中，請稍候...");
+        resultArea.clear();
+        resultArea.setText("載入中，請稍候...");
         chartPane.setVisible(false);
 
         CompletableFuture.supplyAsync(() -> {
@@ -1600,9 +1621,6 @@ public class MainApp extends Application {
             resultArea.setText(data.text);
 
             if (data.dates != null && data.netPositions != null && !data.dates.isEmpty()) {
-                System.err.println("data_date：" + data.dates);
-                System.err.println("data_netPositions：" + data.netPositions);
-
                 // 建立一個「包裝物件」的 List，方便取 index
                 List<Integer> positions = new ArrayList<>(data.netPositions);
                 
@@ -1645,7 +1663,8 @@ public class MainApp extends Application {
         }
 
         resultArea.clear();
-        resultArea.appendText("【聯準會利率期貨隱含機率】\n查詢中，請稍候...\n");
+        resultArea.setText("載入中，請稍候...");
+        chartPane.setVisible(false);
 
         CompletableFuture.runAsync(() -> {
             FedWatchService.FedWatchResult data = FedWatchService.getProbability(apiKey);
@@ -1690,6 +1709,10 @@ public class MainApp extends Application {
             showAlert("天數必須為有效數字（1 以上）");
             return;
         }
+
+        resultArea.clear();
+        resultArea.setText("載入中，請稍候...");
+        chartPane.setVisible(false);
 
         CompletableFuture.supplyAsync(() -> {
             try {
