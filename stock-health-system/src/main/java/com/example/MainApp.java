@@ -66,6 +66,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import java.util.concurrent.CompletableFuture;
 
 import java.io.IOException;
@@ -450,8 +451,14 @@ public class MainApp extends Application {
             // SimpleDateFormat：Java 文字處理 API，用來格式化 LocalDate 為字符串（X 軸標籤）。
             SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
 
-            double minValue = Double.MAX_VALUE;
-            double maxValue = Double.MIN_VALUE;
+            /**
+             * 重要！千萬別用 Double.MIN_VALUE 初始化 maxValue！
+             * Double.MIN_VALUE 是 4.9E-324（最小正數），不是「最小的 double」！
+             * 當資料全是負數時，maxValue 永遠不會被更新！
+             * 正確做法：用 Double.NEGATIVE_INFINITY
+             */
+            double minValue = Double.POSITIVE_INFINITY;
+            double maxValue = Double.NEGATIVE_INFINITY;
 
             // 迴圈填充 dataset：從 data List 迭代，每個 data 轉日期字符串 + 收盤價。
             // 目的：建 X=日期類別，Y=close 數值系列 "收盤價走勢"。
@@ -1592,78 +1599,24 @@ public class MainApp extends Application {
         }).thenAccept(data -> Platform.runLater(() -> {
             resultArea.setText(data.text);
 
-            if (data.dates != null && data.netPositions != null) {
-                chartPane.setContent(createForeignNetLineChart(data.dates, data.netPositions));
-                resizeChartProportionally();
-                PauseTransition delay = new PauseTransition(Duration.millis(400));
-                delay.setOnFinished(e -> chartPane.setVisible(true));
-                delay.play();
+            if (data.dates != null && data.netPositions != null && !data.dates.isEmpty()) {
+                System.err.println("data_date：" + data.dates);
+                System.err.println("data_netPositions：" + data.netPositions);
+
+                // 建立一個「包裝物件」的 List，方便取 index
+                List<Integer> positions = new ArrayList<>(data.netPositions);
+                
+                chartPane.setContent(createCommonLineChart(
+                    positions,
+                    "外資大盤淨空單",
+                    "口數",
+                    new Color(255, 140, 0),
+                    obj -> ((Integer) obj).doubleValue(),
+                    obj -> LocalDate.parse(data.dates.get(positions.indexOf(obj)))
+                ));
+                resizeChartProportionally(); // 改用統一的等比例縮放方法
             }
         }));
-    }
-
-    // 外資空單數折線圖（Y 軸倒置 + 自動範圍 + 與 K 線完全一致）
-    private Node createForeignNetLineChart(List<String> dates, List<Integer> netPositions) {
-        SwingNode swingNode = new SwingNode();
-
-        SwingUtilities.invokeLater(() -> {
-            DefaultCategoryDataset dataset = new DefaultCategoryDataset();
-
-            for (int i = 0; i < dates.size(); i++) {
-                dataset.addValue(netPositions.get(i), "外資淨空單數", dates.get(i));
-            }
-
-            JFreeChart chart = ChartFactory.createLineChart(
-                "外資台指期淨空單數趨勢圖",
-                "日期",
-                "淨空單數",
-                dataset,
-                PlotOrientation.VERTICAL,
-                false, true, false
-            );
-
-            CategoryPlot plot = chart.getCategoryPlot();
-
-            // Y 軸倒置（數值越小越在上方）
-            plot.getRangeAxis().setInverted(true);
-
-            // 自動調整範圍 + 10% padding
-            if (!netPositions.isEmpty()) {
-                int min = netPositions.stream().mapToInt(Integer::intValue).min().orElse(0);
-                int max = netPositions.stream().mapToInt(Integer::intValue).max().orElse(0);
-                int range = max - min;
-                int padding = range == 0 ? 2000 : (int) (range * 0.1);
-
-                plot.getRangeAxis().setLowerBound(min - padding);
-                plot.getRangeAxis().setUpperBound(max + padding);
-            }
-
-            Font font = new Font("Microsoft YaHei", Font.BOLD, 14);
-            chart.getTitle().setFont(font);
-            plot.getDomainAxis().setLabelFont(font);
-            plot.getRangeAxis().setLabelFont(font);
-
-            LineAndShapeRenderer renderer = (LineAndShapeRenderer) plot.getRenderer();
-            renderer.setSeriesPaint(0, Color.BLUE);
-            renderer.setSeriesStroke(0, new java.awt.BasicStroke(2.5f));
-
-            CategoryAxis domainAxis = (CategoryAxis) plot.getDomainAxis();
-            domainAxis.setCategoryLabelPositions(CategoryLabelPositions.UP_90);
-
-            currentChartPanel = new ChartPanel(chart);
-            currentChartPanel.setPreferredSize(new java.awt.Dimension(695, 400));
-            swingNode.setContent(currentChartPanel);
-
-            Timer timer = new Timer(200, e -> {
-                currentChartPanel.revalidate();
-                currentChartPanel.repaint();
-                ((Timer) e.getSource()).stop();
-            });
-            timer.setRepeats(false);
-            timer.start();
-        });
-
-        return swingNode;
     }
 
     private static class ForeignNetData {

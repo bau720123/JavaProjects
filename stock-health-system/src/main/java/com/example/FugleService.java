@@ -18,9 +18,7 @@ import java.time.format.DateTimeFormatter;  // Java 時間 API 中的 DateTimeFo
 
 // 集合操作（java.util）
 import java.util.List; // Java 集合框架的 List 介面（抽象）：有序、可重複元素的集合介面。這裡用作泛型（如 List<BidAsk>），讓方法返回靈活的資料結構。ArrayList 實現它。
-import java.util.stream.Collectors;
 import java.util.ArrayList;  // Java 集合框架中的 ArrayList 類別（具體）：動態陣列實現 List 介面，用於儲存可變大小的資料。這裡用來建構 bids/asks 的 List<BidAsk>，或 fetchHistory 的 candles 清單。
-import java.util.Comparator;
 
 // RSI 記錄類別（簡潔記錄 date 和 rsi）
 record RSI(LocalDate date, double rsi) {}
