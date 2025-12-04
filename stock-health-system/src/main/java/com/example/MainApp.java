@@ -923,10 +923,10 @@ public class MainApp extends Application {
                         sb.append(String.format("區間最強勢：%.2f（%s）\n", maxRsi, maxRsiDateStr));  // 格式化添加（%.2f 保留2位小數）
                         sb.append(String.format("區間最弱勢：%.2f（%s）\n", minRsi, minRsiDateStr));  // 格式化添加（%.2f 保留2位小數）
 
-                        sb.append("\n* 超買與超賣：\n");
-                        sb.append("  當RSI 顯示超買時（通常大於70），可能表示市場過熱，價格有回調的可能，是賣出訊號。 反之，當RSI 顯示超賣時（通常小於30），可能表示市場過冷，價格有上漲的潛力，是買入訊號。\n\n");
-                        sb.append("* 市場趨勢：\n");
-                        sb.append("  RSI 值越高，表示過去一段期間的上漲機率較大；值越小，則下跌機率較大。");
+                        sb.append("\n＊超買與超賣：\n");
+                        sb.append("當RSI 顯示超買時（通常大於70），可能表示市場過熱，價格有回調的可能，是賣出訊號。 反之，當RSI 顯示超賣時（通常小於30），可能表示市場過冷，價格有上漲的潛力，是買入訊號。\n\n");
+                        sb.append("＊市場趨勢：\n");
+                        sb.append("RSI 值越高，表示過去一段期間的上漲機率較大；值越小，則下跌機率較大。");
 
                         resultArea.setText(sb.toString());  // 設定完整文字
 
@@ -1093,10 +1093,10 @@ public class MainApp extends Application {
                         sb.append(String.format("區間最強勢：%.2f（%s）\n", maxMacd, maxMacdDateStr));  // 格式化添加（%.2f 保留2位小數）
                         sb.append(String.format("區間最弱勢：%.2f（%s）\n", minMacd, minMacdDateStr));  // 格式化添加（%.2f 保留2位小數）
 
-                        sb.append("\n* 黃金交叉：\n");
-                        sb.append("  當移動平均線（MACD）慢慢往上交叉信號線（signalLine）時發生。這通常被視為一個買進訊號，表示上漲趨勢可能增強。\n\n");
-                        sb.append("* 死亡交叉：\n");
-                        sb.append("  當移動平均線（MACD）慢慢往下交叉信號線（signalLine）時發生。這通常被視為一個賣出訊號，表示下跌趨勢可能增強。");
+                        sb.append("\n＊黃金交叉：\n");
+                        sb.append("當移動平均線（MACD）慢慢往上交叉信號線（signalLine）時發生。這通常被視為一個買進訊號，表示上漲趨勢可能增強。\n\n");
+                        sb.append("＊死亡交叉：\n");
+                        sb.append("當移動平均線（MACD）慢慢往下交叉信號線（signalLine）時發生。這通常被視為一個賣出訊號，表示下跌趨勢可能增強。");
 
                         resultArea.setText(sb.toString());  // 設定完整文字
 
@@ -1234,8 +1234,8 @@ public class MainApp extends Application {
                         sb.append(String.format("   下軌：%.4f\n\n", b.lower()));
                     }
 
-                    sb.append("* 買入訊號：當股價觸及下軌並有反彈跡象時，可能是一個買入訊號\n");
-                    sb.append("* 賣出訊號：當股價觸及上軌並有回落跡象時，可能是一個賣出訊號。");
+                    sb.append("＊買入訊號：當股價觸及下軌並有反彈跡象時，可能是一個買入訊號\n");
+                    sb.append("＊賣出訊號：當股價觸及上軌並有回落跡象時，可能是一個賣出訊號。");
 
                     resultArea.setText(sb.toString());
 
@@ -1388,11 +1388,7 @@ public class MainApp extends Application {
                     if (!dates.isEmpty()) {
                         Node chart = createInstitutionalChart(dates, trustList, dealerList, foreignList);
                         chartPane.setContent(chart);
-                        resizeChartProportionally();
-
-                        PauseTransition delay = new PauseTransition(Duration.millis(400));
-                        delay.setOnFinished(e -> chartPane.setVisible(true));
-                        delay.play();
+                        resizeChartProportionally(); // 改用統一的等比例縮放方法
                     } else {
                         chartPane.setContent(createEmptyChartPanel());
                     }
@@ -1445,30 +1441,35 @@ public class MainApp extends Application {
                 true, true, false
             );
 
-            Font chineseFont = new Font("Microsoft JhengHei", Font.BOLD, 14);
-            chart.getTitle().setFont(new Font("Microsoft JhengHei", Font.BOLD, 18));
-            chart.getLegend().setItemFont(chineseFont);
-
+            // CategoryPlot：JFreeChart 繪圖區域，處理 CategoryDataset 的線圖。
             CategoryPlot plot = (CategoryPlot) chart.getPlot();
+
+            // 設定字型以利解決亂碼問題
+            Font font = new Font("Microsoft JhengHei", Font.BOLD, 14);
+            chart.getTitle().setFont(new Font("Microsoft JhengHei", Font.BOLD, 14));
+            chart.getLegend().setItemFont(font);
+            plot.getDomainAxis().setLabelFont(font);
+            plot.getDomainAxis().setTickLabelFont(font);
+            plot.getRangeAxis().setLabelFont(font);
+            plot.getRangeAxis().setTickLabelFont(font);
+
             plot.setBackgroundPaint(Color.WHITE);
-            plot.getDomainAxis().setLabelFont(chineseFont);
-            plot.getDomainAxis().setTickLabelFont(chineseFont);
-            plot.getRangeAxis().setLabelFont(chineseFont);
-            plot.getRangeAxis().setTickLabelFont(chineseFont);
             plot.getDomainAxis().setCategoryLabelPositions(
-                CategoryLabelPositions.UP_90  // ← 你原本所有圖表都用的神技！
+                CategoryLabelPositions.UP_90
             );
 
             // 顏色設定
             plot.getRenderer().setSeriesPaint(0, new Color(255, 100, 100)); // 投信 紅
             plot.getRenderer().setSeriesPaint(1, new Color(100, 100, 255)); // 自營商 藍
-            plot.getRenderer().setSeriesPaint(2, new Color(0, 180, 0));     // 外資 綠
+            plot.getRenderer().setSeriesPaint(2, new Color(0, 180, 0)); // 外資 綠
 
             ChartPanel chartPanel = new ChartPanel(chart);
             chartPanel.setPreferredSize(new java.awt.Dimension(695, 400));
             currentChartPanel = chartPanel;
             swingNode.setContent(currentChartPanel);
 
+            // Timer：Swing 的計時器，單次延遲 200ms 觸發 ActionListener。
+            // 目的：解決 SwingNode 嵌入 JavaFX 時的初始渲染延遲（社區常見 bug，JFreeChart 需要時間初始化 plot）。
             Timer timer = new Timer(200, e -> {
                 currentChartPanel.revalidate();
                 currentChartPanel.repaint();
@@ -1477,6 +1478,11 @@ public class MainApp extends Application {
             timer.setRepeats(false);
             timer.start();
         });
+
+        // 延遲 setVisible，給 Swing 初始化時間
+        PauseTransition delay = new PauseTransition(Duration.millis(400));
+        delay.setOnFinished(e -> chartPane.setVisible(true));
+        delay.play();
 
         return swingNode;
     }
@@ -1803,14 +1809,14 @@ public class MainApp extends Application {
             sb.append(String.format("區間最高指數：%.2f（%s）\n", vix.maxClose(), vix.maxDate()))
             .append(String.format("區間最低指數：%.2f（%s）\n", vix.minClose(), vix.minDate()));
 
-            sb.append("\n* 恐慌指數：\n");
-            sb.append("  是衡量市場對未來30天標準普爾500指數波動性預期的指標。它被廣泛認為是市場恐慌和不確定性的指標，並提供了關於市場風險的有力信號。\n\n");
-            sb.append("* 常態區間：\n");
-            sb.append("  通常保持在10-20之間。\n\n");
-            sb.append("* 警戒區間：\n");
-            sb.append("  當超過20時，投資者應注意市場可能出現較大波動。\n\n");
-            sb.append("* 恐慌區間：\n");
-            sb.append("  當超過30，尤其是40以上，市場已經進入高度恐慌階段，並可能伴隨大規模拋售和市場崩盤風險。");
+            sb.append("\n＊恐慌指數：\n");
+            sb.append("是衡量市場對未來30天標準普爾500指數波動性預期的指標。它被廣泛認為是市場恐慌和不確定性的指標，並提供了關於市場風險的有力信號。\n\n");
+            sb.append("＊常態區間：\n");
+            sb.append("通常保持在10-20之間。\n\n");
+            sb.append("＊警戒區間：\n");
+            sb.append("當超過20時，投資者應注意市場可能出現較大波動。\n\n");
+            sb.append("＊恐慌區間：\n");
+            sb.append("當超過30，尤其是40以上，市場已經進入高度恐慌階段，並可能伴隨大規模拋售和市場崩盤風險。");
 
             resultArea.setText(sb.toString());
 
