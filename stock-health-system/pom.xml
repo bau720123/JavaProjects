@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.example</groupId>
     <artifactId>stock-health</artifactId>
-    <version>1.0.0</version>
+    <version>2.0.0</version>
 
     <properties>
         <maven.compiler.source>25</maven.compiler.source>
@@ -152,7 +152,7 @@
                             <!-- 應用程式基本資訊 -->
 
                             <name>StockHealth</name>  <!-- 安裝後的程式名稱,也是 .exe 檔名的前綴 -->
-                            <mainJar>stock-health-1.0.0.jar</mainJar>  <!-- 主要的 JAR 檔名(從 input 目錄讀取) -->
+                            <mainJar>stock-health-2.0.0.jar</mainJar>  <!-- 主要的 JAR 檔名(從 input 目錄讀取) -->
                             <mainClass>com.example.Launcher</mainClass>  <!-- 程式的主類別(入口點) -->
                             <type>EXE</type>  <!-- 打包類型: EXE=安裝檔, MSI=Windows 安裝程式, APP-IMAGE=免安裝版 -->
                             
@@ -171,6 +171,8 @@
                                 <addModule>java.xml</addModule>  <!-- XML 處理模組 -->
                                 <addModule>jdk.unsupported</addModule>  <!-- 非公開 API 支援(某些函式庫需要) -->
                                 <addModule>jdk.unsupported.desktop</addModule>  <!-- SwingNode 需要此模組(用於 JFreeChart) -->
+                                <addModule>java.net.http</addModule>  <!-- HttpClient 需要 -->
+                                <addModule>java.naming</addModule>
                             </addModules>
 
                             <!-- 檔案路徑設定 -->
@@ -185,7 +187,7 @@
 
                             <appVersion>${project.version}</appVersion>
                             <!-- 應用程式版本號,從 pom.xml 的 <version> 讀取 -->
-                            <!-- 例如: 1.0.0 → StockHealth-1.0.0.exe -->
+                            <!-- 例如: 2.0.0 → StockHealth-2.0.0.exe -->
 
                             <icon>${project.basedir}/src/main/resources/icon.ico</icon>
                             <!-- 應用程式圖示檔案路徑 -->
@@ -222,7 +224,7 @@
                             <!-- true: 顯示 "Destination Folder" 畫面,可以選擇路徑 -->
                             <!-- false: 直接安裝到預設路徑,不詢問 -->
 
-                            <vendor>YourName</vendor>
+                            <vendor>ColinBau</vendor>
                             <!-- 開發商/廠商名稱 -->
                             <!-- 會顯示在: -->
                             <!-- 1. 控制台 > 程式和功能 > 發行者 -->

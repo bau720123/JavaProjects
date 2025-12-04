@@ -324,39 +324,39 @@ public class MainApp extends Application {
 
         // 處裡非同步的操作，有點像是jQuery中的$.ajax(...)
         CompletableFuture.supplyAsync(() -> service.fetchQuote(symbol, apiKey))
-                .thenAccept(quote -> Platform.runLater(() -> {
-                    if (quote != null) {
-                        StringBuilder sb = new StringBuilder();
-                        sb.append(String.format("股票代碼：%s\n股票名稱：%s\n\n上個收盤價：%.0f\n開盤價：%.0f\n最高價：%.0f\n最低價：%.0f\n現價：%.0f\n均價：%.2f\n漲跌：%.0f\n幅度：%.2f\n累計成交量：%d \n累計內盤成交量：%d \n累計外盤成交量：%d \n累計成交筆數：%d \n",
-                                quote.symbol(), quote.name(), quote.previousClose(), quote.openPrice(), quote.highPrice(), quote.lowPrice(), quote.closePrice(),
-                                quote.avgPrice(), quote.change(), quote.changePercent(), quote.tradeVolume(), quote.tradeVolumeAtBid(), quote.tradeVolumeAtAsk(), quote.transaction()));
+            .thenAccept(quote -> Platform.runLater(() -> {
+                if (quote != null) {
+                    StringBuilder sb = new StringBuilder();
+                    sb.append(String.format("股票代碼：%s\n股票名稱：%s\n\n上個收盤價：%.0f\n開盤價：%.0f\n最高價：%.0f\n最低價：%.0f\n現價：%.0f\n均價：%.2f\n漲跌：%.0f\n幅度：%.2f\n累計成交量：%d \n累計內盤成交量：%d \n累計外盤成交量：%d \n累計成交筆數：%d \n",
+                            quote.symbol(), quote.name(), quote.previousClose(), quote.openPrice(), quote.highPrice(), quote.lowPrice(), quote.closePrice(),
+                            quote.avgPrice(), quote.change(), quote.changePercent(), quote.tradeVolume(), quote.tradeVolumeAtBid(), quote.tradeVolumeAtAsk(), quote.transaction()));
 
-                        // 委買價區段內容
-                        sb.append("\n【委買價】\n\n");
-                        for (BidAsk ba : quote.bids()) {
-                            sb.append(String.format("    價格：%.0f\n    張數：%d\n\n", ba.price(), ba.size()));
-                        }
-
-                        // 委賣價區段內容
-                        sb.append("【委賣價】\n\n");
-                        for (BidAsk ba : quote.asks()) {
-                            sb.append(String.format("    價格：%.0f\n    張數：%d\n\n", ba.price(), ba.size()));
-                        }
-
-                        resultArea.setText(sb.toString());
-
-                        // 柱狀圖
-                        chartPane.setContent(createQuoteBarChart(quote));
-                        resizeChartProportionally(); // 改用統一的等比例縮放方法
-                    } else {
-                        resultArea.setText("查詢失敗，請稍後再試\n若 API 不可用，請稍後再使用。");
+                    // 委買價區段內容
+                    sb.append("\n【委買價】\n\n");
+                    for (BidAsk ba : quote.bids()) {
+                        sb.append(String.format("    價格：%.0f\n    張數：%d\n\n", ba.price(), ba.size()));
                     }
-                }))
-                .exceptionally(ex -> {
-                    // exceptionally 像是 "非同步catch"，上游supplyAsync拋錯（如Fugle Key無效）時，自動恢復null並秀Alert—避免整個CompletableFuture崩潰，若直接showAlert，會造成整個應用程式crash
-                    Platform.runLater(() -> showAlert("系統異常，請稍後再試：" + ex.getMessage()));
-                    return null;
-                });
+
+                    // 委賣價區段內容
+                    sb.append("【委賣價】\n\n");
+                    for (BidAsk ba : quote.asks()) {
+                        sb.append(String.format("    價格：%.0f\n    張數：%d\n\n", ba.price(), ba.size()));
+                    }
+
+                    resultArea.setText(sb.toString());
+
+                    // 柱狀圖
+                    chartPane.setContent(createQuoteBarChart(quote));
+                    resizeChartProportionally(); // 改用統一的等比例縮放方法
+                } else {
+                    resultArea.setText("查詢失敗，請稍後再試\n若 API 不可用，請稍後再使用。");
+                }
+            }))
+            .exceptionally(ex -> {
+                // exceptionally 像是 "非同步catch"，上游supplyAsync拋錯（如Fugle Key無效）時，自動恢復null並秀Alert—避免整個CompletableFuture崩潰，若直接showAlert，會造成整個應用程式crash
+                Platform.runLater(() -> showAlert("系統異常，請稍後再試：" + ex.getMessage()));
+                return null;
+            });
     }
 
     // 即時報價專用柱狀圖
@@ -627,85 +627,85 @@ public class MainApp extends Application {
 
         // 處裡非同步的操作，有點像是jQuery中的$.ajax(...)
         CompletableFuture.supplyAsync(() -> service.fetchHistory(symbol, days, apiKey))
-                .thenAccept(candles -> Platform.runLater(() -> {
-                    if (!candles.isEmpty()) {
-                        LocalDate today = LocalDate.now();
-                        boolean hasToday = candles.stream().anyMatch(c -> c.date().equals(today));
+            .thenAccept(candles -> Platform.runLater(() -> {
+                if (!candles.isEmpty()) {
+                    LocalDate today = LocalDate.now();
+                    boolean hasToday = candles.stream().anyMatch(c -> c.date().equals(today));
 
-                        if (!hasToday) {
-                            Quote quote = service.fetchQuote(symbol, apiKey); // 即時報價
+                    if (!hasToday) {
+                        Quote quote = service.fetchQuote(symbol, apiKey); // 即時報價
 
-                            // 建立今日虛擬K棒
-                            Candle todayCandle = new Candle(
-                                today,
-                                quote.openPrice(),
-                                quote.highPrice(),
-                                quote.lowPrice(),
-                                quote.closePrice(), // 目前成交價當作「收盤價」
-                                0, // 今日成交量暫設為0，因為歷史K線的volume是整日總量，無法從即時報價取得
-                                quote.change()
-                            );
+                        // 建立今日虛擬K棒
+                        Candle todayCandle = new Candle(
+                            today,
+                            quote.openPrice(),
+                            quote.highPrice(),
+                            quote.lowPrice(),
+                            quote.closePrice(), // 目前成交價當作「收盤價」
+                            0, // 今日成交量暫設為0，因為歷史K線的volume是整日總量，無法從即時報價取得
+                            quote.change()
+                        );
 
-                            candles.add(todayCandle);
-                            candles.sort(Comparator.comparing(Candle::date));
-                        }
-
-                        StringBuilder sb = new StringBuilder(String.format("歷史 K 線圖已載入（近 %d 日走勢）。\n\n", candles.size()));
-                        for (Candle c : candles) {
-                            String tag = c.date().equals(today) && !hasToday ? "（盤中預估）" : "";
-                            sb.append(String.format("日期：%s%s\n開盤價：%.1f\n最高價：%.1f\n最低價：%.1f\n收盤價：%.1f\n成交量：%d\n漲跌：%.1f\n\n",
-                                c.date(), tag, c.open(), c.high(), c.low(), c.close(), c.volume(), c.change()));
-                        }
-
-                        // 計算區間最高價（所有 high 的 max）和最低價（所有 low 的 min）
-                        // 用 Stream API：mapToDouble(Candle::high).max().orElse(0.0) - 高效 O(n)，method reference 簡潔
-                        double maxHigh = candles.stream().mapToDouble(Candle::high).max().orElse(0.0);  // 區間最高價
-                        double minLow = candles.stream().mapToDouble(Candle::low).min().orElse(0.0);  // 區間最低價
-
-                        // 找出達到最高價的所有日期，並按遞減（從最新到最舊）排序
-                        List<LocalDate> maxHighDates = candles.stream()
-                                .filter(c -> c.high() == maxHigh)
-                                .map(Candle::date)
-                                .sorted(Comparator.reverseOrder())
-                                .collect(Collectors.toList());
-                        String maxHighDateStr = maxHighDates.stream()
-                                .map(LocalDate::toString)
-                                .collect(Collectors.joining("、"));
-
-                        // 找出達到最低價的所有日期，並按遞減（從最新到最舊）排序
-                        List<LocalDate> minLowDates = candles.stream()
-                                .filter(c -> c.low() == minLow)
-                                .map(Candle::date)
-                                .sorted(Comparator.reverseOrder())
-                                .collect(Collectors.toList());
-                        String minLowDateStr = minLowDates.stream()
-                                .map(LocalDate::toString)
-                                .collect(Collectors.joining("、"));
-
-                        sb.append(String.format("區間最高價：%.1f（%s）\n", maxHigh, maxHighDateStr)); // 格式化添加（%.1f 保留1位小數）
-                        sb.append(String.format("區間最低價：%.1f（%s）\n", minLow, minLowDateStr)); // 格式化添加（%.1f 保留1位小數）
-
-                        resultArea.setText(sb.toString()); // 設定完整文字
-
-                        // K 線圖表
-                        chartPane.setContent(createCommonLineChart(
-                            candles,
-                            "收盤價走勢",
-                            "價格",
-                            Color.RED,
-                            obj -> ((Candle) obj).close(),
-                            obj -> ((Candle) obj).date() // 直接回傳 LocalDate
-                        ));
-                        resizeChartProportionally(); // 改用統一的等比例縮放方法
-                    } else {
-                        resultArea.setText("歷史資料載入失敗，請稍後再試\n若 API 不可用，請確認 API key 有效。");
+                        candles.add(todayCandle);
+                        candles.sort(Comparator.comparing(Candle::date));
                     }
-                }))
-                .exceptionally(ex -> {
-                    // exceptionally 像是 "非同步catch"，上游supplyAsync拋錯（如Fugle Key無效）時，自動恢復null並秀Alert—避免整個CompletableFuture崩潰，若直接showAlert，會造成整個應用程式crash
-                    Platform.runLater(() -> showAlert("系統異常，請稍後再試：" + ex.getMessage()));
-                    return null;
-                });
+
+                    StringBuilder sb = new StringBuilder(String.format("歷史 K 線圖已載入（近 %d 日走勢）。\n\n", candles.size()));
+                    for (Candle c : candles) {
+                        String tag = c.date().equals(today) && !hasToday ? "（即時演算）" : "";
+                        sb.append(String.format("日期：%s%s\n開盤價：%.1f\n最高價：%.1f\n最低價：%.1f\n收盤價：%.1f\n成交量：%d\n漲跌：%.1f\n\n",
+                            c.date(), tag, c.open(), c.high(), c.low(), c.close(), c.volume(), c.change()));
+                    }
+
+                    // 計算區間最高價（所有 high 的 max）和最低價（所有 low 的 min）
+                    // 用 Stream API：mapToDouble(Candle::high).max().orElse(0.0) - 高效 O(n)，method reference 簡潔
+                    double maxHigh = candles.stream().mapToDouble(Candle::high).max().orElse(0.0);  // 區間最高價
+                    double minLow = candles.stream().mapToDouble(Candle::low).min().orElse(0.0);  // 區間最低價
+
+                    // 找出達到最高價的所有日期，並按遞減（從最新到最舊）排序
+                    List<LocalDate> maxHighDates = candles.stream()
+                            .filter(c -> c.high() == maxHigh)
+                            .map(Candle::date)
+                            .sorted(Comparator.reverseOrder())
+                            .collect(Collectors.toList());
+                    String maxHighDateStr = maxHighDates.stream()
+                            .map(LocalDate::toString)
+                            .collect(Collectors.joining("、"));
+
+                    // 找出達到最低價的所有日期，並按遞減（從最新到最舊）排序
+                    List<LocalDate> minLowDates = candles.stream()
+                            .filter(c -> c.low() == minLow)
+                            .map(Candle::date)
+                            .sorted(Comparator.reverseOrder())
+                            .collect(Collectors.toList());
+                    String minLowDateStr = minLowDates.stream()
+                            .map(LocalDate::toString)
+                            .collect(Collectors.joining("、"));
+
+                    sb.append(String.format("區間最高價：%.1f（%s）\n", maxHigh, maxHighDateStr)); // 格式化添加（%.1f 保留1位小數）
+                    sb.append(String.format("區間最低價：%.1f（%s）\n", minLow, minLowDateStr)); // 格式化添加（%.1f 保留1位小數）
+
+                    resultArea.setText(sb.toString()); // 設定完整文字
+
+                    // K 線圖表
+                    chartPane.setContent(createCommonLineChart(
+                        candles,
+                        "收盤價走勢",
+                        "價格",
+                        Color.RED,
+                        obj -> ((Candle) obj).close(),
+                        obj -> ((Candle) obj).date() // 直接回傳 LocalDate
+                    ));
+                    resizeChartProportionally(); // 改用統一的等比例縮放方法
+                } else {
+                    resultArea.setText("歷史資料載入失敗，請稍後再試\n若 API 不可用，請確認 API key 有效。");
+                }
+            }))
+            .exceptionally(ex -> {
+                // exceptionally 像是 "非同步catch"，上游supplyAsync拋錯（如Fugle Key無效）時，自動恢復null並秀Alert—避免整個CompletableFuture崩潰，若直接showAlert，會造成整個應用程式crash
+                Platform.runLater(() -> showAlert("系統異常，請稍後再試：" + ex.getMessage()));
+                return null;
+            });
     }
 
     // 查詢 SMA 邏輯（使用共用 daysField）
@@ -741,87 +741,87 @@ public class MainApp extends Application {
 
         // 處裡非同步的操作，有點像是jQuery中的$.ajax(...)
         CompletableFuture.supplyAsync(() -> service.fetchSMA(symbol, days, apiKey))
-                .thenAccept(smaList -> Platform.runLater(() -> {
-                    if (!smaList.isEmpty()) {
-                        LocalDate today = LocalDate.now();
-                        boolean hasToday = smaList.stream().anyMatch(s -> s.date().equals(today));
+            .thenAccept(smaList -> Platform.runLater(() -> {
+                if (!smaList.isEmpty()) {
+                    LocalDate today = LocalDate.now();
+                    boolean hasToday = smaList.stream().anyMatch(s -> s.date().equals(today));
 
-                        if (!hasToday) {
-                            Quote quote = service.fetchQuote(symbol, apiKey);
-                            List<Candle> history = service.fetchHistory(symbol, days, apiKey);
+                    if (!hasToday) {
+                        Quote quote = service.fetchQuote(symbol, apiKey);
+                        List<Candle> history = service.fetchHistory(symbol, days, apiKey);
 
-                            // 建立今日虛擬K棒
-                            Candle todayCandle = new Candle(
-                                today,
-                                quote.openPrice(),
-                                quote.highPrice(),
-                                quote.lowPrice(),
-                                quote.closePrice(), // 目前成交價當作「收盤價」
-                                0, // 今日成交量暫設為0，因為歷史K線的volume是整日總量，無法從即時報價取得
-                                quote.change()
-                            );
+                        // 建立今日虛擬K棒
+                        Candle todayCandle = new Candle(
+                            today,
+                            quote.openPrice(),
+                            quote.highPrice(),
+                            quote.lowPrice(),
+                            quote.closePrice(), // 目前成交價當作「收盤價」
+                            0, // 今日成交量暫設為0，因為歷史K線的volume是整日總量，無法從即時報價取得
+                            quote.change()
+                        );
 
-                            List<Candle> fullCandles = new ArrayList<>(history);
-                            fullCandles.add(todayCandle);
-                            fullCandles.sort(Comparator.comparing(Candle::date));
+                        List<Candle> fullCandles = new ArrayList<>(history);
+                        fullCandles.add(todayCandle);
+                        fullCandles.sort(Comparator.comparing(Candle::date));
 
-                            // 計算 SMA(5)，確認資料筆數最其碼有5筆以上
-                            if (fullCandles.size() >= 5) {
-                                double sum = fullCandles.stream()
-                                    .skip(Math.max(0, fullCandles.size() - 5)) // 挑最近的5筆
-                                    .mapToDouble(Candle::close)
-                                    .sum();
-                                double sma5 = sum / 5.0;
+                        // 計算 SMA(5)，確認資料筆數最其碼有5筆以上
+                        if (fullCandles.size() >= 5) {
+                            double sum = fullCandles.stream()
+                                .skip(Math.max(0, fullCandles.size() - 5)) // 挑最近的5筆
+                                .mapToDouble(Candle::close)
+                                .sum();
+                            double sma5 = sum / 5.0;
 
-                                smaList.add(new SMA(today, round(sma5)));
-                                smaList.sort(Comparator.comparing(SMA::date));
-                            }
+                            smaList.add(new SMA(today, round(sma5)));
+                            smaList.sort(Comparator.comparing(SMA::date));
                         }
-
-                        StringBuilder sb = new StringBuilder(String.format("簡單移動平均線（SMA）已載入（近 %d 日走勢）\n\n", smaList.size()));
-                        for (SMA s : smaList) {
-                            String tag = s.date().equals(today) && !hasToday ? "（盤中預估）" : "";
-                            sb.append(String.format("日期：%s%s\nSMA：%.2f\n\n", s.date(), tag, s.sma()));
-                        }
-
-                        // 計算區間最高價（所有 high 的 max）和最低價（所有 low 的 min）
-                        // 用 Stream API：mapToDouble(Candle::high).max().orElse(0.0) - 高效 O(n)，method reference 簡潔
-                        double max = smaList.stream().mapToDouble(SMA::sma).max().orElse(0);
-                        double min = smaList.stream().mapToDouble(SMA::sma).min().orElse(0);
-
-                        // 找出達到最高價的所有日期，並按遞減（從最新到最舊）排序
-                        List<LocalDate> maxDates = smaList.stream()
-                                .filter(s -> s.sma() == max)
-                                .map(SMA::date)
-                                .sorted(Comparator.reverseOrder())
-                                .collect(Collectors.toList());
-
-                        // 找出達到最低價的所有日期，並按遞減（從最新到最舊）排序
-                        List<LocalDate> minDates = smaList.stream()
-                                .filter(s -> s.sma() == min)
-                                .map(SMA::date)
-                                .sorted(Comparator.reverseOrder())
-                                .collect(Collectors.toList());
-
-                        sb.append(String.format("區間最高：%.2f（%s）\n", max, maxDates.stream().map(Object::toString).collect(Collectors.joining("、"))));
-                        sb.append(String.format("區間最低：%.2f（%s）\n", min, minDates.stream().map(Object::toString).collect(Collectors.joining("、"))));
-
-                        resultArea.setText(sb.toString()); // 設定完整文字
-
-                        // SMA 圖表
-                        chartPane.setContent(createCommonLineChart(
-                            smaList,
-                            "SMA 指標",
-                            "價格",
-                            Color.ORANGE,
-                            obj -> ((SMA) obj).sma(),
-                            obj -> ((SMA) obj).date() // 直接回傳 LocalDate
-                        ));
-                        resizeChartProportionally(); // 改用統一的等比例縮放方法
-                    } else {
-                        resultArea.setText("SMA 資料載入失敗，請稍後再試\n若 API 不可用，請確認 API key 有效。");
                     }
-                }));
+
+                    StringBuilder sb = new StringBuilder(String.format("簡單移動平均線（SMA）已載入（近 %d 日走勢）\n\n", smaList.size()));
+                    for (SMA s : smaList) {
+                        String tag = s.date().equals(today) && !hasToday ? "（即時演算）" : "";
+                        sb.append(String.format("日期：%s%s\nSMA：%.2f\n\n", s.date(), tag, s.sma()));
+                    }
+
+                    // 計算區間最高價（所有 high 的 max）和最低價（所有 low 的 min）
+                    // 用 Stream API：mapToDouble(Candle::high).max().orElse(0.0) - 高效 O(n)，method reference 簡潔
+                    double max = smaList.stream().mapToDouble(SMA::sma).max().orElse(0);
+                    double min = smaList.stream().mapToDouble(SMA::sma).min().orElse(0);
+
+                    // 找出達到最高價的所有日期，並按遞減（從最新到最舊）排序
+                    List<LocalDate> maxDates = smaList.stream()
+                            .filter(s -> s.sma() == max)
+                            .map(SMA::date)
+                            .sorted(Comparator.reverseOrder())
+                            .collect(Collectors.toList());
+
+                    // 找出達到最低價的所有日期，並按遞減（從最新到最舊）排序
+                    List<LocalDate> minDates = smaList.stream()
+                            .filter(s -> s.sma() == min)
+                            .map(SMA::date)
+                            .sorted(Comparator.reverseOrder())
+                            .collect(Collectors.toList());
+
+                    sb.append(String.format("區間最高：%.2f（%s）\n", max, maxDates.stream().map(Object::toString).collect(Collectors.joining("、"))));
+                    sb.append(String.format("區間最低：%.2f（%s）\n", min, minDates.stream().map(Object::toString).collect(Collectors.joining("、"))));
+
+                    resultArea.setText(sb.toString()); // 設定完整文字
+
+                    // SMA 圖表
+                    chartPane.setContent(createCommonLineChart(
+                        smaList,
+                        "SMA 指標",
+                        "價格",
+                        Color.ORANGE,
+                        obj -> ((SMA) obj).sma(),
+                        obj -> ((SMA) obj).date() // 直接回傳 LocalDate
+                    ));
+                    resizeChartProportionally(); // 改用統一的等比例縮放方法
+                } else {
+                    resultArea.setText("SMA 資料載入失敗，請稍後再試\n若 API 不可用，請確認 API key 有效。");
+                }
+            }));
     }
 
     // 查詢 RSI 邏輯（使用共用 daysField）
@@ -858,97 +858,96 @@ public class MainApp extends Application {
 
         // 處裡非同步的操作，有點像是jQuery中的$.ajax(...)
         CompletableFuture.supplyAsync(() -> service.fetchRSI(symbol, days, apiKey))
-                .thenAccept(rsiList -> Platform.runLater(() -> {
-                    if (!rsiList.isEmpty()) {
-                        // RSI 盤中預估（基於資料歸檔，Fugle 的 API最其碼要在今天收盤之後，才會進行歸檔，在那之前，是不會有今天的資料的）
-                        LocalDate today = LocalDate.now();
-                        boolean hasToday = rsiList.stream().anyMatch(r -> r.date().equals(today));
+            .thenAccept(rsiList -> Platform.runLater(() -> {
+                if (!rsiList.isEmpty()) {
+                    LocalDate today = LocalDate.now();
+                    boolean hasToday = rsiList.stream().anyMatch(r -> r.date().equals(today));
 
-                        if (!hasToday) {
-                            Quote quote = service.fetchQuote(symbol, apiKey);
-                            List<Candle> history = service.fetchHistory(symbol, days, apiKey);
+                    if (!hasToday) {
+                        Quote quote = service.fetchQuote(symbol, apiKey);
+                        List<Candle> history = service.fetchHistory(symbol, days, apiKey);
 
-                            // 建立今日虛擬K棒
-                            Candle todayCandle = new Candle(
-                                today,
-                                0, 0, 0, quote.closePrice(), 0L, 0.0
-                            );
+                        // 建立今日虛擬K棒
+                        Candle todayCandle = new Candle(
+                            today,
+                            0, 0, 0, quote.closePrice(), 0L, 0.0
+                        );
 
-                            List<Candle> fullCandles = new ArrayList<>(history);
-                            fullCandles.add(todayCandle);
-                            fullCandles.sort(Comparator.comparing(Candle::date));
+                        List<Candle> fullCandles = new ArrayList<>(history);
+                        fullCandles.add(todayCandle);
+                        fullCandles.sort(Comparator.comparing(Candle::date));
 
-                            // 呼叫標準 Wilder RSI 計算
-                            List<RSI> calculated = calculateWilderRSI(fullCandles, 6);
+                        // 呼叫標準 Wilder RSI 計算
+                        List<RSI> calculated = calculateWilderRSI(fullCandles, 6);
 
-                            if (!calculated.isEmpty()) {
-                                RSI todayRSI = calculated.get(calculated.size() - 1);
-                                rsiList.add(todayRSI);
-                                rsiList.sort(Comparator.comparing(RSI::date));
-                            }
+                        if (!calculated.isEmpty()) {
+                            RSI todayRSI = calculated.get(calculated.size() - 1);
+                            rsiList.add(todayRSI);
+                            rsiList.sort(Comparator.comparing(RSI::date));
                         }
-
-                        StringBuilder sb = new StringBuilder(String.format("相對強弱指標 （RSI）已載入（近 %d 日走勢）。\n\n強弱指數如下：\n\n", rsiList.size())); // 使用 StringBuilder 可多行段落顯示，並且在字串相接時比較高效，無額外開銷
-                        for (RSI r : rsiList) {
-                            String tag = r.date().equals(today) && !hasToday ? "（盤中預估）" : "";
-                            sb.append(String.format("日期：%s%s\n指數：%.2f\n\n",
-                                r.date(), tag, r.rsi()));
-                        }
-
-                        // 計算區間最強勢（所有 rsi 的 max）和最弱勢（所有 rsi 的 min）
-                        // 用 Stream API：mapToDouble(RSI::rsi).max().orElse(0.0) - 高效 O(n)，method reference 簡潔
-                        double maxRsi = rsiList.stream().mapToDouble(RSI::rsi).max().orElse(0.0);  // 區間最強勢
-                        double minRsi = rsiList.stream().mapToDouble(RSI::rsi).min().orElse(0.0);  // 區間最弱勢
-
-                        // 找出達到最高 RSI 的所有日期，並按遞減（從最新到最舊）排序
-                        List<LocalDate> maxRsiDates = rsiList.stream()
-                                .filter(r -> r.rsi() == maxRsi)
-                                .map(RSI::date)
-                                .sorted(Comparator.reverseOrder())
-                                .collect(Collectors.toList());
-                        String maxRsiDateStr = maxRsiDates.stream()
-                                .map(LocalDate::toString)
-                                .collect(Collectors.joining("、"));
-
-                        // 找出達到最低 RSI 的所有日期，並按遞減（從最新到最舊）排序
-                        List<LocalDate> minRsiDates = rsiList.stream()
-                                .filter(r -> r.rsi() == minRsi)
-                                .map(RSI::date)
-                                .sorted(Comparator.reverseOrder())
-                                .collect(Collectors.toList());
-                        String minRsiDateStr = minRsiDates.stream()
-                                .map(LocalDate::toString)
-                                .collect(Collectors.joining("、"));
-
-                        sb.append(String.format("區間最強勢：%.2f（%s）\n", maxRsi, maxRsiDateStr));  // 格式化添加（%.2f 保留2位小數）
-                        sb.append(String.format("區間最弱勢：%.2f（%s）\n", minRsi, minRsiDateStr));  // 格式化添加（%.2f 保留2位小數）
-
-                        sb.append("\n＊超買與超賣：\n");
-                        sb.append("當RSI 顯示超買時（通常大於70），可能表示市場過熱，價格有回調的可能，是賣出訊號。 反之，當RSI 顯示超賣時（通常小於30），可能表示市場過冷，價格有上漲的潛力，是買入訊號。\n\n");
-                        sb.append("＊市場趨勢：\n");
-                        sb.append("RSI 值越高，表示過去一段期間的上漲機率較大；值越小，則下跌機率較大。");
-
-                        resultArea.setText(sb.toString());  // 設定完整文字
-
-                        // MRSI 圖表
-                        chartPane.setContent(createCommonLineChart(
-                            rsiList,
-                            "RSI 指標",
-                            "RSI（0-100）",
-                            Color.MAGENTA,
-                            obj -> ((RSI) obj).rsi(),
-                            obj -> ((RSI) obj).date() // 直接回傳 LocalDate
-                        ));
-                        resizeChartProportionally(); // 改用統一的等比例縮放方法
-                    } else {
-                        resultArea.setText("RSI 資料載入失敗，請稍後再試\n若 API 不可用，請確認 API key 有效。");
                     }
-                }))
-                .exceptionally(ex -> {
-                    // exceptionally 像是 "非同步catch"，上游supplyAsync拋錯（如Fugle Key無效）時，自動恢復null並秀Alert—避免整個CompletableFuture崩潰，若直接showAlert，會造成整個應用程式crash
-                    Platform.runLater(() -> showAlert("系統異常，請稍後再試：" + ex.getMessage()));
-                    return null;
-                });
+
+                    StringBuilder sb = new StringBuilder(String.format("相對強弱指標 （RSI）已載入（近 %d 日走勢）。\n\n強弱指數如下：\n\n", rsiList.size())); // 使用 StringBuilder 可多行段落顯示，並且在字串相接時比較高效，無額外開銷
+                    for (RSI r : rsiList) {
+                        String tag = r.date().equals(today) && !hasToday ? "（即時演算）" : "";
+                        sb.append(String.format("日期：%s%s\n指數：%.2f\n\n",
+                            r.date(), tag, r.rsi()));
+                    }
+
+                    // 計算區間最強勢（所有 rsi 的 max）和最弱勢（所有 rsi 的 min）
+                    // 用 Stream API：mapToDouble(RSI::rsi).max().orElse(0.0) - 高效 O(n)，method reference 簡潔
+                    double maxRsi = rsiList.stream().mapToDouble(RSI::rsi).max().orElse(0.0);  // 區間最強勢
+                    double minRsi = rsiList.stream().mapToDouble(RSI::rsi).min().orElse(0.0);  // 區間最弱勢
+
+                    // 找出達到最高 RSI 的所有日期，並按遞減（從最新到最舊）排序
+                    List<LocalDate> maxRsiDates = rsiList.stream()
+                            .filter(r -> r.rsi() == maxRsi)
+                            .map(RSI::date)
+                            .sorted(Comparator.reverseOrder())
+                            .collect(Collectors.toList());
+                    String maxRsiDateStr = maxRsiDates.stream()
+                            .map(LocalDate::toString)
+                            .collect(Collectors.joining("、"));
+
+                    // 找出達到最低 RSI 的所有日期，並按遞減（從最新到最舊）排序
+                    List<LocalDate> minRsiDates = rsiList.stream()
+                            .filter(r -> r.rsi() == minRsi)
+                            .map(RSI::date)
+                            .sorted(Comparator.reverseOrder())
+                            .collect(Collectors.toList());
+                    String minRsiDateStr = minRsiDates.stream()
+                            .map(LocalDate::toString)
+                            .collect(Collectors.joining("、"));
+
+                    sb.append(String.format("區間最強勢：%.2f（%s）\n", maxRsi, maxRsiDateStr));  // 格式化添加（%.2f 保留2位小數）
+                    sb.append(String.format("區間最弱勢：%.2f（%s）\n", minRsi, minRsiDateStr));  // 格式化添加（%.2f 保留2位小數）
+
+                    sb.append("\n＊超買與超賣：\n");
+                    sb.append("當RSI 顯示超買時（通常大於70），可能表示市場過熱，價格有回調的可能，是賣出訊號。 反之，當RSI 顯示超賣時（通常小於30），可能表示市場過冷，價格有上漲的潛力，是買入訊號。\n\n");
+                    sb.append("＊市場趨勢：\n");
+                    sb.append("RSI 值越高，表示過去一段期間的上漲機率較大；值越小，則下跌機率較大。");
+
+                    resultArea.setText(sb.toString());  // 設定完整文字
+
+                    // MRSI 圖表
+                    chartPane.setContent(createCommonLineChart(
+                        rsiList,
+                        "RSI 指標",
+                        "RSI（0-100）",
+                        Color.MAGENTA,
+                        obj -> ((RSI) obj).rsi(),
+                        obj -> ((RSI) obj).date() // 直接回傳 LocalDate
+                    ));
+                    resizeChartProportionally(); // 改用統一的等比例縮放方法
+                } else {
+                    resultArea.setText("RSI 資料載入失敗，請稍後再試\n若 API 不可用，請確認 API key 有效。");
+                }
+            }))
+            .exceptionally(ex -> {
+                // exceptionally 像是 "非同步catch"，上游supplyAsync拋錯（如Fugle Key無效）時，自動恢復null並秀Alert—避免整個CompletableFuture崩潰，若直接showAlert，會造成整個應用程式crash
+                Platform.runLater(() -> showAlert("系統異常，請稍後再試：" + ex.getMessage()));
+                return null;
+            });
     }
 
     // 標準 Wilder RSI 計算
@@ -1024,104 +1023,104 @@ public class MainApp extends Application {
 
         // 處裡非同步的操作，有點像是jQuery中的$.ajax(...)
         CompletableFuture.supplyAsync(() -> service.fetchMACD(symbol, days, apiKey))
-                .thenAccept(macdList -> Platform.runLater(() -> {
-                    if (!macdList.isEmpty()) {
-                        LocalDate today = LocalDate.now();
-                        boolean hasToday = macdList.stream().anyMatch(m -> m.date().equals(today));
+            .thenAccept(macdList -> Platform.runLater(() -> {
+                if (!macdList.isEmpty()) {
+                    LocalDate today = LocalDate.now();
+                    boolean hasToday = macdList.stream().anyMatch(m -> m.date().equals(today));
 
-                        if (!hasToday) {
-                            Quote quote = service.fetchQuote(symbol, apiKey);
-                            List<Candle> history = service.fetchHistory(symbol, days, apiKey);
+                    if (!hasToday) {
+                        Quote quote = service.fetchQuote(symbol, apiKey);
+                        List<Candle> history = service.fetchHistory(symbol, days, apiKey);
 
-                            // 建立今日虛擬K棒
-                            Candle todayCandle = new Candle(
-                                today,
-                                quote.openPrice(),
-                                quote.highPrice(),
-                                quote.lowPrice(),
-                                quote.closePrice(), // 目前成交價當作「收盤價」
-                                0, // 今日成交量暫設為0，因為歷史K線的volume是整日總量，無法從即時報價取得
-                                quote.change()
-                            );
+                        // 建立今日虛擬K棒
+                        Candle todayCandle = new Candle(
+                            today,
+                            quote.openPrice(),
+                            quote.highPrice(),
+                            quote.lowPrice(),
+                            quote.closePrice(), // 目前成交價當作「收盤價」
+                            0, // 今日成交量暫設為0，因為歷史K線的volume是整日總量，無法從即時報價取得
+                            quote.change()
+                        );
 
-                            List<Candle> fullCandles = new ArrayList<>(history);
-                            fullCandles.add(todayCandle);
-                            fullCandles.sort(Comparator.comparing(Candle::date));
+                        List<Candle> fullCandles = new ArrayList<>(history);
+                        fullCandles.add(todayCandle);
+                        fullCandles.sort(Comparator.comparing(Candle::date));
 
-                            // 呼叫標準 MACD 計算
-                            List<MACD> calculated = calculateStandardMACD(fullCandles);
+                        // 呼叫標準 MACD 計算
+                        List<MACD> calculated = calculateStandardMACD(fullCandles);
 
-                            if (!calculated.isEmpty()) {
-                                MACD todayMACD = calculated.get(calculated.size() - 1);
-                                macdList.add(todayMACD);
-                                macdList.sort(Comparator.comparing(MACD::date));
-                            }
+                        if (!calculated.isEmpty()) {
+                            MACD todayMACD = calculated.get(calculated.size() - 1);
+                            macdList.add(todayMACD);
+                            macdList.sort(Comparator.comparing(MACD::date));
                         }
-
-                        StringBuilder sb = new StringBuilder(String.format("移動平均指標 （MACD）已載入（近 %d 日走勢）。\n\n", macdList.size()));
-                        for (MACD m : macdList) {
-                            String tag = m.date().equals(today) && !hasToday ? "（盤中預估）" : "";
-                            sb.append(String.format("日期：%s%s\nMACD 線：%.2f\n信號線：%.2f\n\n",
-                                m.date(), tag, m.macdLine(), m.signalLine()));
-                        }
-
-                        // 計算區間最強勢（所有 macdLine 的 max）和最弱勢（所有 macdLine 的 min）
-                        // 用 Stream API：mapToDouble(MACD::macdLine).max().orElse(0.0) - 高效 O(n)，method reference 簡潔
-                        double maxMacd = macdList.stream().mapToDouble(MACD::macdLine).max().orElse(0.0);
-                        double minMacd = macdList.stream().mapToDouble(MACD::macdLine).min().orElse(0.0);
-
-                        // 找出達到最高 MACD 的所有日期，並按遞減（從最新到最舊）排序
-                        List<LocalDate> maxMacdDates = macdList.stream()
-                                .filter(m -> m.macdLine() == maxMacd)
-                                .map(MACD::date)
-                                .sorted(Comparator.reverseOrder())
-                                .collect(Collectors.toList());
-                        String maxMacdDateStr = maxMacdDates.stream()
-                                .map(LocalDate::toString)
-                                .collect(Collectors.joining("、"));
-
-                        // 找出達到最低 MACD 的所有日期，並按遞減（從最新到最舊）排序
-                        List<LocalDate> minMacdDates = macdList.stream()
-                                .filter(m -> m.macdLine() == minMacd)
-                                .map(MACD::date)
-                                .sorted(Comparator.reverseOrder())
-                                .collect(Collectors.toList());
-                        String minMacdDateStr = minMacdDates.stream()
-                                .map(LocalDate::toString)
-                                .collect(Collectors.joining("、"));
-
-                        sb.append(String.format("區間最強勢：%.2f（%s）\n", maxMacd, maxMacdDateStr));  // 格式化添加（%.2f 保留2位小數）
-                        sb.append(String.format("區間最弱勢：%.2f（%s）\n", minMacd, minMacdDateStr));  // 格式化添加（%.2f 保留2位小數）
-
-                        sb.append("\n＊黃金交叉：\n");
-                        sb.append("當移動平均線（MACD）慢慢往上交叉信號線（signalLine）時發生。這通常被視為一個買進訊號，表示上漲趨勢可能增強。\n\n");
-                        sb.append("＊死亡交叉：\n");
-                        sb.append("當移動平均線（MACD）慢慢往下交叉信號線（signalLine）時發生。這通常被視為一個賣出訊號，表示下跌趨勢可能增強。");
-
-                        resultArea.setText(sb.toString());  // 設定完整文字
-
-                        // MACD 圖表
-                        chartPane.setContent(createCommonLineChart(
-                            macdList,
-                            "MACD 線",
-                            "MACD",
-                            Color.RED,
-                            obj -> ((MACD) obj).macdLine(),
-                            obj -> ((MACD) obj).date(), // 直接回傳 LocalDate
-                            obj -> ((MACD) obj).signalLine(),
-                            "信號線",
-                            Color.BLUE
-                        ));
-                        resizeChartProportionally(); // 改用統一的等比例縮放方法
-                    } else {
-                        resultArea.setText("MACD 資料載入失敗，請稍後再試\n若 API 不可用，請確認 API key 有效。");
                     }
-                }))
-                .exceptionally(ex -> {
-                    // exceptionally 像是 "非同步catch"，上游supplyAsync拋錯（如Fugle Key無效）時，自動恢復null並秀Alert—避免整個CompletableFuture崩潰，若直接showAlert，會造成整個應用程式crash
-                    Platform.runLater(() -> showAlert("系統異常，請稍後再試：" + ex.getMessage()));
-                    return null;
-                });
+
+                    StringBuilder sb = new StringBuilder(String.format("移動平均指標 （MACD）已載入（近 %d 日走勢）。\n\n", macdList.size()));
+                    for (MACD m : macdList) {
+                        String tag = m.date().equals(today) && !hasToday ? "（即時演算）" : "";
+                        sb.append(String.format("日期：%s%s\nMACD 線：%.2f\n信號線：%.2f\n\n",
+                            m.date(), tag, m.macdLine(), m.signalLine()));
+                    }
+
+                    // 計算區間最強勢（所有 macdLine 的 max）和最弱勢（所有 macdLine 的 min）
+                    // 用 Stream API：mapToDouble(MACD::macdLine).max().orElse(0.0) - 高效 O(n)，method reference 簡潔
+                    double maxMacd = macdList.stream().mapToDouble(MACD::macdLine).max().orElse(0.0);
+                    double minMacd = macdList.stream().mapToDouble(MACD::macdLine).min().orElse(0.0);
+
+                    // 找出達到最高 MACD 的所有日期，並按遞減（從最新到最舊）排序
+                    List<LocalDate> maxMacdDates = macdList.stream()
+                            .filter(m -> m.macdLine() == maxMacd)
+                            .map(MACD::date)
+                            .sorted(Comparator.reverseOrder())
+                            .collect(Collectors.toList());
+                    String maxMacdDateStr = maxMacdDates.stream()
+                            .map(LocalDate::toString)
+                            .collect(Collectors.joining("、"));
+
+                    // 找出達到最低 MACD 的所有日期，並按遞減（從最新到最舊）排序
+                    List<LocalDate> minMacdDates = macdList.stream()
+                            .filter(m -> m.macdLine() == minMacd)
+                            .map(MACD::date)
+                            .sorted(Comparator.reverseOrder())
+                            .collect(Collectors.toList());
+                    String minMacdDateStr = minMacdDates.stream()
+                            .map(LocalDate::toString)
+                            .collect(Collectors.joining("、"));
+
+                    sb.append(String.format("區間最強勢：%.2f（%s）\n", maxMacd, maxMacdDateStr));  // 格式化添加（%.2f 保留2位小數）
+                    sb.append(String.format("區間最弱勢：%.2f（%s）\n", minMacd, minMacdDateStr));  // 格式化添加（%.2f 保留2位小數）
+
+                    sb.append("\n＊黃金交叉：\n");
+                    sb.append("當移動平均線（MACD）慢慢往上交叉信號線（signalLine）時發生。這通常被視為一個買進訊號，表示上漲趨勢可能增強。\n\n");
+                    sb.append("＊死亡交叉：\n");
+                    sb.append("當移動平均線（MACD）慢慢往下交叉信號線（signalLine）時發生。這通常被視為一個賣出訊號，表示下跌趨勢可能增強。");
+
+                    resultArea.setText(sb.toString());  // 設定完整文字
+
+                    // MACD 圖表
+                    chartPane.setContent(createCommonLineChart(
+                        macdList,
+                        "MACD 線",
+                        "MACD",
+                        Color.RED,
+                        obj -> ((MACD) obj).macdLine(),
+                        obj -> ((MACD) obj).date(), // 直接回傳 LocalDate
+                        obj -> ((MACD) obj).signalLine(),
+                        "信號線",
+                        Color.BLUE
+                    ));
+                    resizeChartProportionally(); // 改用統一的等比例縮放方法
+                } else {
+                    resultArea.setText("MACD 資料載入失敗，請稍後再試\n若 API 不可用，請確認 API key 有效。");
+                }
+            }))
+            .exceptionally(ex -> {
+                // exceptionally 像是 "非同步catch"，上游supplyAsync拋錯（如Fugle Key無效）時，自動恢復null並秀Alert—避免整個CompletableFuture崩潰，若直接showAlert，會造成整個應用程式crash
+                Platform.runLater(() -> showAlert("系統異常，請稍後再試：" + ex.getMessage()));
+                return null;
+            });
     }
 
     // 標準 MACD 計算（12,26,9）
@@ -1197,11 +1196,9 @@ public class MainApp extends Application {
         resultArea.setText("載入中，請稍候...");
         chartPane.setVisible(false);
 
-        CompletableFuture
-            .supplyAsync(() -> service.fetchBollinger(symbol, days, apiKey))
+        CompletableFuture.supplyAsync(() -> service.fetchBollinger(symbol, days, apiKey))
             .thenAccept(bbList -> Platform.runLater(() -> {
                 if (!bbList.isEmpty()) {
-                    // Bollinger 盤中預估（基於資料歸檔，Fugle 的 API最其碼要在今天收盤之後，才會進行歸檔，在那之前，是不會有今天的資料的）
                     LocalDate today = LocalDate.now();
                     List<Candle> candles = service.fetchHistory(symbol, days, apiKey);
                     boolean hasToday = candles.stream().anyMatch(c -> c.date().equals(today));
@@ -1242,13 +1239,7 @@ public class MainApp extends Application {
                     // === 畫圖 ===
                     Node chartNode = createBollingerWithCandlesChart(candles, bbList);
                     chartPane.setContent(chartNode);
-
-                    // 跟 queryMACD 一樣優雅處理圖表顯示
-                    resizeChartProportionally();
-
-                    PauseTransition delayVisible = new PauseTransition(Duration.millis(400));
-                    delayVisible.setOnFinished(e -> chartPane.setVisible(true));
-                    delayVisible.play();
+                    resizeChartProportionally(); // 改用統一的等比例縮放方法
                 } else {
                     resultArea.setText("布林通道資料載入失敗，請稍後再試\n若 API 不可用，請確認 API key 有效。");
                 }
@@ -1258,6 +1249,183 @@ public class MainApp extends Application {
                 Platform.runLater(() -> showAlert("系統異常，請稍後再試：" + ex.getMessage()));
                 return null;
             });
+    }
+
+    // 布林通道 + K線 複合圖表
+    private Node createBollingerWithCandlesChart(List<Candle> candles, List<Bollinger> bbList) {
+        SwingNode swingNode = new SwingNode();
+
+        SwingUtilities.invokeLater(() -> {
+            // 1) 準備索引化資料（x = index；labels = yyyy-MM-dd）
+            final int n = candles.size();
+            final String[] labels = new String[n];
+            final double[] xIndex = new double[n];
+            final double[] opens = new double[n];
+            final double[] highs = new double[n];
+            final double[] lows = new double[n];
+            final double[] closes = new double[n];
+            final double[] volumes = new double[n];
+
+            for (int i = 0; i < n; i++) {
+                Candle c = candles.get(i);
+                labels[i] = c.date().toString();  // yyyy-MM-dd
+                xIndex[i] = i;                    // 用索引作為 x
+                opens[i] = c.open();
+                highs[i] = c.high();
+                lows[i] = c.low();
+                closes[i] = c.close();
+                volumes[i] = c.volume();
+            }
+
+            // 本地類別：索引化 OHLCDataset（避免 DateAxis）
+            class IndexedOHLCDataset extends org.jfree.data.xy.AbstractXYDataset implements org.jfree.data.xy.OHLCDataset {
+                private final Comparable seriesKey = "股價";
+
+                @Override public int getSeriesCount() { return 1; }
+                @Override public Comparable getSeriesKey(int series) { return seriesKey; }
+                @Override public int getItemCount(int series) { return n; }
+
+                // X/Y as Number
+                @Override public Number getX(int series, int item) { return xIndex[item]; }
+                @Override public Number getY(int series, int item) { return closes[item]; }
+
+                // X/Y as primitive double (some renderers use these)
+                @Override public double getXValue(int series, int item) { return xIndex[item]; }
+                @Override public double getYValue(int series, int item) { return closes[item]; }
+
+                // OHLC as Number
+                @Override public Number getOpen(int series, int item)   { return opens[item]; }
+                @Override public Number getHigh(int series, int item)   { return highs[item]; }
+                @Override public Number getLow(int series, int item)    { return lows[item]; }
+                @Override public Number getClose(int series, int item)  { return closes[item]; }
+                @Override public Number getVolume(int series, int item) { return volumes[item]; }
+
+                // OHLC as primitive double
+                @Override public double getOpenValue(int series, int item)   { return opens[item]; }
+                @Override public double getHighValue(int series, int item)   { return highs[item]; }
+                @Override public double getLowValue(int series, int item)    { return lows[item]; }
+                @Override public double getCloseValue(int series, int item)  { return closes[item]; }
+                @Override public double getVolumeValue(int series, int item) { return volumes[item]; }
+            }
+
+            org.jfree.data.xy.OHLCDataset candleDataset = new IndexedOHLCDataset();
+
+            // 2) 建 Bollinger 線（同樣使用索引 x）
+            XYSeries upperSeries = new XYSeries("上軌（壓力線）");
+            XYSeries middleSeries = new XYSeries("中軌（20日均線）");
+            XYSeries lowerSeries = new XYSeries("下軌（支撐線）");
+
+            // 建立日期→索引對應，確保只畫存在的日期
+            Map<String, Integer> indexByDate = new LinkedHashMap<>();
+            for (int i = 0; i < n; i++) indexByDate.put(labels[i], i);
+
+            for (Bollinger b : bbList) {
+                String d = b.date().toString();
+                Integer idx = indexByDate.get(d);
+                if (idx != null) {
+                    upperSeries.add(idx.doubleValue(), b.upper());
+                    middleSeries.add(idx.doubleValue(), b.middle());
+                    lowerSeries.add(idx.doubleValue(), b.lower());
+                }
+            }
+
+            XYSeriesCollection lineDataset = new XYSeriesCollection();
+            lineDataset.addSeries(upperSeries);
+            lineDataset.addSeries(middleSeries);
+            lineDataset.addSeries(lowerSeries);
+
+            // 3) 建圖：使用 XYPlot + CandlestickRenderer（支援 OHLCDataset）
+            XYPlot plot = new XYPlot();
+            plot.setDataset(0, candleDataset);
+            plot.setDataset(1, lineDataset);
+
+            // Y 軸
+            org.jfree.chart.axis.NumberAxis rangeAxis = new org.jfree.chart.axis.NumberAxis("股價");
+            rangeAxis.setAutoRangeIncludesZero(false);
+            plot.setRangeAxis(rangeAxis);
+
+            // X 軸：SymbolAxis（強制顯示所有日期，垂直排列）
+            org.jfree.chart.axis.SymbolAxis domainAxis = new org.jfree.chart.axis.SymbolAxis("日期", labels);
+            domainAxis.setGridBandsVisible(false);
+            domainAxis.setLowerMargin(0.0);
+            domainAxis.setUpperMargin(0.0);
+
+            // 顯示所有標籤並垂直排列（UP_90）
+            domainAxis.setTickLabelsVisible(true);
+            domainAxis.setVerticalTickLabels(true);
+            domainAxis.setTickLabelFont(new Font("Microsoft JhengHei", Font.PLAIN, 12));
+
+            plot.setDomainAxis(domainAxis);
+
+            // Renderers
+            CandlestickRenderer candleRenderer = new CandlestickRenderer();
+            candleRenderer.setUpPaint(Color.GREEN);
+            candleRenderer.setDownPaint(Color.RED);
+            candleRenderer.setDrawVolume(false);
+            candleRenderer.setAutoWidthMethod(CandlestickRenderer.WIDTHMETHOD_SMALLEST);
+            plot.setRenderer(0, candleRenderer);
+
+            XYLineAndShapeRenderer lineRenderer = new XYLineAndShapeRenderer(true, false);
+            lineRenderer.setSeriesPaint(0, new Color(255, 80, 80));    // 上軌：亮紅
+            lineRenderer.setSeriesPaint(1, new Color(70, 130, 255));   // 中軌：寶藍
+            lineRenderer.setSeriesPaint(2, new Color(80, 200, 120));   // 下軌：翠綠
+            lineRenderer.setSeriesStroke(0, new BasicStroke(2.2f));
+            lineRenderer.setSeriesStroke(1, new BasicStroke(2.5f));
+            lineRenderer.setSeriesStroke(2, new BasicStroke(2.2f));
+            plot.setRenderer(1, lineRenderer);
+
+            // 4) 設定 Y 軸範圍（含布林上軌，用於視覺留白）
+            double maxPrice = Arrays.stream(highs).max().orElse(1000);
+            double minPrice = Arrays.stream(lows).min().orElse(0);
+            double bbMax = bbList.stream().mapToDouble(Bollinger::upper).max().orElse(maxPrice);
+            maxPrice = Math.max(maxPrice, bbMax);
+            double range = maxPrice - minPrice;
+            if (range == 0) range = Math.max(1.0, maxPrice * 0.1);
+            double upperBound = maxPrice + range * 0.1;
+            double lowerBound = minPrice - range * 0.1;
+            plot.getRangeAxis().setRange(lowerBound, upperBound);
+
+            // 5) 組成 JFreeChart
+            JFreeChart chart = new JFreeChart(
+                    "布林通道 + K線圖（近 " + candles.size() + " 日）",
+                    new Font("Microsoft JhengHei", Font.BOLD, 18),
+                    plot,
+                    true
+            );
+
+            // 字體
+            Font chineseFont = new Font("Microsoft JhengHei", Font.BOLD, 14);
+            Font legendFont = new Font("Microsoft JhengHei", Font.BOLD, 15);
+            plot.getDomainAxis().setLabelFont(chineseFont);
+            plot.getRangeAxis().setLabelFont(chineseFont);
+            chart.getLegend().setItemFont(legendFont);
+
+            // ChartPanel
+            ChartPanel chartPanel = new ChartPanel(chart);
+            chartPanel.setPreferredSize(new java.awt.Dimension(695, 420));
+            chartPanel.setMouseWheelEnabled(true);
+            chartPanel.setRangeZoomable(false);
+
+            currentChartPanel = chartPanel;
+            swingNode.setContent(chartPanel);
+
+            // Timer：Swing 的計時器，單次延遲 200ms 觸發 ActionListener。
+            // 目的：解決 SwingNode 嵌入 JavaFX 時的初始渲染延遲（社區常見 bug，JFreeChart 需要時間初始化 plot）。
+            Timer timer = new Timer(200, e -> {
+                currentChartPanel.revalidate();
+                currentChartPanel.repaint();
+                ((Timer) e.getSource()).stop();
+            });
+            timer.setRepeats(false);
+            timer.start();
+        });
+
+        // 延遲 setVisible，給 Swing 初始化時間
+        PauseTransition delay = new PauseTransition(Duration.millis(400));
+        delay.setOnFinished(e -> chartPane.setVisible(true));
+        delay.play();
+
+        return swingNode;
     }
 
     // 查三大法人買賣超
@@ -1507,19 +1675,19 @@ public class MainApp extends Application {
         resultArea.setText("載入中，請稍候...");
         chartPane.setVisible(false);
 
-        CompletableFuture.supplyAsync(() -> {
+        CompletableFuture.runAsync(() -> {
             try {
                 Document doc = Jsoup.connect("https://stock.wearn.com/taifexphoto.asp")
-                        .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-                        .timeout(12000)
+                        .userAgent("Mozilla/5.0")
+                        .timeout(15000)
                         .get();
 
                 Element table = doc.selectFirst("table.taifexphoto");
                 if (table == null) {
-                    return new ForeignNetData("錯誤：無法找到外資空單數表格（網站可能改版）", null, null);
+                    Platform.runLater(() -> showAlert("找不到外資空單表格，網站可能改版了！"));
+                    return;
                 }
 
-                // 原始資料
                 List<String> originalDates = new ArrayList<>();
                 List<Integer> originalNet = new ArrayList<>();
 
@@ -1533,7 +1701,7 @@ public class MainApp extends Application {
                         if (dateStr.matches("\\d{3}/\\d{2}/\\d{2}")) {
                             int rocYear = Integer.parseInt(dateStr.substring(0, 3));
                             int year = 1911 + rocYear;
-                            String adDate = year + dateStr.substring(3); // 2025/11/21
+                            String adDate = year + dateStr.substring(3);
 
                             try {
                                 int net = Integer.parseInt(foreignStr);
@@ -1545,7 +1713,8 @@ public class MainApp extends Application {
                 }
 
                 if (originalDates.isEmpty()) {
-                    return new ForeignNetData("錯誤：未解析到任何外資空單數資料", null, null);
+                    Platform.runLater(() -> showAlert("沒有抓到任何外資空單資料！"));
+                    return;
                 }
 
                 // 反轉：最舊在前
@@ -1562,12 +1731,9 @@ public class MainApp extends Application {
                 // 計算增減（基於原始順序：最新在前）
                 List<Integer> changes = new ArrayList<>();
                 for (int i = 0; i < originalNet.size(); i++) {
-                    if (i < originalNet.size() - 1) {
-                        changes.add(originalNet.get(i) - originalNet.get(i + 1));
-                    } else {
-                        changes.add(0);
-                    }
+                    changes.add(i < originalNet.size() - 1 ? originalNet.get(i) - originalNet.get(i + 1) : 0);
                 }
+
                 // 反轉增減順序對應文字區
                 Collections.reverse(changes);
 
@@ -1581,12 +1747,12 @@ public class MainApp extends Application {
 
                 // 若天數限制，則截取最後 N 筆
                 if (days > 0 && ascendingDates.size() > days) {
-                    int startIndex = ascendingDates.size() - days;
-                    ascendingDates = ascendingDates.subList(startIndex, ascendingDates.size());
-                    ascendingNet = ascendingNet.subList(startIndex, ascendingNet.size());
-                    chartDates = chartDates.subList(startIndex, chartDates.size());
-                    changes = changes.subList(startIndex, changes.size());
-                }   
+                    int start = ascendingDates.size() - days;
+                    ascendingDates = ascendingDates.subList(start, ascendingDates.size());
+                    ascendingNet = ascendingNet.subList(start, ascendingNet.size());
+                    chartDates = chartDates.subList(start, chartDates.size());
+                    changes = changes.subList(start, changes.size());
+                }
 
                 // 最大最小空單數
                 int highestNet = ascendingNet.stream().mapToInt(Integer::intValue).min().orElse(0);
@@ -1599,60 +1765,44 @@ public class MainApp extends Application {
                     if (ascendingNet.get(i) == lowestNet)  lowestDates.add(ascendingDates.get(i));
                 }
 
-                // 文字區
-                StringBuilder sb = new StringBuilder();
-                sb.append("外資歷史空單數如下：\n\n");
-
+                // 組文字
+                StringBuilder sb = new StringBuilder("外資歷史空單數如下：\n\n");
                 for (int i = 0; i < ascendingDates.size(); i++) {
-                    String displayDate = ascendingDates.get(i).replace("/", "-"); // 轉成 yyyy-MM-dd
                     sb.append(String.format("日期：%s\n空單數：%,d\n增減：%,d\n\n",
-                            displayDate, ascendingNet.get(i), changes.get(i)));
+                            ascendingDates.get(i).replace("/", "-"),
+                            ascendingNet.get(i),
+                            changes.get(i)));
                 }
-
                 sb.append(String.format("區間最高空單數：%,d（%s）\n",
-                        highestNet, String.join("、", highestDates.stream()
-                                .map(d -> d.replace("/", "-"))
-                                .collect(Collectors.toList()))));
+                        highestNet, String.join("、", highestDates.stream().map(d -> d.replace("/", "-")).toList())));
                 sb.append(String.format("區間最低空單數：%,d（%s）\n",
-                        lowestNet, String.join("、", lowestDates.stream()
-                                .map(d -> d.replace("/", "-"))
-                                .collect(Collectors.toList()))));
+                        lowestNet, String.join("、", lowestDates.stream().map(d -> d.replace("/", "-")).toList())));
 
-                return new ForeignNetData(sb.toString(), chartDates, ascendingNet);
+                // ====== 成功！直接更新 UI（不用 final 變數）======
+                String finalText = sb.toString();
+                List<String> finalDates = new ArrayList<>(chartDates);
+                List<Integer> finalNet = new ArrayList<>(ascendingNet);
+
+                Platform.runLater(() -> {
+                    resultArea.setText(finalText);
+                    chartPane.setContent(createCommonLineChart(
+                        finalNet, "外資大盤淨空單", "口數",
+                        new Color(255, 140, 0),
+                        obj -> ((Integer) obj).doubleValue(),
+                        obj -> LocalDate.parse(finalDates.get(finalNet.indexOf(obj)))
+                    ));
+                    resizeChartProportionally(); // 改用統一的等比例縮放方法
+                });
 
             } catch (Exception e) {
-                return new ForeignNetData("爬蟲失敗：" + e.getMessage(), null, null);
+                Platform.runLater(() -> {
+                    resultArea.setText("載入失敗");
+                    showAlert("外資空單資料抓取失敗！\n\n" +
+                            "錯誤訊息：" + e.getMessage() + "\n\n" +
+                            "請檢查網路，或稍後再試（網站可能改版）");
+                });
             }
-        }).thenAccept(data -> Platform.runLater(() -> {
-            resultArea.setText(data.text);
-
-            if (data.dates != null && data.netPositions != null && !data.dates.isEmpty()) {
-                // 建立一個「包裝物件」的 List，方便取 index
-                List<Integer> positions = new ArrayList<>(data.netPositions);
-                
-                chartPane.setContent(createCommonLineChart(
-                    positions,
-                    "外資大盤淨空單",
-                    "口數",
-                    new Color(255, 140, 0),
-                    obj -> ((Integer) obj).doubleValue(),
-                    obj -> LocalDate.parse(data.dates.get(positions.indexOf(obj)))
-                ));
-                resizeChartProportionally(); // 改用統一的等比例縮放方法
-            }
-        }));
-    }
-
-    private static class ForeignNetData {
-        final String text;
-        final List<String> dates;
-        final List<Integer> netPositions;
-
-        ForeignNetData(String text, List<String> dates, List<Integer> netPositions) {
-            this.text = text;
-            this.dates = dates;
-            this.netPositions = netPositions;
-        }
+        });
     }
 
     // 查聯準會利率
@@ -1878,177 +2028,6 @@ public class MainApp extends Application {
         }
     }
 
-    // 布林通道 + K線 複合圖表
-    private Node createBollingerWithCandlesChart(List<Candle> candles, List<Bollinger> bbList) {
-        SwingNode swingNode = new SwingNode();
-
-        SwingUtilities.invokeLater(() -> {
-            // 1) 準備索引化資料（x = index；labels = yyyy-MM-dd）
-            final int n = candles.size();
-            final String[] labels = new String[n];
-            final double[] xIndex = new double[n];
-            final double[] opens = new double[n];
-            final double[] highs = new double[n];
-            final double[] lows = new double[n];
-            final double[] closes = new double[n];
-            final double[] volumes = new double[n];
-
-            for (int i = 0; i < n; i++) {
-                Candle c = candles.get(i);
-                labels[i] = c.date().toString();  // yyyy-MM-dd
-                xIndex[i] = i;                    // 用索引作為 x
-                opens[i] = c.open();
-                highs[i] = c.high();
-                lows[i] = c.low();
-                closes[i] = c.close();
-                volumes[i] = c.volume();
-            }
-
-            // 本地類別：索引化 OHLCDataset（避免 DateAxis）
-            class IndexedOHLCDataset extends org.jfree.data.xy.AbstractXYDataset implements org.jfree.data.xy.OHLCDataset {
-                private final Comparable seriesKey = "股價";
-
-                @Override public int getSeriesCount() { return 1; }
-                @Override public Comparable getSeriesKey(int series) { return seriesKey; }
-                @Override public int getItemCount(int series) { return n; }
-
-                // X/Y as Number
-                @Override public Number getX(int series, int item) { return xIndex[item]; }
-                @Override public Number getY(int series, int item) { return closes[item]; }
-
-                // X/Y as primitive double (some renderers use these)
-                @Override public double getXValue(int series, int item) { return xIndex[item]; }
-                @Override public double getYValue(int series, int item) { return closes[item]; }
-
-                // OHLC as Number
-                @Override public Number getOpen(int series, int item)   { return opens[item]; }
-                @Override public Number getHigh(int series, int item)   { return highs[item]; }
-                @Override public Number getLow(int series, int item)    { return lows[item]; }
-                @Override public Number getClose(int series, int item)  { return closes[item]; }
-                @Override public Number getVolume(int series, int item) { return volumes[item]; }
-
-                // OHLC as primitive double
-                @Override public double getOpenValue(int series, int item)   { return opens[item]; }
-                @Override public double getHighValue(int series, int item)   { return highs[item]; }
-                @Override public double getLowValue(int series, int item)    { return lows[item]; }
-                @Override public double getCloseValue(int series, int item)  { return closes[item]; }
-                @Override public double getVolumeValue(int series, int item) { return volumes[item]; }
-            }
-
-            org.jfree.data.xy.OHLCDataset candleDataset = new IndexedOHLCDataset();
-
-            // 2) 建 Bollinger 線（同樣使用索引 x）
-            XYSeries upperSeries = new XYSeries("上軌（壓力線）");
-            XYSeries middleSeries = new XYSeries("中軌（20日均線）");
-            XYSeries lowerSeries = new XYSeries("下軌（支撐線）");
-
-            // 建立日期→索引對應，確保只畫存在的日期
-            Map<String, Integer> indexByDate = new LinkedHashMap<>();
-            for (int i = 0; i < n; i++) indexByDate.put(labels[i], i);
-
-            for (Bollinger b : bbList) {
-                String d = b.date().toString();
-                Integer idx = indexByDate.get(d);
-                if (idx != null) {
-                    upperSeries.add(idx.doubleValue(), b.upper());
-                    middleSeries.add(idx.doubleValue(), b.middle());
-                    lowerSeries.add(idx.doubleValue(), b.lower());
-                }
-            }
-
-            XYSeriesCollection lineDataset = new XYSeriesCollection();
-            lineDataset.addSeries(upperSeries);
-            lineDataset.addSeries(middleSeries);
-            lineDataset.addSeries(lowerSeries);
-
-            // 3) 建圖：使用 XYPlot + CandlestickRenderer（支援 OHLCDataset）
-            XYPlot plot = new XYPlot();
-            plot.setDataset(0, candleDataset);
-            plot.setDataset(1, lineDataset);
-
-            // Y 軸
-            org.jfree.chart.axis.NumberAxis rangeAxis = new org.jfree.chart.axis.NumberAxis("股價");
-            rangeAxis.setAutoRangeIncludesZero(false);
-            plot.setRangeAxis(rangeAxis);
-
-            // X 軸：SymbolAxis（強制顯示所有日期，垂直排列）
-            org.jfree.chart.axis.SymbolAxis domainAxis = new org.jfree.chart.axis.SymbolAxis("日期", labels);
-            domainAxis.setGridBandsVisible(false);
-            domainAxis.setLowerMargin(0.0);
-            domainAxis.setUpperMargin(0.0);
-
-            // 顯示所有標籤並垂直排列（UP_90）
-            domainAxis.setTickLabelsVisible(true);
-            domainAxis.setVerticalTickLabels(true);
-            domainAxis.setTickLabelFont(new Font("Microsoft JhengHei", Font.PLAIN, 12));
-
-            plot.setDomainAxis(domainAxis);
-
-            // Renderers
-            CandlestickRenderer candleRenderer = new CandlestickRenderer();
-            candleRenderer.setUpPaint(Color.GREEN);
-            candleRenderer.setDownPaint(Color.RED);
-            candleRenderer.setDrawVolume(false);
-            candleRenderer.setAutoWidthMethod(CandlestickRenderer.WIDTHMETHOD_SMALLEST);
-            plot.setRenderer(0, candleRenderer);
-
-            XYLineAndShapeRenderer lineRenderer = new XYLineAndShapeRenderer(true, false);
-            lineRenderer.setSeriesPaint(0, new Color(255, 80, 80));    // 上軌：亮紅
-            lineRenderer.setSeriesPaint(1, new Color(70, 130, 255));   // 中軌：寶藍
-            lineRenderer.setSeriesPaint(2, new Color(80, 200, 120));   // 下軌：翠綠
-            lineRenderer.setSeriesStroke(0, new BasicStroke(2.2f));
-            lineRenderer.setSeriesStroke(1, new BasicStroke(2.5f));
-            lineRenderer.setSeriesStroke(2, new BasicStroke(2.2f));
-            plot.setRenderer(1, lineRenderer);
-
-            // 4) 設定 Y 軸範圍（含布林上軌，用於視覺留白）
-            double maxPrice = Arrays.stream(highs).max().orElse(1000);
-            double minPrice = Arrays.stream(lows).min().orElse(0);
-            double bbMax = bbList.stream().mapToDouble(Bollinger::upper).max().orElse(maxPrice);
-            maxPrice = Math.max(maxPrice, bbMax);
-            double range = maxPrice - minPrice;
-            if (range == 0) range = Math.max(1.0, maxPrice * 0.1);
-            double upperBound = maxPrice + range * 0.1;
-            double lowerBound = minPrice - range * 0.1;
-            plot.getRangeAxis().setRange(lowerBound, upperBound);
-
-            // 5) 組成 JFreeChart
-            JFreeChart chart = new JFreeChart(
-                    "布林通道 + K線圖（近 " + candles.size() + " 日）",
-                    new Font("Microsoft JhengHei", Font.BOLD, 18),
-                    plot,
-                    true
-            );
-
-            // 字體
-            Font chineseFont = new Font("Microsoft JhengHei", Font.BOLD, 14);
-            Font legendFont = new Font("Microsoft JhengHei", Font.BOLD, 15);
-            plot.getDomainAxis().setLabelFont(chineseFont);
-            plot.getRangeAxis().setLabelFont(chineseFont);
-            chart.getLegend().setItemFont(legendFont);
-
-            // ChartPanel
-            ChartPanel chartPanel = new ChartPanel(chart);
-            chartPanel.setPreferredSize(new java.awt.Dimension(695, 420));
-            chartPanel.setMouseWheelEnabled(true);
-            chartPanel.setRangeZoomable(false);
-
-            currentChartPanel = chartPanel;
-            swingNode.setContent(chartPanel);
-
-            // 解決 SwingNode 延遲
-            Timer timer = new Timer(180, e -> {
-                chartPanel.revalidate();
-                chartPanel.repaint();
-                ((Timer) e.getSource()).stop();
-            });
-            timer.setRepeats(false);
-            timer.start();
-        });
-
-        return swingNode;
-    }
-
     // 創建 聯準會利率 圓餅圖
     private Node createFedRatePieChart(FedWatchService.FedWatchResult data) {
         SwingNode swingNode = new SwingNode();
@@ -2242,16 +2221,24 @@ public class MainApp extends Application {
         return swingNode;
     }
 
-    // 顯示警示（ERROR 型）
-    private void showAlert(String msg) {
-        Alert alert = new Alert(AlertType.ERROR, msg);
-        alert.showAndWait();
+    private void showAlert(String message, AlertType type) {
+        Platform.runLater(() -> {
+            Alert alert = new Alert(type, message);
+            alert.setHeaderText("");
+            alert.setTitle(switch (type) {
+                case ERROR -> "錯誤";
+                case INFORMATION -> "資訊";
+                case WARNING -> "警告";
+                case CONFIRMATION -> "確認";
+                default -> "提示";
+            });
+            alert.showAndWait();
+        });
     }
 
-    // 顯示資訊（INFO 型，用於除錯 Alert）
-    private void showInfoAlert(String msg) {
-        Alert alert = new Alert(AlertType.INFORMATION, msg);
-        alert.showAndWait();
+    // 重載
+    private void showAlert(String message) {
+        showAlert(message, AlertType.ERROR);
     }
 
     // JVM 的要求：所有 Java 應用程式必須有一個 public static void main(String[] args) 作為啟動入口
