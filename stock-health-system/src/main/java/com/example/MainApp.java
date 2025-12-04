@@ -231,7 +231,7 @@ public class MainApp extends Application {
         centerBox.setAlignment(Pos.TOP_LEFT);  // 改為 TOP_LEFT，讓內容頂左對齊
 
         // 文字區塊
-        resultArea = new TextArea("歡迎使用台股健診系統\n功能持續擴充中\n請多多支持！"); // 可設定文字區塊預設文字
+        resultArea = new TextArea("歡迎使用台股健診系統\n請在上方輸入股票代號與 API Key 等資訊後點擊查詢\n任何系統回饋請寄EMAIL：bau720123@gmail.com\n"); // 可設定文字區塊預設文字
         resultArea.setWrapText(true); // 設定當文字超過欄位的寬度時是否自動換行
         resultArea.setPrefRowCount(10); // 但JavaFX布局系統的響應式設計（responsive layout）會讓其根據視窗大小的變化來自動延展其高
         resultArea.setEditable(false); // 設定該文字區塊可否修改
@@ -1343,8 +1343,7 @@ public class MainApp extends Application {
                 String minTrustDate = "", minDealerDate = "", minForeignDate = "";
 
                 StringBuilder sb = new StringBuilder();
-                sb.append("【三大法人買賣超】 ").append(symbol).append("\n\n");
-                sb.append("三大法人買賣超如下：\n\n");
+                sb.append("三大法人買賣超資訊如下：\n\n");
 
                 for (String[] row : displayAndChartData) {
                     int trust = Integer.parseInt(row[1]);
