@@ -172,7 +172,7 @@ public final class MarketEventCalendar {
     /** 美國初請失業金人數 - 最即時勞動市場指標 */
     private static boolean isTodayInitialJoblessClaims() {
         return getMoneyDJEvents().stream().anyMatch(event -> {
-            if (!containsDetails(event, "美國首次申請失業救濟人數")) return false;
+            if (!containsDetails(event, "申請失業救濟人數")) return false;
             String dateStr = event.path("start_date").asText().split(" ")[0];
             LocalDate eventDate = LocalDate.parse(dateStr, MONEYDJ_DATE_FORMATTER);
             return eventDate.equals(LocalDate.now());
@@ -253,7 +253,7 @@ public final class MarketEventCalendar {
             sb.append("消費力強弱直接決定軟著陸機率\n");
         }
         if (isTodayInitialJoblessClaims()) {
-            sb.append("今晚 20:30 美國初請失業金人數即將公布！\n");
+            sb.append("今晚 20:30 美國失業金人數即將公布！\n");
             sb.append("勞動市場最即時指標，連續惡化就是衰退警報\n");
         }
 

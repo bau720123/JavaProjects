@@ -30,7 +30,6 @@ import org.jfree.chart.plot.CategoryPlot;
 import org.jfree.chart.plot.PiePlot;
 import org.jfree.chart.plot.PlotOrientation;
 import org.jfree.chart.plot.XYPlot;
-import org.jfree.chart.title.TextTitle;
 import org.jfree.data.category.DefaultCategoryDataset;
 import org.jfree.data.general.DefaultPieDataset;
 import org.jfree.data.xy.XYSeries;
@@ -241,9 +240,11 @@ public class MainApp extends Application {
 
         // 圖表區塊
         chartPane = new ScrollPane(createEmptyChartPanel());
-        chartPane.setVisible(false); // 一開始不直接顯示圖表區塊
+        chartPane.setVisible(true); // 一開始不直接顯示圖表區塊
         chartPane.setPrefWidth(700); // 寬度維持 700px
         chartPane.setFitToWidth(true); // 啟用內容自動fit容器寬（Content Scaling，響應式延展/壓縮），當視窗窄時，內容壓縮（不水平滾動）；寬時，內容延展（但不超過原圖）
+        chartPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        chartPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
 
         centerBox.getChildren().addAll(resultArea, chartPane); // 添加子節點到容器的操作
         root.setCenter(centerBox); // 將centerBox（已含TextArea和ScrollPane的HBox）設定為根容器root（BorderPane）的中間區域。結果：中間內容填滿剩餘視窗空間（寬=視窗寬 - left 150px - padding，高=視窗高 - top），無論視窗resize，BorderPane會自動拉伸中間區內容。
@@ -2217,7 +2218,22 @@ public class MainApp extends Application {
             DefaultCategoryDataset emptyDataset = new DefaultCategoryDataset();
             JFreeChart emptyChart = ChartFactory.createLineChart(" ", " ", " ", emptyDataset);
             swingNode.setContent(new ChartPanel(emptyChart));
+
+            // 建立 ChartPanel 並設定大小
+            currentChartPanel = new ChartPanel(emptyChart);
+            currentChartPanel.setPreferredSize(new java.awt.Dimension(695, 400));
+            swingNode.setContent(currentChartPanel);
+
+            // 要調高到 1000ms 才能解決非同步渲染問題
+            Timer timer = new Timer(1000, e -> {
+                currentChartPanel.revalidate();
+                currentChartPanel.repaint();
+                ((Timer) e.getSource()).stop();
+            });
+            timer.setRepeats(false);
+            timer.start();
         });
+
         return swingNode;
     }
 
