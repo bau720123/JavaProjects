@@ -478,10 +478,17 @@ public class MainApp extends Application {
 
                 dataset.addValue(value, titlePrefix, dateStr); // 用日期字符串作為類別（X 軸標籤），Y 為 value 值
 
-                // 第二條線
+                // 如果有指定第二條線
                 if (secondaryValueExtractor != null && secondarySeriesName != null && secondaryColor != null) {
                     double secondaryValue = secondaryValueExtractor.applyAsDouble(item);
                     dataset.addValue(secondaryValue, secondarySeriesName, dateStr);
+                }
+
+                // 如果是 VIX
+                if ("VIX" .equals(titlePrefix)) {
+                    dataset.addValue(20, "安全區", dateStr);
+                    dataset.addValue(30, "警戒區", dateStr);
+                    dataset.addValue(40, "恐慌區", dateStr);
                 }
 
                 minValue = Math.min(minValue, value);
@@ -526,11 +533,15 @@ public class MainApp extends Application {
             LineAndShapeRenderer renderer = (LineAndShapeRenderer) plot.getRenderer();
             renderer.setSeriesPaint(0, lineColor);
             renderer.setSeriesStroke(0, new BasicStroke(2.5f));
+            renderer.setSeriesShapesVisible(0, true);
+            renderer.setSeriesShape(0, new java.awt.geom.Ellipse2D.Double(-4, -4, 8, 8));
 
             // 設定第二條線的樣式（如果存在）
             if (secondarySeriesName != null) {
                 renderer.setSeriesPaint(1, secondaryColor);
                 renderer.setSeriesStroke(1, new BasicStroke(2.0f));  // 信號線細一點
+                renderer.setSeriesShapesVisible(1, true);
+                renderer.setSeriesShape(1, new java.awt.geom.Ellipse2D.Double(-4, -4, 8, 8));
             }
 
             // CategoryAxis：X 軸類別軸，處理日期標籤位置。
@@ -1944,9 +1955,8 @@ public class MainApp extends Application {
                 return;
             }
 
-            // === 文字區塊顯示 ===
             StringBuilder sb = new StringBuilder();
-            sb.append("歷史 K 線圖已載入（近 ").append(vix.candles().size()).append(" 日走勢）。\n\n");
+            sb.append("VIX 恐慌指數 線圖已載入（近 ").append(vix.candles().size()).append(" 日走勢）。\n\n");
 
             for (VixCandle c : vix.candles()) {
                 sb.append(String.format("日期：%s\n", c.date()))
@@ -1970,9 +1980,15 @@ public class MainApp extends Application {
 
             resultArea.setText(sb.toString());
 
-            // === 圖表區塊顯示 ===
-            chartPane.setVisible(true);
-            chartPane.setContent(createVixChart(vix.candles()));
+            // 恐慌指數圖表
+            chartPane.setContent(createCommonLineChart(
+                vix.candles(), // 資料來源
+                "VIX",
+                "恐慌指數",
+                new Color(178, 34, 34),
+                candle -> ((VixCandle) candle).close(),
+                candle -> ((VixCandle) candle).date() // 直接回傳 LocalDate
+            ));
             resizeChartProportionally(); // 改用統一的等比例縮放方法
 
         }), Platform::runLater).exceptionally(ex -> {
@@ -2074,118 +2090,6 @@ public class MainApp extends Application {
             Timer timer = new Timer(200, e -> {
                 currentChartPanel.revalidate();
                 currentChartPanel.repaint();
-                ((Timer) e.getSource()).stop();
-            });
-            timer.setRepeats(false);
-            timer.start();
-        });
-
-        return swingNode;
-    }
-
-    // 繪製 VIX 收盤走勢圖
-    private Node createVixChart(List<VixCandle> candles) {
-        SwingNode swingNode = new SwingNode();
-        SwingUtilities.invokeLater(() -> {
-            XYSeries closeSeries = new XYSeries("VIX 收盤指數");
-            XYSeries line20 = new XYSeries("20 - 安全區");
-            XYSeries line30 = new XYSeries("30 - 警戒區");
-            XYSeries line40 = new XYSeries("40 - 恐慌區");
-
-            String[] dateLabels = new String[candles.size()];
-            double maxClose = Double.MIN_VALUE;
-            double minClose = Double.MAX_VALUE;
-
-            for (int i = 0; i < candles.size(); i++) {
-                VixCandle c = candles.get(i);
-                double x = i;
-                closeSeries.add(x, c.close());
-                dateLabels[i] = c.date().format(java.time.format.DateTimeFormatter.ofPattern("YYYY-MM-dd"));
-
-                if (c.close() > maxClose) maxClose = c.close();
-                if (c.close() < minClose) minClose = c.close();
-
-                // 為每條警戒線補滿點（讓它橫跨整個圖表）
-                line20.add(x, 20.0);
-                line30.add(x, 30.0);
-                line40.add(x, 40.0);
-            }
-
-            XYSeriesCollection dataset = new XYSeriesCollection();
-            dataset.addSeries(closeSeries);
-            dataset.addSeries(line20);
-            dataset.addSeries(line30);
-            dataset.addSeries(line40);
-
-            JFreeChart chart = ChartFactory.createXYLineChart(
-                    "VIX 恐慌指數走勢圖（近 " + candles.size() + " 日）",
-                    "日期",
-                    "收盤指數",
-                    dataset,
-                    PlotOrientation.VERTICAL,
-                    true, true, false
-            );
-
-            XYPlot plot = chart.getXYPlot();
-            plot.setBackgroundPaint(Color.WHITE);
-            plot.setDomainGridlinePaint(Color.LIGHT_GRAY);
-            plot.setRangeGridlinePaint(Color.LIGHT_GRAY);
-
-            // === X 軸：日期標籤 ===
-            SymbolAxis domainAxis = new SymbolAxis("日期", dateLabels);
-            domainAxis.setTickLabelFont(new Font("Microsoft JhengHei", Font.PLAIN, 11));
-            domainAxis.setVerticalTickLabels(true);
-            plot.setDomainAxis(domainAxis);
-
-            // === Y 軸：自動範圍 + 10% 留白 ===
-            NumberAxis rangeAxis = new NumberAxis("收盤指數");
-            double range = maxClose - minClose;
-            if (range == 0) range = maxClose * 0.2;
-            // double padding = range * 0.1;
-            double padding = (maxClose - minClose) * 0.05;  // 5% 緩衝空間（padding）：Y 軸上下留白，避免線貼邊
-            rangeAxis.setRange(Math.max(0, minClose - padding), maxClose + padding);
-            rangeAxis.setTickLabelFont(new Font("Microsoft JhengHei", Font.PLAIN, 12));
-            plot.setRangeAxis(rangeAxis);
-
-            // === 渲染器設定 ===
-            XYLineAndShapeRenderer renderer = new XYLineAndShapeRenderer();
-            
-            // 主走勢線（藍色粗線 + 圓點）
-            renderer.setSeriesPaint(0, new Color(0, 80, 255));
-            renderer.setSeriesStroke(0, new BasicStroke(3.0f));
-            renderer.setSeriesShape(0, new java.awt.geom.Ellipse2D.Double(-4, -4, 8, 8));
-            
-            // 20 線 - 翠綠色
-            renderer.setSeriesPaint(1, new Color(0, 180, 0));
-            renderer.setSeriesStroke(1, new BasicStroke(2.5f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_BEVEL, 0, new float[]{6, 4}, 0));
-            
-            // 30 線 - 亮黃色
-            renderer.setSeriesPaint(2, new Color(255, 200, 0));
-            renderer.setSeriesStroke(2, new BasicStroke(2.5f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_BEVEL, 0, new float[]{6, 4}, 0));
-            
-            // 40 線 - 鮮紅色
-            renderer.setSeriesPaint(3, new Color(220, 20, 60));
-            renderer.setSeriesStroke(3, new BasicStroke(2.5f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_BEVEL, 0, new float[]{6, 4}, 0));
-
-            plot.setRenderer(renderer);
-
-            // === 中文標題與圖例 ===
-            Font titleFont = new Font("Microsoft JhengHei", Font.BOLD, 18);
-            Font legendFont = new Font("Microsoft JhengHei", Font.BOLD, 14);
-            chart.getTitle().setFont(titleFont);
-            chart.getLegend().setItemFont(legendFont);
-
-            ChartPanel chartPanel = new ChartPanel(chart);
-            chartPanel.setPreferredSize(new java.awt.Dimension(695, 420));
-            chartPanel.setMouseWheelEnabled(true);
-
-            currentChartPanel = chartPanel;
-            swingNode.setContent(chartPanel);
-
-            // 修復延遲
-            Timer timer = new Timer(150, e -> {
-                chartPanel.revalidate();
-                chartPanel.repaint();
                 ((Timer) e.getSource()).stop();
             });
             timer.setRepeats(false);
