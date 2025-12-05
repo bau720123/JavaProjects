@@ -549,22 +549,7 @@ public class MainApp extends Application {
             currentChartPanel = new ChartPanel(chart);
             currentChartPanel.setPreferredSize(new java.awt.Dimension(695, 400));
             swingNode.setContent(currentChartPanel);
-
-            // Timer：Swing 的計時器，單次延遲 200ms 觸發 ActionListener。
-            // 目的：解決 SwingNode 嵌入 JavaFX 時的初始渲染延遲（社區常見 bug，JFreeChart 需要時間初始化 plot）。
-            Timer timer = new Timer(200, e -> {
-                currentChartPanel.revalidate();
-                currentChartPanel.repaint();
-                ((Timer) e.getSource()).stop();
-            });
-            timer.setRepeats(false);
-            timer.start();
         });
-
-        // 延遲 setVisible，給 Swing 初始化時間
-        PauseTransition delay = new PauseTransition(Duration.millis(400));
-        delay.setOnFinished(e -> chartPane.setVisible(true));
-        delay.play();
 
         return swingNode;
     }
@@ -1860,6 +1845,8 @@ public class MainApp extends Application {
         SwingNode swingNode = new SwingNode();
 
         SwingUtilities.invokeLater(() -> {
+            // DefaultCategoryDataset：JFreeChart 的資料集類別，用於類別型資料（如 X=日期字符串，Y=數值），支援多系列。
+            // 日期是離散類別（非連續時間），CategoryAxis 只顯示有資料的點，解決假日空白問題。
             DefaultPieDataset<String> dataset = new DefaultPieDataset<>();
             Color[] colors = { new Color(0, 120, 0), new Color(144, 238, 144) };
 
@@ -1867,18 +1854,22 @@ public class MainApp extends Application {
                 dataset.setValue(data.labels.get(i), data.probabilities.get(i));
             }
 
+            // JFreeChart 核心工廠，生成線圖（CategoryPlot 類型）。
             JFreeChart chart = ChartFactory.createPieChart(
                 "聯準會利率期貨隱含機率 - " + data.meetingDate,
                 dataset,
                 true, true, false
             );
 
-            Font chineseFont = new Font("Microsoft JhengHei", Font.BOLD, 14);
-            chart.getTitle().setFont(new Font("Microsoft JhengHei", Font.BOLD, 18));
-            chart.getLegend().setItemFont(chineseFont);
-
+            // CategoryPlot：JFreeChart 繪圖區域，處理 CategoryDataset 的線圖。
             PiePlot plot = (PiePlot) chart.getPlot();
-            plot.setLabelFont(chineseFont);
+
+            // 設定字型以利解決亂碼問題
+            Font font = new Font("Microsoft JhengHei", Font.BOLD, 14);
+            chart.getTitle().setFont(new Font("Microsoft JhengHei", Font.BOLD, 18));
+            chart.getLegend().setItemFont(font);
+            plot.setLabelFont(font);
+
             plot.setBackgroundPaint(Color.WHITE);
 
             for (int i = 0; i < data.labels.size(); i++) {
@@ -1898,7 +1889,8 @@ public class MainApp extends Application {
             currentChartPanel = chartPanel;
             swingNode.setContent(currentChartPanel);
 
-            // 延遲 repaint，確保圖表正確顯示
+            // Timer：Swing 的計時器，單次延遲 200ms 觸發 ActionListener。
+            // 目的：解決 SwingNode 嵌入 JavaFX 時的初始渲染延遲（社區常見 bug，JFreeChart 需要時間初始化 plot）。
             Timer timer = new Timer(200, e -> {
                 currentChartPanel.revalidate();
                 currentChartPanel.repaint();
@@ -2079,24 +2071,28 @@ public class MainApp extends Application {
         chartPane.setPrefHeight(chartHeight); // 同步調整高度
         chartPane.setFitToWidth(false); // 關閉自動拉寬（改用等比例）
         chartPane.setFitToHeight(false); // 關閉自動拉高
-        
-        // 若圖表已載入，延遲 200ms 後觸發 Swing 組件重繪
-        if (currentChartPanel != null) {
-            SwingUtilities.invokeLater(() -> {
-                // 調整 ChartPanel 實際尺寸（等比例）
-                currentChartPanel.setPreferredSize(
-                    new java.awt.Dimension((int)chartWidth, (int)chartHeight)
-                );
-                
-                Timer timer = new Timer(200, e -> {
-                    currentChartPanel.revalidate();
-                    currentChartPanel.repaint();
-                    ((Timer) e.getSource()).stop();
-                });
-                timer.setRepeats(false);
-                timer.start();
+
+        SwingUtilities.invokeLater(() -> {
+            // 調整 ChartPanel 實際尺寸（等比例）
+            currentChartPanel.setPreferredSize(
+                new java.awt.Dimension((int)chartWidth, (int)chartHeight)
+            );
+
+            // Timer：Swing 的計時器，單次延遲 200ms 觸發 ActionListener。
+            // 目的：解決 SwingNode 嵌入 JavaFX 時的初始渲染延遲（社區常見 bug，JFreeChart 需要時間初始化 plot）。
+            Timer timer = new Timer(200, e -> {
+                currentChartPanel.revalidate();
+                currentChartPanel.repaint();
+                ((Timer) e.getSource()).stop();
             });
-        }
+            timer.setRepeats(false);
+            timer.start();
+        });
+
+        // 延遲 setVisible，給 Swing 初始化時間
+        PauseTransition delay = new PauseTransition(Duration.millis(400));
+        delay.setOnFinished(e -> chartPane.setVisible(true));
+        delay.play();
     }
 
     // 創建空圖表面板
