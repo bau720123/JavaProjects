@@ -9,6 +9,7 @@ import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.control.Alert.AlertType;
+import javafx.scene.image.Image;
 import javafx.scene.layout.*;
 import javafx.stage.Stage;
 import javafx.animation.KeyFrame;
@@ -59,6 +60,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -2132,6 +2134,13 @@ public class MainApp extends Application {
                 case CONFIRMATION -> "確認";
                 default -> "提示";
             });
+
+            // 設定 ALERT 視窗上左上角的小圖
+            Stage alertStage = (Stage) alert.getDialogPane().getScene().getWindow();
+            alertStage.getIcons().add(new Image(
+                Objects.requireNonNull(getClass().getResourceAsStream("/icon.png"))
+            ));
+
             alert.showAndWait();
         });
     }

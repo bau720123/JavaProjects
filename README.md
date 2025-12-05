@@ -277,6 +277,16 @@ WARNING: sun.misc.Unsafe::staticFieldBase will be removed in a future release
 [INFO] ------------------------------------------------------------------------
 ```
 
+```
+PS C:\project\JavaProjects\stock-health-system> java -jar target/stock-health-2.0.0-full.jar
+12月 05, 2025 11:05:27 上午 com.sun.javafx.application.PlatformImpl startup
+警告: Unsupported JavaFX configuration: classes were loaded from 'unnamed module @603b51d1'
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::load has been called by com.sun.glass.utils.NativeLibLoader in an unnamed module (file:/C:/project/JavaProjects/stock-health-system/target/stock-health-2.0.0-full.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+```
+
 <img width="387" height="301" alt="01_install" src="https://github.com/user-attachments/assets/f179288c-2575-4a29-97a5-c9148d90c6f6" />
 <img width="387" height="301" alt="02_install" src="https://github.com/user-attachments/assets/ef598c74-949f-4a34-83a7-57b64bf1f121" />
 <img width="315" height="108" alt="03_install" src="https://github.com/user-attachments/assets/189e5fde-81af-4f99-824f-f4ee6105bf4c" />
