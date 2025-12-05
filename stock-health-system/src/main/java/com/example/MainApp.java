@@ -24,7 +24,6 @@ import org.jfree.chart.ChartPanel;
 import org.jfree.chart.JFreeChart;
 import org.jfree.chart.axis.CategoryAxis;
 import org.jfree.chart.axis.CategoryLabelPositions;
-import org.jfree.chart.axis.SymbolAxis;
 import org.jfree.chart.labels.StandardPieSectionLabelGenerator;
 import org.jfree.chart.plot.CategoryPlot;
 import org.jfree.chart.plot.PiePlot;
@@ -78,8 +77,6 @@ import java.awt.BasicStroke;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
-
-import org.jfree.chart.axis.NumberAxis;
 
 public class MainApp extends Application {
     private final FugleService service = new FugleService(); // 使用 Fugle API 做資料存取
@@ -1833,6 +1830,7 @@ public class MainApp extends Application {
         resultArea.setText("載入中，請稍候...");
         chartPane.setVisible(false);
 
+        // 處裡非同步的操作，有點像是jQuery中的$.ajax(...)
         CompletableFuture.runAsync(() -> {
             FedWatchService.FedWatchResult data = FedWatchService.getProbability(apiKey);
 
@@ -1841,12 +1839,8 @@ public class MainApp extends Application {
                 resultArea.appendText(data.fullText);
 
                 if (!data.labels.isEmpty() && !data.probabilities.isEmpty()) {
-                    Node pieChart = createFedRatePieChart(data);
-                    chartPane.setContent(pieChart);
-                    resizeChartProportionally();
-                    PauseTransition delay = new PauseTransition(Duration.millis(400));
-                    delay.setOnFinished(e -> chartPane.setVisible(true));
-                    delay.play();
+                    chartPane.setContent(createFedRatePieChart(data));
+                    resizeChartProportionally(); // 改用統一的等比例縮放方法
                 } else {
                     chartPane.setContent(createEmptyChartPanel());
                 }
@@ -1859,6 +1853,67 @@ public class MainApp extends Application {
             });
             return null;
         });
+    }
+
+    // 創建 聯準會利率 圓餅圖
+    private Node createFedRatePieChart(FedWatchService.FedWatchResult data) {
+        SwingNode swingNode = new SwingNode();
+
+        SwingUtilities.invokeLater(() -> {
+            DefaultPieDataset<String> dataset = new DefaultPieDataset<>();
+            Color[] colors = { new Color(0, 120, 0), new Color(144, 238, 144) };
+
+            for (int i = 0; i < data.labels.size(); i++) {
+                dataset.setValue(data.labels.get(i), data.probabilities.get(i));
+            }
+
+            JFreeChart chart = ChartFactory.createPieChart(
+                "聯準會利率期貨隱含機率 - " + data.meetingDate,
+                dataset,
+                true, true, false
+            );
+
+            Font chineseFont = new Font("Microsoft JhengHei", Font.BOLD, 14);
+            chart.getTitle().setFont(new Font("Microsoft JhengHei", Font.BOLD, 18));
+            chart.getLegend().setItemFont(chineseFont);
+
+            PiePlot plot = (PiePlot) chart.getPlot();
+            plot.setLabelFont(chineseFont);
+            plot.setBackgroundPaint(Color.WHITE);
+
+            for (int i = 0; i < data.labels.size(); i++) {
+                plot.setSectionPaint(data.labels.get(i), colors[i % colors.length]);
+            }
+
+            plot.setLabelGenerator(new StandardPieSectionLabelGenerator(
+                "{0}: {1} ({2})",
+                NumberFormat.getPercentInstance(),
+                NumberFormat.getPercentInstance()
+            ));
+
+            ChartPanel chartPanel = new ChartPanel(chart);
+            chartPanel.setPreferredSize(new java.awt.Dimension(695, 400));
+            chartPanel.setMouseWheelEnabled(true);
+
+            currentChartPanel = chartPanel;
+            swingNode.setContent(currentChartPanel);
+
+            // 延遲 repaint，確保圖表正確顯示
+            Timer timer = new Timer(200, e -> {
+                currentChartPanel.revalidate();
+                currentChartPanel.repaint();
+                ((Timer) e.getSource()).stop();
+            });
+            timer.setRepeats(false);
+            timer.start();
+        });
+
+        // 延遲 setVisible，給 Swing 初始化時間
+        PauseTransition delay = new PauseTransition(Duration.millis(400));
+        delay.setOnFinished(e -> chartPane.setVisible(true));
+        delay.play();
+
+        return swingNode;
     }
 
     // 查 VIX 恐慌指數
@@ -2042,61 +2097,6 @@ public class MainApp extends Application {
                 timer.start();
             });
         }
-    }
-
-    // 創建 聯準會利率 圓餅圖
-    private Node createFedRatePieChart(FedWatchService.FedWatchResult data) {
-        SwingNode swingNode = new SwingNode();
-
-        SwingUtilities.invokeLater(() -> {
-            DefaultPieDataset<String> dataset = new DefaultPieDataset<>();
-            Color[] colors = { new Color(0, 120, 0), new Color(144, 238, 144) };
-
-            for (int i = 0; i < data.labels.size(); i++) {
-                dataset.setValue(data.labels.get(i), data.probabilities.get(i));
-            }
-
-            JFreeChart chart = ChartFactory.createPieChart(
-                "聯準會利率期貨隱含機率 - " + data.meetingDate,
-                dataset,
-                true, true, false
-            );
-
-            Font chineseFont = new Font("Microsoft JhengHei", Font.BOLD, 14);
-            chart.getTitle().setFont(new Font("Microsoft JhengHei", Font.BOLD, 18));
-            chart.getLegend().setItemFont(chineseFont);
-
-            PiePlot plot = (PiePlot) chart.getPlot();
-            plot.setLabelFont(chineseFont);
-            plot.setBackgroundPaint(Color.WHITE);
-
-            for (int i = 0; i < data.labels.size(); i++) {
-                plot.setSectionPaint(data.labels.get(i), colors[i % colors.length]);
-            }
-
-            plot.setLabelGenerator(new StandardPieSectionLabelGenerator(
-                "{0}: {1} ({2})",
-                NumberFormat.getPercentInstance(),
-                NumberFormat.getPercentInstance()
-            ));
-
-            ChartPanel chartPanel = new ChartPanel(chart);
-            chartPanel.setPreferredSize(new java.awt.Dimension(695, 400));
-            chartPanel.setMouseWheelEnabled(true);
-
-            currentChartPanel = chartPanel;
-            swingNode.setContent(currentChartPanel);
-
-            Timer timer = new Timer(200, e -> {
-                currentChartPanel.revalidate();
-                currentChartPanel.repaint();
-                ((Timer) e.getSource()).stop();
-            });
-            timer.setRepeats(false);
-            timer.start();
-        });
-
-        return swingNode;
     }
 
     // 創建空圖表面板
