@@ -1178,12 +1178,12 @@ public class MainApp extends Application {
 
         try {
             days = Integer.parseInt(daysText);
-            if (days < 1) {
-                showAlert("天數必須為 1 以上");
+            if (days < 30) {
+                showAlert("查詢布林通道建議設定「30 天以上」，以確保有足夠交易日");
                 return;
             }
         } catch (NumberFormatException e) {
-            showAlert("天數必須為有效數字（1 以上）");
+            showAlert("天數必須為有效數字（建議 30 以上）");
             return;
         }
 
@@ -1193,51 +1193,85 @@ public class MainApp extends Application {
 
         CompletableFuture.supplyAsync(() -> service.fetchBollinger(symbol, days, apiKey))
             .thenAccept(bbList -> Platform.runLater(() -> {
-                if (!bbList.isEmpty()) {
-                    LocalDate today = LocalDate.now();
-                    List<Candle> candles = service.fetchHistory(symbol, days, apiKey);
-                    boolean hasToday = candles.stream().anyMatch(c -> c.date().equals(today));
-
-                    if (!hasToday) {
-                        Quote quote = service.fetchQuote(symbol, apiKey);
-                        Candle todayCandle = new Candle(
-                            LocalDate.now(),
-                            quote.openPrice(),
-                            quote.highPrice(),
-                            quote.lowPrice(),
-                            quote.closePrice(), // 目前成交價當作「收盤價」
-                            0, // 今日成交量暫設為0，因為歷史K線的volume是整日總量，無法從即時報價取得
-                            quote.change()
-                        );
-                        candles.add(todayCandle);
-                    }
-
-                    // === 文字區塊 ===
-                    StringBuilder sb = new StringBuilder();
-                    sb.append(String.format("布林通道 （Bollinger Bands）已載入（近 %d 日走勢）。\n\n", bbList.size()));
-                    sb.append("布林通道指數如下：\n\n");
-
-                    SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
-                    for (Bollinger b : bbList) {
-                        String dateStr = sdf.format(Date.from(b.date().atStartOfDay(ZoneId.systemDefault()).toInstant()));
-                        sb.append(String.format("日期：%s\n", dateStr));
-                        sb.append(String.format("   上軌：%.4f\n", b.upper()));
-                        sb.append(String.format("   中軌：%.4f\n", b.middle()));
-                        sb.append(String.format("   下軌：%.4f\n\n", b.lower()));
-                    }
-
-                    sb.append("＊買入訊號：當股價觸及下軌並有反彈跡象時，可能是一個買入訊號\n");
-                    sb.append("＊賣出訊號：當股價觸及上軌並有回落跡象時，可能是一個賣出訊號。");
-
-                    resultArea.setText(sb.toString());
-
-                    // === 畫圖 ===
-                    Node chartNode = createBollingerWithCandlesChart(candles, bbList);
-                    chartPane.setContent(chartNode);
-                    resizeChartProportionally(); // 改用統一的等比例縮放方法
-                } else {
+                if (bbList.isEmpty()) {
                     resultArea.setText("布林通道資料載入失敗，請稍後再試\n若 API 不可用，請確認 API key 有效。");
+                    return;
                 }
+
+                if (bbList.size() < 20) {
+                    resultArea.setText("資料不足：目前僅有 " + bbList.size() + " 筆交易日資料\n\n" + "布林通道需至少 20 個交易日才能正確計算\n" + "建議將「天數」設定為 40 以上，或等待更多交易日");
+                    return;
+                }
+
+                LocalDate today = LocalDate.now();
+                List<Candle> candles = service.fetchHistory(symbol, days, apiKey);
+                boolean hasToday = candles.stream().anyMatch(c -> c.date().equals(today));
+
+                if (!hasToday) {
+                    Quote quote = service.fetchQuote(symbol, apiKey);
+                    Candle todayCandle = new Candle(
+                        LocalDate.now(),
+                        quote.openPrice(),
+                        quote.highPrice(),
+                        quote.lowPrice(),
+                        quote.closePrice(), // 目前成交價當作「收盤價」
+                        0, // 今日成交量暫設為0，因為歷史K線的volume是整日總量，無法從即時報價取得
+                        quote.change()
+                    );
+                    candles.add(todayCandle);
+                }
+
+                boolean bbListHasToday = bbList.get(bbList.size() - 1).date().equals(today);
+
+                if (!bbListHasToday) {
+                    // 近 20 天的股價歷史資料
+                    List<Double> last20Closes = candles.stream()
+                        .sorted(Comparator.comparing(Candle::date))
+                        .skip(candles.size() - 20)
+                        .limit(20)
+                        .map(Candle::close)
+                        .collect(Collectors.toList());
+
+                    if (last20Closes.size() == 20) {
+                        // 將近 20 天的收盤價加總之後除以 20，藉此得到中位數（均價）
+                        double sum = last20Closes.stream().mapToDouble(d -> d).sum();
+                        double middle = sum / 20.0;
+                        
+                        // 對每一根 K 線：(當天收盤價 - 中軌)²
+                        // 把這 20 個平方值加起來，再除以 20 → 得到「變異數」
+                        double varianceSum = last20Closes.stream()
+                            .mapToDouble(c -> Math.pow(c - middle, 2))
+                            .sum();
+                        double stdDev = Math.sqrt(varianceSum / 20.0);
+
+                        double upper = middle + 2 * stdDev; // 上軌
+                        double lower = middle - 2 * stdDev; // 下軌
+
+                        bbList.add(new Bollinger(today, upper, middle, lower));
+                    }
+                }
+
+                StringBuilder sb = new StringBuilder();
+                sb.append(String.format("布林通道 （Bollinger Bands）已載入（近 %d 日走勢）。\n\n", bbList.size()));
+                sb.append("布林通道指數如下：\n\n");
+
+                SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+                for (Bollinger b : bbList) {
+                    String dateStr = sdf.format(Date.from(b.date().atStartOfDay(ZoneId.systemDefault()).toInstant()));
+                    sb.append(String.format("日期：%s\n", dateStr));
+                    sb.append(String.format("上軌：%.4f\n", b.upper()));
+                    sb.append(String.format("中軌：%.4f\n", b.middle()));
+                    sb.append(String.format("下軌：%.4f\n\n", b.lower()));
+                }
+
+                sb.append("＊買入訊號：當股價觸及下軌並有反彈跡象時，可能是一個買入訊號\n\n");
+                sb.append("＊賣出訊號：當股價觸及上軌並有回落跡象時，可能是一個賣出訊號。");
+
+                resultArea.setText(sb.toString());
+
+                Node chartNode = createBollingerWithCandlesChart(candles, bbList);
+                chartPane.setContent(chartNode);
+                resizeChartProportionally(); // 改用統一的等比例縮放方法
             }))
             .exceptionally(ex -> {
                 // exceptionally 像是 "非同步catch"，上游supplyAsync拋錯（如Fugle Key無效）時，自動恢復null並秀Alert—避免整個CompletableFuture崩潰，若直接showAlert，會造成整個應用程式crash
@@ -1354,8 +1388,8 @@ public class MainApp extends Application {
 
             // Renderers
             CandlestickRenderer candleRenderer = new CandlestickRenderer();
-            candleRenderer.setUpPaint(Color.GREEN);
-            candleRenderer.setDownPaint(Color.RED);
+            candleRenderer.setUpPaint(Color.RED);
+            candleRenderer.setDownPaint(Color.GREEN);
             candleRenderer.setDrawVolume(false);
             candleRenderer.setAutoWidthMethod(CandlestickRenderer.WIDTHMETHOD_SMALLEST);
             plot.setRenderer(0, candleRenderer);
@@ -1382,7 +1416,7 @@ public class MainApp extends Application {
 
             // 5) 組成 JFreeChart
             JFreeChart chart = new JFreeChart(
-                    "布林通道 + K線圖（近 " + candles.size() + " 日）",
+                    "布林通道＋K線圖（近 " + candles.size() + " 日）",
                     new Font("Microsoft JhengHei", Font.BOLD, 18),
                     plot,
                     true
@@ -1390,14 +1424,14 @@ public class MainApp extends Application {
 
             // 字體
             Font chineseFont = new Font("Microsoft JhengHei", Font.BOLD, 14);
-            Font legendFont = new Font("Microsoft JhengHei", Font.BOLD, 15);
+            Font legendFont = new Font("Microsoft JhengHei", Font.BOLD, 14);
             plot.getDomainAxis().setLabelFont(chineseFont);
             plot.getRangeAxis().setLabelFont(chineseFont);
             chart.getLegend().setItemFont(legendFont);
 
             // ChartPanel
             ChartPanel chartPanel = new ChartPanel(chart);
-            chartPanel.setPreferredSize(new java.awt.Dimension(695, 420));
+            chartPanel.setPreferredSize(new java.awt.Dimension(695, 400));
             chartPanel.setMouseWheelEnabled(true);
             chartPanel.setRangeZoomable(false);
 
