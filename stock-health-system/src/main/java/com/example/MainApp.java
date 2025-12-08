@@ -230,7 +230,7 @@ public class MainApp extends Application {
         centerBox.setAlignment(Pos.TOP_LEFT);  // 改為 TOP_LEFT，讓內容頂左對齊
 
         // 文字區塊
-        resultArea = new TextArea("歡迎使用台股健診系統\n請在上方輸入股票代號與 API Key 等資訊後點擊查詢\n任何系統回饋請寄EMAIL：bau720123@gmail.com\n"); // 可設定文字區塊預設文字
+        resultArea = new TextArea("歡迎使用台股健診系統\n\n請在上方輸入股票代號與 API Key\n\n完成後點擊查詢左方相關功能\n\n任何系統回饋請寄EMAIL：\nbau720123@gmail.com\n\n"); // 可設定文字區塊預設文字
         resultArea.setWrapText(true); // 設定當文字超過欄位的寬度時是否自動換行
         resultArea.setPrefRowCount(10); // 但JavaFX布局系統的響應式設計（responsive layout）會讓其根據視窗大小的變化來自動延展其高
         resultArea.setEditable(false); // 設定該文字區塊可否修改
@@ -281,8 +281,8 @@ public class MainApp extends Application {
         Platform.runLater(() -> {
             String eventMsg = MarketEventCalendar.getTodayEventMessage();
             if (eventMsg != null) {
-                // String original = resultArea.getText();
-                resultArea.setText(eventMsg);
+                String original = resultArea.getText();
+                resultArea.setText(original + eventMsg);
 
                 // 套用紅色警示風格
                 resultArea.setStyle("-fx-font-weight: bold; " +
@@ -2134,24 +2134,35 @@ public class MainApp extends Application {
     // 創建空圖表面板
     private Node createEmptyChartPanel() {
         SwingNode swingNode = new SwingNode();
+
         SwingUtilities.invokeLater(() -> {
-            DefaultCategoryDataset emptyDataset = new DefaultCategoryDataset();
-            JFreeChart emptyChart = ChartFactory.createLineChart(" ", " ", " ", emptyDataset);
-            swingNode.setContent(new ChartPanel(emptyChart));
+            JFreeChart emptyChart = ChartFactory.createLineChart("", "", "", new DefaultCategoryDataset());
+            ChartPanel panel = new ChartPanel(emptyChart);
+            panel.setPreferredSize(new java.awt.Dimension(695, 400));
 
-            // 建立 ChartPanel 並設定大小
-            currentChartPanel = new ChartPanel(emptyChart);
-            currentChartPanel.setPreferredSize(new java.awt.Dimension(695, 400));
-            swingNode.setContent(currentChartPanel);
+            swingNode.setContent(panel);
+            currentChartPanel = panel;
+        });
 
-            // 要調高到 1000ms 才能解決非同步渲染問題
-            Timer timer = new Timer(1000, e -> {
-                currentChartPanel.revalidate();
-                currentChartPanel.repaint();
-                ((Timer) e.getSource()).stop();
-            });
-            timer.setRepeats(false);
-            timer.start();
+        // 核彈級解法：直接監聽 scene + window + 延遲 300ms 強制重繪
+        swingNode.sceneProperty().addListener((obs, oldScene, newScene) -> {
+            if (newScene != null && newScene.getWindow() != null) {
+                PauseTransition finalForce = new PauseTransition(Duration.millis(300));
+                finalForce.setOnFinished(e -> {
+                    Platform.runLater(() -> {
+                        SwingUtilities.invokeLater(() -> {
+                            ChartPanel p = (ChartPanel) swingNode.getContent();
+                            if (p != null) {
+                                p.setSize(695, 400);
+                                p.revalidate();
+                                p.repaint();
+                                System.out.println("[Chart] 核彈級強制重繪成功");
+                            }
+                        });
+                    });
+                });
+                finalForce.play();
+            }
         });
 
         return swingNode;
