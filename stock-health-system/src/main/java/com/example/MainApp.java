@@ -25,6 +25,8 @@ import org.jfree.chart.ChartPanel;
 import org.jfree.chart.JFreeChart;
 import org.jfree.chart.axis.CategoryAxis;
 import org.jfree.chart.axis.CategoryLabelPositions;
+import org.jfree.chart.axis.NumberTickUnit;
+import org.jfree.chart.axis.NumberAxis;
 import org.jfree.chart.labels.StandardPieSectionLabelGenerator;
 import org.jfree.chart.plot.CategoryPlot;
 import org.jfree.chart.plot.PiePlot;
@@ -397,6 +399,10 @@ public class MainApp extends Application {
             double min = Math.min(low, Math.min(open, avg));
             plot.getRangeAxis().setRange(min, max);
 
+            // 動態設定台股最小跳動單位
+            ((NumberAxis) plot.getRangeAxis())
+                .setTickUnit(new NumberTickUnit(getTaiwanStockTickSize(close)));
+
             // 字型設定並且解決亂碼問題
             Font font = new Font("Microsoft YaHei", Font.BOLD, 16);
             chart.getTitle().setFont(font);
@@ -430,6 +436,16 @@ public class MainApp extends Application {
         delay.play();
 
         return swingNode;
+    }
+
+    // 股價刻度
+    private static double getTaiwanStockTickSize(double price) {
+        if (price < 10)    return 0.01;
+        if (price < 50)    return 0.05;
+        if (price < 100)   return 0.1;
+        if (price < 500)   return 0.5;
+        if (price < 1000)  return 1.0;
+        return 5.0;
     }
 
     // 通用圖表
@@ -2144,10 +2160,10 @@ public class MainApp extends Application {
             currentChartPanel = panel;
         });
 
-        // 核彈級解法：直接監聽 scene + window + 延遲 300ms 強制重繪
+        // 直接監聽 scene + window + 延遲 400ms 強制重繪
         swingNode.sceneProperty().addListener((obs, oldScene, newScene) -> {
             if (newScene != null && newScene.getWindow() != null) {
-                PauseTransition finalForce = new PauseTransition(Duration.millis(300));
+                PauseTransition finalForce = new PauseTransition(Duration.millis(400));
                 finalForce.setOnFinished(e -> {
                     Platform.runLater(() -> {
                         SwingUtilities.invokeLater(() -> {
@@ -2156,7 +2172,6 @@ public class MainApp extends Application {
                                 p.setSize(695, 400);
                                 p.revalidate();
                                 p.repaint();
-                                System.out.println("[Chart] 核彈級強制重繪成功");
                             }
                         });
                     });

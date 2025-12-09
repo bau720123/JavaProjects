@@ -38,6 +38,11 @@ public final class MarketEventCalendar {
 
     // MoneyDJ 動態經濟事件
     private static List<JsonNode> getMoneyDJEvents() {
+        // 如果已經抓過了，直接回傳快取
+        if (Events != null) {
+            return Events;
+        }
+
         int currentYear = Year.now().getValue();
         String url = String.format("https://www.moneydj.com/us/rest/eventlist?from=%d-01-01&to=%d-12-31", currentYear, currentYear);
 
@@ -56,13 +61,26 @@ public final class MarketEventCalendar {
             }
         } catch (Exception e) {
             System.err.println("MoneyDJ 經濟事件 API 抓取失敗，將停用動態提醒：" + e.getMessage());
+            e.printStackTrace();
         }
 
-        return List.of();
+        // 失敗時回傳空清單，並標記已嘗試過（避免重複嘗試）
+        Events = List.of();
+        return Events;
     }
 
-    private static boolean containsDetails(JsonNode event, String keyword) {
-        return event.path("details").asText().contains(keyword);
+    // 輔助方法：檢查今天是否有符合關鍵字的事件（使用全年快取）
+    private static boolean hasEventToday(String keyword) {
+        LocalDate today = LocalDate.now();
+        String todayStr = today.format(MONEYDJ_DATE_FORMATTER);
+
+        return getMoneyDJEvents().stream().anyMatch(event -> {
+            String startDate = event.path("start_date").asText().split(" ")[0];
+            if (!startDate.equals(todayStr)) return false;
+            
+            String details = event.path("details").asText();
+            return details.contains(keyword);
+        });
     }
 
     // 美國核心CPI年增率
@@ -70,12 +88,7 @@ public final class MarketEventCalendar {
     // 低於預期：大漲（降息希望上升）
     // 高於預期：大跌（升息或延後降息）
     private static boolean isTodayCoreCPI() {
-        return getMoneyDJEvents().stream().anyMatch(event -> {
-            if (!containsDetails(event, "美國核心CPI年增率")) return false;
-            String dateStr = event.path("start_date").asText().split(" ")[0];
-            LocalDate eventDate = LocalDate.parse(dateStr, MONEYDJ_DATE_FORMATTER);
-            return eventDate.equals(LocalDate.now());
-        });
+        return hasEventToday("美國核心CPI年增率");
     }
 
     // 美國生產者物價指數（PPI）
@@ -83,13 +96,7 @@ public final class MarketEventCalendar {
     // 高於預期：利空（通膨頑固）
     // 低於預期：利多
     private static boolean isTodayPPI() {
-        return getMoneyDJEvents().stream().anyMatch(event -> {
-            String details = event.path("details").asText();
-            if (!details.contains("美國生產者物價指數") && !details.contains("EI020089")) return false;
-            String dateStr = event.path("start_date").asText().split(" ")[0];
-            LocalDate eventDate = LocalDate.parse(dateStr, MONEYDJ_DATE_FORMATTER);
-            return eventDate.equals(LocalDate.now());
-        });
+        return hasEventToday("美國生產者物價指數") || hasEventToday("EI020089");
     }
 
     // 美國零售銷售月增率
@@ -97,12 +104,7 @@ public final class MarketEventCalendar {
     // 強於預期：利多（經濟強勁）
     // 弱於預期：利空（衰退風險）
     private static boolean isTodayRetailSales() {
-        return getMoneyDJEvents().stream().anyMatch(event -> {
-            if (!containsDetails(event, "美國零售額月增率")) return false;
-            String dateStr = event.path("start_date").asText().split(" ")[0];
-            LocalDate eventDate = LocalDate.parse(dateStr, MONEYDJ_DATE_FORMATTER);
-            return eventDate.equals(LocalDate.now());
-        });
+        return hasEventToday("美國零售額月增率");
     }
 
     // 美國初請失業金人數
@@ -110,32 +112,17 @@ public final class MarketEventCalendar {
     // 低於40萬：利多
     // 連續>45萬：重磅衰退警報
     private static boolean isTodayInitialJoblessClaims() {
-        return getMoneyDJEvents().stream().anyMatch(event -> {
-            if (!containsDetails(event, "申請失業救濟人數")) return false;
-            String dateStr = event.path("start_date").asText().split(" ")[0];
-            LocalDate eventDate = LocalDate.parse(dateStr, MONEYDJ_DATE_FORMATTER);
-            return eventDate.equals(LocalDate.now());
-        });
+        return hasEventToday("申請失業救濟人數");
     }
 
     // 美國非農就業數據（NFP）
     private static boolean isTodayUSNonFarmPayroll() {
-        return getMoneyDJEvents().stream().anyMatch(event -> {
-            if (!containsDetails(event, "美國非農業就業人數變化")) return false;
-            String dateStr = event.path("start_date").asText().split(" ")[0];
-            LocalDate eventDate = LocalDate.parse(dateStr, MONEYDJ_DATE_FORMATTER);
-            return eventDate.equals(LocalDate.now());
-        });
+        return hasEventToday("美國非農業就業人數變化");
     }
 
     // 美國消費者信心指數
     private static boolean isTodayUSConsumerConfidence() {
-        return getMoneyDJEvents().stream().anyMatch(event -> {
-            if (!containsDetails(event, "美國消費者信心指數")) return false;
-            String dateStr = event.path("start_date").asText().split(" ")[0];
-            LocalDate eventDate = LocalDate.parse(dateStr, MONEYDJ_DATE_FORMATTER);
-            return eventDate.equals(LocalDate.now());
-        });
+        return hasEventToday("美國消費者信心指數");
     }
 
     /**
@@ -166,18 +153,7 @@ public final class MarketEventCalendar {
             sb.append("近期有重要美股財報！（NVDA、AAPL、META等），請注意相關交易波動\n");
         }
 
-        // 只取一次日曆的資料
-        List<JsonNode> events = getMoneyDJEvents();
-
-        // === 美國經濟數據動態提醒（MoneyDJ）===
-        if (isTodayUSNonFarmPayroll()) {
-            sb.append("今晚 21:30 美國非農就業數據 (NFP) 即將公布！\n");
-            sb.append("美元、美股、台指夜盤將劇烈波動，隔天開盤請特別小心！\n");
-        }
-        if (isTodayUSConsumerConfidence()) {
-            sb.append("今晚 23:00 美國消費者信心指數 (CCI) 即將公布！\n");
-            sb.append("若低於預期，消費股與科技股易受壓！\n");
-        }
+        // 美國經濟數據動態提醒（MoneyDJ）
         if (isTodayCoreCPI()) {
             sb.append("今晚 20:30 美國核心CPI即將公布！\n");
             sb.append("這是聯準會最重視的通膨指標，波動會非常大！\n");
@@ -194,8 +170,16 @@ public final class MarketEventCalendar {
             sb.append("今晚 20:30 美國失業金人數即將公布！\n");
             sb.append("勞動市場最即時指標，連續惡化就是衰退警報\n");
         }
+        if (isTodayUSNonFarmPayroll()) {
+            sb.append("今晚 21:30 美國非農就業數據 (NFP) 即將公布！\n");
+            sb.append("美元、美股、台指夜盤將劇烈波動，隔天開盤請特別小心！\n");
+        }
+        if (isTodayUSConsumerConfidence()) {
+            sb.append("今晚 23:00 美國消費者信心指數 (CCI) 即將公布！\n");
+            sb.append("若低於預期，消費股與科技股易受壓！\n");
+        }
 
-        // === 美股休市提醒（含節日名稱顯示）===
+        // 美股休市提醒（含節日名稱顯示）
 
         // 整天休市
         List<String> fullDayHolidays = List.of(
@@ -208,7 +192,8 @@ public final class MarketEventCalendar {
             "獨立紀念日", "感恩節", "聖誕節"
         );
 
-        LocalDate tomorrow = today.plusDays(1);
+        LocalDate tomorrow = today.plusDays(1); // 明天
+        List<JsonNode> events = getMoneyDJEvents(); // 只取一次日曆的資料
 
         // 輔助方法：傳入 keywordList 和日期，回傳「真正匹配的節日名稱」
         BiFunction<List<String>, LocalDate, String> findHolidayNameByDate = (keywordList, targetDate) -> {
