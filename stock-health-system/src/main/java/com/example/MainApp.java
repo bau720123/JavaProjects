@@ -52,7 +52,7 @@ import org.jfree.chart.renderer.xy.CandlestickRenderer;
 import org.jfree.chart.renderer.xy.XYLineAndShapeRenderer;
 
 import java.awt.Font;
-import java.awt.Color;  // 顏色設定用於 MACD 圖表線條
+import java.awt.Color;
 import java.text.NumberFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -89,9 +89,9 @@ public class MainApp extends Application {
     private TextField daysField; // 天數輸入欄位（共用給歷史 K 線、RSI、MACD）
     private TextArea resultArea; // 文字顯示區塊
     private ScrollPane chartPane; // 圖表顯示區塊
-    private BorderPane root;  // 讓 queryHistory() 可存取
-    private ChartPanel currentChartPanel;  // 存取 ChartPanel 成員，允許多次 repaint
-    private Stage primaryStage;  // 將 stage 升級為類別成員變數，讓 createLineChart 可存取
+    private BorderPane root; // 讓 queryHistory() 可存取
+    private ChartPanel currentChartPanel; // 存取 ChartPanel 成員，允許多次 repaint
+    private Stage primaryStage; // 將 stage 升級為類別成員變數，讓 createLineChart 可存取
 
     // 在類別載入時讀取版本號
     private static String APP_VERSION = "Unknown";
@@ -321,7 +321,6 @@ public class MainApp extends Application {
 
         resultArea.clear();
         resultArea.setText("載入中，請稍候...");
-        chartPane.setVisible(false);
 
         // 處裡非同步的操作，有點像是jQuery中的$.ajax(...)
         CompletableFuture.supplyAsync(() -> service.fetchQuote(symbol, apiKey))
@@ -634,7 +633,6 @@ public class MainApp extends Application {
 
         resultArea.clear();
         resultArea.setText("載入中，請稍候...");
-        chartPane.setVisible(false);
 
         // 處裡非同步的操作，有點像是jQuery中的$.ajax(...)
         CompletableFuture.supplyAsync(() -> service.fetchHistory(symbol, days, apiKey))
@@ -748,7 +746,6 @@ public class MainApp extends Application {
 
         resultArea.clear();
         resultArea.setText("載入中，請稍候...");
-        chartPane.setVisible(false);
 
         // 處裡非同步的操作，有點像是jQuery中的$.ajax(...)
         CompletableFuture.supplyAsync(() -> service.fetchSMA(symbol, days, apiKey))
@@ -756,9 +753,9 @@ public class MainApp extends Application {
                 if (!smaList.isEmpty()) {
                     LocalDate today = LocalDate.now();
                     boolean hasToday = smaList.stream().anyMatch(s -> s.date().equals(today));
+                    Quote quote = service.fetchQuote(symbol, apiKey);
 
                     if (!hasToday) {
-                        Quote quote = service.fetchQuote(symbol, apiKey);
                         List<Candle> history = service.fetchHistory(symbol, days, apiKey);
 
                         // 建立今日虛擬K棒
@@ -817,6 +814,49 @@ public class MainApp extends Application {
                     sb.append(String.format("區間最高：%.2f（%s）\n", max, maxDates.stream().map(Object::toString).collect(Collectors.joining("、"))));
                     sb.append(String.format("區間最低：%.2f（%s）\n", min, minDates.stream().map(Object::toString).collect(Collectors.joining("、"))));
 
+                    // 系統建議
+                    if (quote.closePrice() != 0) {
+                        double latestSMA = smaList.get(smaList.size() - 1).sma(); // 最新一筆 SMA
+                        double currentPrice = quote.closePrice(); // 使用即時價當收盤價
+                        double deviationPct = (currentPrice - latestSMA) / latestSMA * 100.0; // 偏差百分比
+
+                        sb.append(String.format("\n%s（" + "%s）投資建議如下\n\n", quote.name(), quote.symbol()));
+                        sb.append(String.format("當前股價：%.2f\n", currentPrice));
+                        sb.append(String.format("偏差幅度：%.2f%% %s\n", deviationPct, deviationPct >= 0 ? "（高於均線）" : "（低於均線）"));
+
+                        String signal; // 信號
+                        String advice; // 建議
+
+                        if (currentPrice >= latestSMA) {
+                            signal = "股價站上均線";
+                            advice = "多頭排列啟動，持股信心強，可考慮加碼或追多";
+                        } else if (deviationPct >= -1.0) {
+                            signal = "貼近均線震盪";
+                            advice = "主力磨線階段，等待突破方向，暫時觀望為主";
+                        } else if (deviationPct >= -3.0) {
+                            signal = "輕度超賣";
+                            advice = "技術性回檔結束，反彈機率＞80%，建議佈局";
+                        } else if (deviationPct >= -6.0) {
+                            signal = "明顯超賣";
+                            advice = "高勝率反彈區，歷史經驗強力買點";
+                        } else {
+                            signal = "極度超賣";
+                            advice = "恐慌性賣壓尾聲，大底即將成形，可重壓";
+                        }
+
+                        sb.append(String.format("信號：%s\n\n", signal));
+                        sb.append(advice + "\n");
+                        showAlert(
+                            quote.name() + "（" + quote.symbol() + "）\n" +
+                            "最新SMA（" + days + "日）：" + String.format("%.2f", latestSMA) + "\n" +
+                            "當前股價：" + currentPrice + "\n" +
+                            "偏差幅度：" + deviationPct + "\n\n" +
+                            "信號：" + signal + "\n" +
+                            advice,
+                            AlertType.INFORMATION
+                        );
+                    }
+
                     resultArea.setText(sb.toString()); // 設定完整文字
 
                     // SMA 圖表
@@ -865,7 +905,6 @@ public class MainApp extends Application {
 
         resultArea.clear();
         resultArea.setText("載入中，請稍候...");
-        chartPane.setVisible(false);
 
         // 處裡非同步的操作，有點像是jQuery中的$.ajax(...)
         CompletableFuture.supplyAsync(() -> service.fetchRSI(symbol, days, apiKey))
@@ -933,9 +972,9 @@ public class MainApp extends Application {
                     sb.append(String.format("區間最強勢：%.2f（%s）\n", maxRsi, maxRsiDateStr));  // 格式化添加（%.2f 保留2位小數）
                     sb.append(String.format("區間最弱勢：%.2f（%s）\n", minRsi, minRsiDateStr));  // 格式化添加（%.2f 保留2位小數）
 
-                    sb.append("\n＊超買與超賣：\n");
+                    sb.append("\n＊超買與超賣\n\n");
                     sb.append("當RSI 顯示超買時（通常大於70），可能表示市場過熱，價格有回調的可能，是賣出訊號。 反之，當RSI 顯示超賣時（通常小於30），可能表示市場過冷，價格有上漲的潛力，是買入訊號。\n\n");
-                    sb.append("＊市場趨勢：\n");
+                    sb.append("＊市場趨勢\n\n");
                     sb.append("RSI 值越高，表示過去一段期間的上漲機率較大；值越小，則下跌機率較大。");
 
                     resultArea.setText(sb.toString());  // 設定完整文字
@@ -1030,7 +1069,6 @@ public class MainApp extends Application {
 
         resultArea.clear();
         resultArea.setText("載入中，請稍候...");
-        chartPane.setVisible(false);
 
         // 處裡非同步的操作，有點像是jQuery中的$.ajax(...)
         CompletableFuture.supplyAsync(() -> service.fetchMACD(symbol, days, apiKey))
@@ -1103,9 +1141,9 @@ public class MainApp extends Application {
                     sb.append(String.format("區間最強勢：%.2f（%s）\n", maxMacd, maxMacdDateStr));  // 格式化添加（%.2f 保留2位小數）
                     sb.append(String.format("區間最弱勢：%.2f（%s）\n", minMacd, minMacdDateStr));  // 格式化添加（%.2f 保留2位小數）
 
-                    sb.append("\n＊黃金交叉：\n");
+                    sb.append("\n＊黃金交叉\n\n");
                     sb.append("當移動平均線（MACD）慢慢往上交叉信號線（signalLine）時發生。這通常被視為一個買進訊號，表示上漲趨勢可能增強。\n\n");
-                    sb.append("＊死亡交叉：\n");
+                    sb.append("＊死亡交叉\n\n");
                     sb.append("當移動平均線（MACD）慢慢往下交叉信號線（signalLine）時發生。這通常被視為一個賣出訊號，表示下跌趨勢可能增強。");
 
                     resultArea.setText(sb.toString());  // 設定完整文字
@@ -1205,7 +1243,6 @@ public class MainApp extends Application {
 
         resultArea.clear();
         resultArea.setText("載入中，請稍候...");
-        chartPane.setVisible(false);
 
         CompletableFuture.supplyAsync(() -> service.fetchBollinger(symbol, days, apiKey))
             .thenAccept(bbList -> Platform.runLater(() -> {
@@ -1497,7 +1534,6 @@ public class MainApp extends Application {
 
         resultArea.clear();
         resultArea.setText("載入中，請稍候...");
-        chartPane.setVisible(false);
 
         CompletableFuture.runAsync(() -> {
             try {
@@ -1569,9 +1605,9 @@ public class MainApp extends Application {
                     foreignList.add(foreign);
 
                     sb.append(String.format("日期：%s\n", row[0]));
+                    sb.append(String.format("外資：%,d\n", foreign));
                     sb.append(String.format("投信：%,d\n", trust));
-                    sb.append(String.format("自營商：%,d\n", dealer));
-                    sb.append(String.format("外資：%,d\n\n", foreign));
+                    sb.append(String.format("自營商：%,d\n\n", dealer));
 
                     // 極值更新
                     if (trust > maxTrust) { maxTrust = trust; maxTrustDate = row[0]; }
@@ -1582,12 +1618,12 @@ public class MainApp extends Application {
                     if (foreign < minForeign) { minForeign = foreign; minForeignDate = row[0]; }
                 }
 
-                sb.append("[買超]\n");
+                sb.append("[買超]\n\n");
                 sb.append(String.format("區間最大（投信）：%,d（%s）\n", maxTrust, maxTrustDate));
                 sb.append(String.format("區間最大（自營商）：%,d（%s）\n", maxDealer, maxDealerDate));
                 sb.append(String.format("區間最大（外資）：%,d（%s）\n", maxForeign, maxForeignDate));
 
-                sb.append("\n[賣超]\n");
+                sb.append("\n[賣超]\n\n");
                 sb.append(String.format("區間最大（投信）：%,d（%s）\n", minTrust, minTrustDate));
                 sb.append(String.format("區間最大（自營商）：%,d（%s）\n", minDealer, minDealerDate));
                 sb.append(String.format("區間最大（外資）：%,d（%s）\n", minForeign, minForeignDate));
@@ -1640,9 +1676,9 @@ public class MainApp extends Application {
             DefaultCategoryDataset dataset = new DefaultCategoryDataset();
 
             for (int i = 0; i < dates.size(); i++) {
+                dataset.addValue(foreign.get(i), "外資", dates.get(i));
                 dataset.addValue(trust.get(i), "投信", dates.get(i));
                 dataset.addValue(dealer.get(i), "自營商", dates.get(i));
-                dataset.addValue(foreign.get(i), "外資", dates.get(i));
             }
 
             JFreeChart chart = ChartFactory.createStackedBarChart(
@@ -1672,9 +1708,9 @@ public class MainApp extends Application {
             );
 
             // 顏色設定
-            plot.getRenderer().setSeriesPaint(0, new Color(255, 100, 100)); // 投信 紅
-            plot.getRenderer().setSeriesPaint(1, new Color(100, 100, 255)); // 自營商 藍
-            plot.getRenderer().setSeriesPaint(2, new Color(0, 180, 0)); // 外資 綠
+            plot.getRenderer().setSeriesPaint(0, new Color(0, 180, 0)); // 外資 綠
+            plot.getRenderer().setSeriesPaint(1, new Color(255, 100, 100)); // 投信 紅
+            plot.getRenderer().setSeriesPaint(2, new Color(100, 100, 255)); // 自營商 藍
 
             ChartPanel chartPanel = new ChartPanel(chart);
             chartPanel.setPreferredSize(new java.awt.Dimension(695, 400));
@@ -1718,7 +1754,6 @@ public class MainApp extends Application {
 
         resultArea.clear();
         resultArea.setText("載入中，請稍候...");
-        chartPane.setVisible(false);
 
         CompletableFuture.runAsync(() -> {
             try {
@@ -1865,7 +1900,6 @@ public class MainApp extends Application {
 
         resultArea.clear();
         resultArea.setText("載入中，請稍候...");
-        chartPane.setVisible(false);
 
         // 處裡非同步的操作，有點像是jQuery中的$.ajax(...)
         CompletableFuture.runAsync(() -> {
@@ -1978,7 +2012,6 @@ public class MainApp extends Application {
 
         resultArea.clear();
         resultArea.setText("載入中，請稍候...");
-        chartPane.setVisible(false);
 
         CompletableFuture.supplyAsync(() -> {
             try {
@@ -2068,13 +2101,13 @@ public class MainApp extends Application {
             sb.append(String.format("區間最高指數：%.2f（%s）\n", vix.maxClose(), vix.maxDate()))
             .append(String.format("區間最低指數：%.2f（%s）\n", vix.minClose(), vix.minDate()));
 
-            sb.append("\n＊恐慌指數：\n");
+            sb.append("\n＊恐慌指數\n\n");
             sb.append("是衡量市場對未來30天標準普爾500指數波動性預期的指標。它被廣泛認為是市場恐慌和不確定性的指標，並提供了關於市場風險的有力信號。\n\n");
-            sb.append("＊常態區間：\n");
+            sb.append("＊常態區間\n\n");
             sb.append("通常保持在10-20之間。\n\n");
-            sb.append("＊警戒區間：\n");
+            sb.append("＊警戒區間\n\n");
             sb.append("當超過20時，投資者應注意市場可能出現較大波動。\n\n");
-            sb.append("＊恐慌區間：\n");
+            sb.append("＊恐慌區間\n\n");
             sb.append("當超過30，尤其是40以上，市場已經進入高度恐慌階段，並可能伴隨大規模拋售和市場崩盤風險。");
 
             resultArea.setText(sb.toString());
