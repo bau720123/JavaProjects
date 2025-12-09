@@ -63,6 +63,7 @@ import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -754,6 +755,8 @@ public class MainApp extends Application {
                     LocalDate today = LocalDate.now();
                     boolean hasToday = smaList.stream().anyMatch(s -> s.date().equals(today));
                     Quote quote = service.fetchQuote(symbol, apiKey);
+                    double currentPrice = quote.closePrice(); // 使用即時價當收盤價
+                    String stockInfo = quote.name() + "（" + quote.symbol() + "）";
 
                     if (!hasToday) {
                         List<Candle> history = service.fetchHistory(symbol, days, apiKey);
@@ -764,7 +767,7 @@ public class MainApp extends Application {
                             quote.openPrice(),
                             quote.highPrice(),
                             quote.lowPrice(),
-                            quote.closePrice(), // 目前成交價當作「收盤價」
+                            currentPrice, // 目前成交價當作「收盤價」
                             0, // 今日成交量暫設為0，因為歷史K線的volume是整日總量，無法從即時報價取得
                             quote.change()
                         );
@@ -783,6 +786,29 @@ public class MainApp extends Application {
 
                             smaList.add(new SMA(today, round(sma5)));
                             smaList.sort(Comparator.comparing(SMA::date));
+                        }
+                    }
+
+                    // 彈出輸入對話框
+                    TextInputDialog dialog = createStyledInputDialog(
+                        "庫存均價查詢（可選）",
+                        "查詢 " + stockInfo + " 的 SMA 相對位置",
+                        "請輸入您的庫存均價（不輸入或填 0 則使用當前股價）："
+                    );
+
+                    Optional<String> result = dialog.showAndWait();
+                    if (result.isPresent()) {
+                        String input = result.get().trim();
+                        if (!input.isEmpty()) {
+                            try {
+                                double inputPrice = Double.parseDouble(input);
+                                if (inputPrice > 0) {
+                                    currentPrice = inputPrice;
+                                    stockInfo += "\n您的庫存均價： " + String.format("%.2f", currentPrice);
+                                }
+                            } catch (NumberFormatException ex) {
+                                // 輸入無效，維持使用當前股價
+                            }
                         }
                     }
 
@@ -815,13 +841,12 @@ public class MainApp extends Application {
                     sb.append(String.format("區間最低：%.2f（%s）\n", min, minDates.stream().map(Object::toString).collect(Collectors.joining("、"))));
 
                     // 系統建議
-                    if (quote.closePrice() != 0) {
+                    if (currentPrice != 0) {
                         double latestSMA = smaList.get(smaList.size() - 1).sma(); // 最新一筆 SMA
-                        double currentPrice = quote.closePrice(); // 使用即時價當收盤價
                         double deviationPct = (currentPrice - latestSMA) / latestSMA * 100.0; // 偏差百分比
 
                         sb.append(String.format("\n%s（" + "%s）投資建議如下\n\n", quote.name(), quote.symbol()));
-                        sb.append(String.format("當前股價：%.2f\n", currentPrice));
+                        sb.append(String.format("當前股價：%.2f\n", quote.closePrice()));
                         sb.append(String.format("偏差幅度：%.2f%% %s\n", deviationPct, deviationPct >= 0 ? "（高於均線）" : "（低於均線）"));
 
                         String signal; // 信號
@@ -847,9 +872,9 @@ public class MainApp extends Application {
                         sb.append(String.format("信號：%s\n\n", signal));
                         sb.append(advice + "\n");
                         showAlert(
-                            quote.name() + "（" + quote.symbol() + "）\n" +
+                            stockInfo + "\n" + 
                             "最新SMA（" + days + "日）：" + String.format("%.2f", latestSMA) + "\n" +
-                            "當前股價：" + currentPrice + "\n" +
+                            "當前股價：" + quote.closePrice() + "\n" +
                             "偏差幅度：" + deviationPct + "\n\n" +
                             "信號：" + signal + "\n" +
                             advice,
@@ -2241,6 +2266,25 @@ public class MainApp extends Application {
     // 重載
     private void showAlert(String message) {
         showAlert(message, AlertType.ERROR);
+    }
+
+    private TextInputDialog createStyledInputDialog(String title, String header, String content) {
+        TextInputDialog dialog = new TextInputDialog();
+        dialog.setTitle(title);
+        dialog.setHeaderText(header);
+        dialog.setContentText(content);
+
+        // 等 dialog 真正顯示出來後，再抓 Stage 設圖示
+        dialog.showingProperty().addListener((obs, wasShowing, isNowShowing) -> {
+            if (isNowShowing && !wasShowing) {
+                Stage stage = (Stage) dialog.getDialogPane().getScene().getWindow();
+                stage.getIcons().add(new Image(
+                    Objects.requireNonNull(getClass().getResourceAsStream("/icon.png"))
+                ));
+            }
+        });
+
+        return dialog;
     }
 
     // JVM 的要求：所有 Java 應用程式必須有一個 public static void main(String[] args) 作為啟動入口
