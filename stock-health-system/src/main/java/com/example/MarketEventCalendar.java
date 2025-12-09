@@ -18,9 +18,6 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import okhttp3.MediaType;
-import okhttp3.RequestBody;
-
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -39,7 +36,7 @@ public final class MarketEventCalendar {
     private static final DateTimeFormatter MONEYDJ_DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy/MM/dd");
     private static List<JsonNode> Events = null;
 
-    // ==================== 7. MoneyDJ 動態經濟事件（全域快取，只抓一次）====================
+    // MoneyDJ 動態經濟事件
     private static List<JsonNode> getMoneyDJEvents() {
         int currentYear = Year.now().getValue();
         String url = String.format("https://www.moneydj.com/us/rest/eventlist?from=%d-01-01&to=%d-12-31", currentYear, currentYear);
@@ -68,9 +65,10 @@ public final class MarketEventCalendar {
         return event.path("details").asText().contains(keyword);
     }
 
-    // ==================== 8. 美國重要經濟數據動態偵測（含財經註解）====================
-
-    /** 美國核心CPI年增率 - 最關鍵通膨指標 */
+    // 美國核心CPI年增率
+    // 影響：聯準會最重視的通膨指標，決定降息路徑
+    // 低於預期：大漲（降息希望上升）
+    // 高於預期：大跌（升息或延後降息）
     private static boolean isTodayCoreCPI() {
         return getMoneyDJEvents().stream().anyMatch(event -> {
             if (!containsDetails(event, "美國核心CPI年增率")) return false;
@@ -79,10 +77,11 @@ public final class MarketEventCalendar {
             return eventDate.equals(LocalDate.now());
         });
     }
-    // 影響：聯準會最重視的通膨指標 → 決定降息路徑
-    // 低於預期 → 大漲（降息希望上升） | 高於預期 → 大跌（升息或延後降息）
 
-    /** 美國生產者物價指數（PPI） - 上游通膨壓力 */
+    // 美國生產者物價指數（PPI）
+    // 影響：預告未來CPI走向，企業成本壓力指標
+    // 高於預期：利空（通膨頑固）
+    // 低於預期：利多
     private static boolean isTodayPPI() {
         return getMoneyDJEvents().stream().anyMatch(event -> {
             String details = event.path("details").asText();
@@ -92,10 +91,11 @@ public final class MarketEventCalendar {
             return eventDate.equals(LocalDate.now());
         });
     }
-    // 影響：預告未來CPI走向，企業成本壓力指標
-    // 高於預期 → 利空（通膨頑固） | 低於預期 → 利多
 
-    /** 美國零售銷售月增率 - 消費力晴雨表 */
+    // 美國零售銷售月增率
+    // 影響：美國70%經濟靠消費，決定「軟著陸」成敗
+    // 強於預期：利多（經濟強勁）
+    // 弱於預期：利空（衰退風險）
     private static boolean isTodayRetailSales() {
         return getMoneyDJEvents().stream().anyMatch(event -> {
             if (!containsDetails(event, "美國零售額月增率")) return false;
@@ -104,10 +104,11 @@ public final class MarketEventCalendar {
             return eventDate.equals(LocalDate.now());
         });
     }
-    // 影響：美國70%經濟靠消費，決定「軟著陸」成敗
-    // 強於預期 → 利多（經濟強勁） | 弱於預期 → 利空（衰退風險）
 
-    /** 美國初請失業金人數 - 最即時勞動市場指標 */
+    // 美國初請失業金人數
+    // 影響：每週四公布，是衰退最領先指標
+    // 低於40萬：利多
+    // 連續>45萬：重磅衰退警報
     private static boolean isTodayInitialJoblessClaims() {
         return getMoneyDJEvents().stream().anyMatch(event -> {
             if (!containsDetails(event, "申請失業救濟人數")) return false;
@@ -116,10 +117,8 @@ public final class MarketEventCalendar {
             return eventDate.equals(LocalDate.now());
         });
     }
-    // 影響：每週四公布，是衰退最領先指標
-    // 低於40萬 → 利多 | 連續>45萬 → 重磅衰退警報
 
-    /** 美國非農就業數據（NFP） */
+    // 美國非農就業數據（NFP）
     private static boolean isTodayUSNonFarmPayroll() {
         return getMoneyDJEvents().stream().anyMatch(event -> {
             if (!containsDetails(event, "美國非農業就業人數變化")) return false;
@@ -129,7 +128,7 @@ public final class MarketEventCalendar {
         });
     }
 
-    /** 美國消費者信心指數（Conference Board版） */
+    // 美國消費者信心指數
     private static boolean isTodayUSConsumerConfidence() {
         return getMoneyDJEvents().stream().anyMatch(event -> {
             if (!containsDetails(event, "美國消費者信心指數")) return false;
