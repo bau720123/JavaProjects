@@ -105,7 +105,7 @@ public class MainApp extends Application {
                 APP_VERSION = prop.getProperty("app.version", "Unknown");
             }
         } catch (IOException e) {
-            System.err.println("無法載入版本資訊: " + e.getMessage());
+            System.err.println("無法載入版本資訊：" + e.getMessage());
         }
     }
 
@@ -645,19 +645,21 @@ public class MainApp extends Application {
                     if (!hasToday) {
                         Quote quote = service.fetchQuote(symbol, apiKey); // 即時報價
 
-                        // 建立今日虛擬K棒
-                        Candle todayCandle = new Candle(
-                            today,
-                            quote.openPrice(),
-                            quote.highPrice(),
-                            quote.lowPrice(),
-                            quote.closePrice(), // 目前成交價當作「收盤價」
-                            0, // 今日成交量暫設為0，因為歷史K線的volume是整日總量，無法從即時報價取得
-                            quote.change()
-                        );
+                        if (quote.closePrice() != 0) {
+                            // 建立今日虛擬K棒
+                            Candle todayCandle = new Candle(
+                                today,
+                                quote.openPrice(),
+                                quote.highPrice(),
+                                quote.lowPrice(),
+                                quote.closePrice(), // 目前成交價當作「收盤價」
+                                0, // 今日成交量暫設為0，因為歷史K線的volume是整日總量，無法從即時報價取得
+                                quote.change()
+                            );
 
-                        candles.add(todayCandle);
-                        candles.sort(Comparator.comparing(Candle::date));
+                            candles.add(todayCandle);
+                            candles.sort(Comparator.comparing(Candle::date));
+                        }
                     }
 
                     StringBuilder sb = new StringBuilder(String.format("歷史 K 線圖已載入（近 %d 日走勢）。\n\n", candles.size()));
@@ -759,33 +761,35 @@ public class MainApp extends Application {
                     String stockInfo = quote.name() + "（" + quote.symbol() + "）";
 
                     if (!hasToday) {
-                        List<Candle> history = service.fetchHistory(symbol, days, apiKey);
+                        if (quote.closePrice() != 0) {
+                            List<Candle> history = service.fetchHistory(symbol, days, apiKey);
 
-                        // 建立今日虛擬K棒
-                        Candle todayCandle = new Candle(
-                            today,
-                            quote.openPrice(),
-                            quote.highPrice(),
-                            quote.lowPrice(),
-                            currentPrice, // 目前成交價當作「收盤價」
-                            0, // 今日成交量暫設為0，因為歷史K線的volume是整日總量，無法從即時報價取得
-                            quote.change()
-                        );
+                            // 建立今日虛擬K棒
+                            Candle todayCandle = new Candle(
+                                today,
+                                quote.openPrice(),
+                                quote.highPrice(),
+                                quote.lowPrice(),
+                                currentPrice, // 目前成交價當作「收盤價」
+                                0, // 今日成交量暫設為0，因為歷史K線的volume是整日總量，無法從即時報價取得
+                                quote.change()
+                            );
 
-                        List<Candle> fullCandles = new ArrayList<>(history);
-                        fullCandles.add(todayCandle);
-                        fullCandles.sort(Comparator.comparing(Candle::date));
+                            List<Candle> fullCandles = new ArrayList<>(history);
+                            fullCandles.add(todayCandle);
+                            fullCandles.sort(Comparator.comparing(Candle::date));
 
-                        // 計算 SMA(5)，確認資料筆數最其碼有5筆以上
-                        if (fullCandles.size() >= 5) {
-                            double sum = fullCandles.stream()
-                                .skip(Math.max(0, fullCandles.size() - 5)) // 挑最近的5筆
-                                .mapToDouble(Candle::close)
-                                .sum();
-                            double sma5 = sum / 5.0;
+                            // 計算 SMA(5)，確認資料筆數最其碼有5筆以上
+                            if (fullCandles.size() >= 5) {
+                                double sum = fullCandles.stream()
+                                    .skip(Math.max(0, fullCandles.size() - 5)) // 挑最近的5筆
+                                    .mapToDouble(Candle::close)
+                                    .sum();
+                                double sma5 = sum / 5.0;
 
-                            smaList.add(new SMA(today, round(sma5)));
-                            smaList.sort(Comparator.comparing(SMA::date));
+                                smaList.add(new SMA(today, round(sma5)));
+                                smaList.sort(Comparator.comparing(SMA::date));
+                            }
                         }
                     }
 
@@ -940,25 +944,28 @@ public class MainApp extends Application {
 
                     if (!hasToday) {
                         Quote quote = service.fetchQuote(symbol, apiKey);
-                        List<Candle> history = service.fetchHistory(symbol, days, apiKey);
 
-                        // 建立今日虛擬K棒
-                        Candle todayCandle = new Candle(
-                            today,
-                            0, 0, 0, quote.closePrice(), 0L, 0.0
-                        );
+                        if (quote.closePrice() != 0) {
+                            List<Candle> history = service.fetchHistory(symbol, days, apiKey);
 
-                        List<Candle> fullCandles = new ArrayList<>(history);
-                        fullCandles.add(todayCandle);
-                        fullCandles.sort(Comparator.comparing(Candle::date));
+                            // 建立今日虛擬K棒
+                            Candle todayCandle = new Candle(
+                                today,
+                                0, 0, 0, quote.closePrice(), 0L, 0.0
+                            );
 
-                        // 呼叫標準 Wilder RSI 計算
-                        List<RSI> calculated = calculateWilderRSI(fullCandles, 6);
+                            List<Candle> fullCandles = new ArrayList<>(history);
+                            fullCandles.add(todayCandle);
+                            fullCandles.sort(Comparator.comparing(Candle::date));
 
-                        if (!calculated.isEmpty()) {
-                            RSI todayRSI = calculated.get(calculated.size() - 1);
-                            rsiList.add(todayRSI);
-                            rsiList.sort(Comparator.comparing(RSI::date));
+                            // 呼叫標準 Wilder RSI 計算
+                            List<RSI> calculated = calculateWilderRSI(fullCandles, 6);
+
+                            if (!calculated.isEmpty()) {
+                                RSI todayRSI = calculated.get(calculated.size() - 1);
+                                rsiList.add(todayRSI);
+                                rsiList.sort(Comparator.comparing(RSI::date));
+                            }
                         }
                     }
 
@@ -1104,30 +1111,33 @@ public class MainApp extends Application {
 
                     if (!hasToday) {
                         Quote quote = service.fetchQuote(symbol, apiKey);
-                        List<Candle> history = service.fetchHistory(symbol, days, apiKey);
 
-                        // 建立今日虛擬K棒
-                        Candle todayCandle = new Candle(
-                            today,
-                            quote.openPrice(),
-                            quote.highPrice(),
-                            quote.lowPrice(),
-                            quote.closePrice(), // 目前成交價當作「收盤價」
-                            0, // 今日成交量暫設為0，因為歷史K線的volume是整日總量，無法從即時報價取得
-                            quote.change()
-                        );
+                        if (quote.closePrice() != 0) {
+                            List<Candle> history = service.fetchHistory(symbol, days, apiKey);
 
-                        List<Candle> fullCandles = new ArrayList<>(history);
-                        fullCandles.add(todayCandle);
-                        fullCandles.sort(Comparator.comparing(Candle::date));
+                            // 建立今日虛擬K棒
+                            Candle todayCandle = new Candle(
+                                today,
+                                quote.openPrice(),
+                                quote.highPrice(),
+                                quote.lowPrice(),
+                                quote.closePrice(), // 目前成交價當作「收盤價」
+                                0, // 今日成交量暫設為0，因為歷史K線的volume是整日總量，無法從即時報價取得
+                                quote.change()
+                            );
 
-                        // 呼叫標準 MACD 計算
-                        List<MACD> calculated = calculateStandardMACD(fullCandles);
+                            List<Candle> fullCandles = new ArrayList<>(history);
+                            fullCandles.add(todayCandle);
+                            fullCandles.sort(Comparator.comparing(Candle::date));
 
-                        if (!calculated.isEmpty()) {
-                            MACD todayMACD = calculated.get(calculated.size() - 1);
-                            macdList.add(todayMACD);
-                            macdList.sort(Comparator.comparing(MACD::date));
+                            // 呼叫標準 MACD 計算
+                            List<MACD> calculated = calculateStandardMACD(fullCandles);
+
+                            if (!calculated.isEmpty()) {
+                                MACD todayMACD = calculated.get(calculated.size() - 1);
+                                macdList.add(todayMACD);
+                                macdList.sort(Comparator.comparing(MACD::date));
+                            }
                         }
                     }
 
@@ -1287,16 +1297,19 @@ public class MainApp extends Application {
 
                 if (!hasToday) {
                     Quote quote = service.fetchQuote(symbol, apiKey);
-                    Candle todayCandle = new Candle(
-                        LocalDate.now(),
-                        quote.openPrice(),
-                        quote.highPrice(),
-                        quote.lowPrice(),
-                        quote.closePrice(), // 目前成交價當作「收盤價」
-                        0, // 今日成交量暫設為0，因為歷史K線的volume是整日總量，無法從即時報價取得
-                        quote.change()
-                    );
-                    candles.add(todayCandle);
+
+                    if (quote.closePrice() != 0) {
+                        Candle todayCandle = new Candle(
+                            LocalDate.now(),
+                            quote.openPrice(),
+                            quote.highPrice(),
+                            quote.lowPrice(),
+                            quote.closePrice(), // 目前成交價當作「收盤價」
+                            0, // 今日成交量暫設為0，因為歷史K線的volume是整日總量，無法從即時報價取得
+                            quote.change()
+                        );
+                        candles.add(todayCandle);
+                    }
                 }
 
                 boolean bbListHasToday = bbList.get(bbList.size() - 1).date().equals(today);
