@@ -2071,7 +2071,7 @@ public class MainApp extends Application {
                         .build();
 
                 try (Response response = client.newCall(request).execute()) {
-                    if (!response.isSuccessful()) throw new RuntimeException("HTTP " + response.code());
+                    if (!response.isSuccessful()) throw new RuntimeException("HTTP CODE：" + response.code());
 
                     JsonNode root = mapper.readTree(response.body().string());
                     JsonNode result = root.path("chart").path("result").get(0);
@@ -2114,10 +2114,10 @@ public class MainApp extends Application {
                     return new VixResult(candles, maxClose, minClose, maxDate, minDate);
 
                 } catch (Exception e) {
-                    throw new RuntimeException("VIX API 失敗: " + e.getMessage());
+                    throw new RuntimeException("VIX API 失敗：" + e.getMessage());
                 }
             } catch (Exception e) {
-                throw new RuntimeException("VIX 資料解析錯誤: " + e.getMessage());
+                throw new RuntimeException("VIX 資料解析錯誤：" + e.getMessage());
             }
         }).thenAcceptAsync(vix -> Platform.runLater(() -> {
             if (vix.candles().isEmpty()) {
