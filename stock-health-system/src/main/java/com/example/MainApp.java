@@ -571,6 +571,42 @@ public class MainApp extends Application {
             currentChartPanel = new ChartPanel(chart);
             currentChartPanel.setPreferredSize(new java.awt.Dimension(695, 400));
             swingNode.setContent(currentChartPanel);
+
+            // 模擬自動點擊 currentChartPanel
+            try {
+                Timer robotTimer = new Timer(800, e -> {
+                    try {
+                        // 強制使用 java.awt.Robot（不是 JavaFX 的！）
+                        java.awt.Robot robot = new java.awt.Robot();
+
+                        // 取得 currentChartPanel 在螢幕上的絕對位置
+                        java.awt.Point screenLoc = currentChartPanel.getLocationOnScreen();
+                        int centerX = screenLoc.x + currentChartPanel.getWidth() / 2;
+                        int centerY = screenLoc.y + currentChartPanel.getHeight() / 2;
+
+                        // 移動滑鼠到圖表中央（可見）
+                        robot.mouseMove(centerX, centerY);
+                        robot.delay(100);
+
+                        // 模擬左鍵點擊（這是 AWT 的寫法！）
+                        robot.mousePress(java.awt.event.InputEvent.BUTTON1_DOWN_MASK);
+                        robot.delay(50);
+                        robot.mouseRelease(java.awt.event.InputEvent.BUTTON1_DOWN_MASK);
+
+                        // 成功！現在 Tooltip 已被激活
+
+                    } catch (Exception ex) {
+                        System.err.println("自動激活失敗（可能無權限）：" + ex.getMessage());
+                    }
+
+                    ((Timer) e.getSource()).stop();
+                });
+                robotTimer.setRepeats(false);
+                robotTimer.start();
+
+            } catch (Exception ex) {
+                System.err.println("無法建立 AWT Robot：" + ex.getMessage());
+            }
         });
 
         return swingNode;
