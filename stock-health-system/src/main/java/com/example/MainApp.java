@@ -27,6 +27,7 @@ import org.jfree.chart.axis.CategoryAxis;
 import org.jfree.chart.axis.CategoryLabelPositions;
 import org.jfree.chart.axis.NumberTickUnit;
 import org.jfree.chart.axis.NumberAxis;
+import org.jfree.chart.labels.StandardCategoryToolTipGenerator;
 import org.jfree.chart.labels.StandardPieSectionLabelGenerator;
 import org.jfree.chart.plot.CategoryPlot;
 import org.jfree.chart.plot.PiePlot;
@@ -550,6 +551,9 @@ public class MainApp extends Application {
             renderer.setSeriesStroke(0, new BasicStroke(2.5f));
             renderer.setSeriesShapesVisible(0, true);
             renderer.setSeriesShape(0, new java.awt.geom.Ellipse2D.Double(-4, -4, 8, 8));
+            renderer.setDefaultToolTipGenerator(new StandardCategoryToolTipGenerator("{2}", NumberFormat.getInstance())); // {0}=系列名, {1}=X軸, {2}=Y值；滑鼠移過去跳出 Tooltip
+            renderer.setDefaultItemLabelsVisible(true); // 每個點上直接顯示數值
+            renderer.setSeriesItemLabelsVisible(0, true);// 讓主要線顯示數值
 
             // 設定第二條線的樣式（如果存在）
             if (secondarySeriesName != null) {
@@ -579,7 +583,7 @@ public class MainApp extends Application {
             String yPrefix,
             Color lineColor,
             ToDoubleFunction<Object> valueExtractor,
-			ToLocalDateFunction<Object> dateExtractor
+            ToLocalDateFunction<Object> dateExtractor
     ) {
         return createCommonLineChart(
             data,
@@ -1399,10 +1403,10 @@ public class MainApp extends Application {
 
             // 本地類別：索引化 OHLCDataset（避免 DateAxis）
             class IndexedOHLCDataset extends org.jfree.data.xy.AbstractXYDataset implements org.jfree.data.xy.OHLCDataset {
-                private final Comparable seriesKey = "股價";
+                private final String seriesKey = "股價";
 
                 @Override public int getSeriesCount() { return 1; }
-                @Override public Comparable getSeriesKey(int series) { return seriesKey; }
+                @Override public String getSeriesKey(int series) { return seriesKey; }
                 @Override public int getItemCount(int series) { return n; }
 
                 // X/Y as Number
