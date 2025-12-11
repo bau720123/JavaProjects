@@ -141,7 +141,22 @@ public class FedWatchService {
                         String label = targetRate + "（" + action + "）";
 
                         result.labels.add(label);
-                        result.probabilities.add(Double.parseDouble(curr.replace("%", "")));
+
+                        // 安全解析 curr，支援 "—"、" - "、空白等情況
+                        double probability;
+                        if (curr.equals("—") || curr.equals("-") || curr.isEmpty() || curr.equals("—%")) {
+                            probability = 0.0;
+                        } else {
+                            // 正常有 % 的情況（如 "77.7%"）
+                            String cleaned = curr.replace("%", "").trim();
+                            try {
+                                probability = Double.parseDouble(cleaned);
+                            } catch (NumberFormatException e) {
+                                System.err.println("無法解析的機率格式，預設為 0: " + curr);
+                                probability = 0.0;
+                            }
+                        }
+                        result.probabilities.add(probability);
 
                         result.fullText += "  目標利率：" + targetRate + "（" + action + "）\n";
                         result.fullText += "  目前概率：" + curr + "\n";
@@ -165,7 +180,7 @@ public class FedWatchService {
             return result;
 
         } catch (Exception e) {
-            result.fullText = "【聯準會利率期貨機率】抓取失敗，請稍後再試\n" + e.getMessage();
+            result.fullText = "【聯準會利率期貨機率】抓取失敗，請稍後再試：" + e.getMessage();
             return result;
         }
     }
