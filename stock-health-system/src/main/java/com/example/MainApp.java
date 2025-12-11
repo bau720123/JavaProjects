@@ -1986,7 +1986,9 @@ public class MainApp extends Application {
             );
 
             // CategoryPlot：JFreeChart 繪圖區域，處理 CategoryDataset 的線圖。
-            PiePlot plot = (PiePlot) chart.getPlot();
+            // PiePlot plot = (PiePlot) chart.getPlot();
+            @SuppressWarnings("unchecked")
+            PiePlot<String> plot = (PiePlot<String>) chart.getPlot();
 
             // 設定字型以利解決亂碼問題
             Font font = new Font("Microsoft JhengHei", Font.BOLD, 14);
