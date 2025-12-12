@@ -575,7 +575,7 @@ public class MainApp extends Application {
             // 模擬自動點擊 currentChartPanel
             try {
                 // Timer 延遲 400ms-800ms，等待 JavaFX 佈局完成，讓 ChartPanel 取得正確的螢幕座標。
-                javax.swing.Timer robotTimer = new javax.swing.Timer(400, e -> {
+                javax.swing.Timer robotTimer = new javax.swing.Timer(800, e -> {
                     try {
                         // 確保 currentChartPanel 已經在螢幕上可見且有尺寸
                         java.awt.Point screenLoc = currentChartPanel.getLocationOnScreen();
@@ -597,7 +597,7 @@ public class MainApp extends Application {
                             robot.mouseRelease(java.awt.event.InputEvent.BUTTON1_DOWN_MASK);
                             
                             // 讓滑鼠回到不會干擾圖表的位置
-                            // robot.mouseMove(centerX + 10, centerY + 10); 
+                            robot.mouseMove(centerX + 10, centerY + 10);
                             
                             // System.out.println("Robot 點擊成功，Tooltip 已激活。");
 
@@ -750,6 +750,7 @@ public class MainApp extends Application {
                     sb.append(String.format("區間最低價：%.1f（%s）\n", minLow, minLowDateStr)); // 格式化添加（%.1f 保留1位小數）
 
                     resultArea.setText(sb.toString()); // 設定完整文字
+                    resultArea.appendText(""); // 自動滾動到最底部
 
                     // K 線圖表
                     chartPane.setContent(createCommonLineChart(
@@ -927,18 +928,19 @@ public class MainApp extends Application {
 
                         sb.append(String.format("信號：%s\n\n", signal));
                         sb.append(advice + "\n");
-                        showAlert(
-                            stockInfo + "\n" + 
-                            "最新SMA（" + days + "日）：" + String.format("%.2f", latestSMA) + "\n" +
-                            "當前股價：" + quote.closePrice() + "\n" +
-                            "偏差幅度：" + deviationPct + "\n\n" +
-                            "信號：" + signal + "\n" +
-                            advice,
-                            AlertType.INFORMATION
-                        );
+                        // showAlert(
+                        //     stockInfo + "\n" + 
+                        //     "最新SMA（" + days + "日）：" + String.format("%.2f", latestSMA) + "\n" +
+                        //     "當前股價：" + quote.closePrice() + "\n" +
+                        //     "偏差幅度：" + deviationPct + "\n\n" +
+                        //     "信號：" + signal + "\n" +
+                        //     advice,
+                        //     AlertType.INFORMATION
+                        // );
                     }
 
                     resultArea.setText(sb.toString()); // 設定完整文字
+                    resultArea.appendText(""); // 自動滾動到最底部
 
                     // SMA 圖表
                     chartPane.setContent(createCommonLineChart(
@@ -1062,6 +1064,7 @@ public class MainApp extends Application {
                     sb.append("RSI 值越高，表示過去一段期間的上漲機率較大；值越小，則下跌機率較大。");
 
                     resultArea.setText(sb.toString());  // 設定完整文字
+                    resultArea.appendText(""); // 自動滾動到最底部
 
                     // MRSI 圖表
                     chartPane.setContent(createCommonLineChart(
@@ -1234,6 +1237,7 @@ public class MainApp extends Application {
                     sb.append("當移動平均線（MACD）慢慢往下交叉信號線（signalLine）時發生。這通常被視為一個賣出訊號，表示下跌趨勢可能增強。");
 
                     resultArea.setText(sb.toString());  // 設定完整文字
+                    resultArea.appendText(""); // 自動滾動到最底部
 
                     // MACD 圖表
                     chartPane.setContent(createCommonLineChart(
@@ -1411,6 +1415,7 @@ public class MainApp extends Application {
                 sb.append("＊賣出訊號：當股價觸及上軌並有回落跡象時，可能是一個賣出訊號。");
 
                 resultArea.setText(sb.toString());
+                resultArea.appendText(""); // 自動滾動到最底部
 
                 Node chartNode = createBollingerWithCandlesChart(candles, bbList);
                 chartPane.setContent(chartNode);
@@ -1955,6 +1960,7 @@ public class MainApp extends Application {
 
                 Platform.runLater(() -> {
                     resultArea.setText(finalText);
+                    resultArea.appendText(""); // 自動滾動到最底部
                     chartPane.setContent(createCommonLineChart(
                         finalNet, "外資大盤淨空單", "口數",
                         new Color(255, 140, 0),
@@ -2203,6 +2209,7 @@ public class MainApp extends Application {
             sb.append("當超過30，尤其是40以上，市場已經進入高度恐慌階段，並可能伴隨大規模拋售和市場崩盤風險。");
 
             resultArea.setText(sb.toString());
+            resultArea.appendText(""); // 自動滾動到最底部
 
             // 恐慌指數圖表
             chartPane.setContent(createCommonLineChart(
