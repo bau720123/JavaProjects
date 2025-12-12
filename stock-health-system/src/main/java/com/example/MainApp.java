@@ -44,6 +44,7 @@ import org.jsoup.select.Elements;
 
 import com.example.FugleService.Bollinger;
 import com.example.FugleService.SMA;
+import com.example.FugleService.VolumeByPrice;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -164,6 +165,11 @@ public class MainApp extends Application {
         queryBtn.setPrefWidth(120);
         queryBtn.setOnAction(e -> queryQuote());
 
+        // 查分價量表
+        Button queryVolumeBtn = new Button("查分價量表");
+        queryVolumeBtn.setPrefWidth(120);
+        queryVolumeBtn.setOnAction(e -> queryVolume());
+
         // 查歷史 K 線
         Button historyBtn = new Button("查歷史 K 線");
         historyBtn.setPrefWidth(120);
@@ -209,7 +215,7 @@ public class MainApp extends Application {
         vixBtn.setPrefWidth(120);
         vixBtn.setOnAction(e -> queryVix());
 
-        buttonBox.getChildren().addAll(queryBtn, historyBtn, smaBtn, rsiBtn, macdBtn, bollingerBtn, institutionalBtn, foreignNetBtn, fedRateBtn, vixBtn); // 添加子節點到容器的操作
+        buttonBox.getChildren().addAll(queryBtn, queryVolumeBtn, historyBtn, smaBtn, rsiBtn, macdBtn, bollingerBtn, institutionalBtn, foreignNetBtn, fedRateBtn, vixBtn); // 添加子節點到容器的操作
 
         // 用 ScrollPane 包住 buttonBox
         ScrollPane buttonScrollPane = new ScrollPane(buttonBox);
@@ -447,6 +453,100 @@ public class MainApp extends Application {
         if (price < 500)   return 0.5;
         if (price < 1000)  return 1.0;
         return 5.0;
+    }
+
+    // 查詢分價量表邏輯
+    private void queryVolume() {
+        String symbol = symbolField.getText().trim(); // 股票代號
+        String apiKey = keyField.getText().trim(); // API Key
+
+        if (symbol.isEmpty()) {
+            showAlert("請輸入 股票代號");
+            return;
+        }
+
+        if (apiKey.isEmpty()) {
+            showAlert("請輸入 Fugle API Key");
+            return;
+        }
+
+        resultArea.clear();
+        resultArea.setText("載入中，請稍候...");
+
+        // 處裡非同步的操作，有點像是jQuery中的$.ajax(...)
+        CompletableFuture.supplyAsync(() -> service.fetchVolume(symbol, apiKey))
+            .thenAccept(profile -> Platform.runLater(() -> {
+                if (profile.data() == null || profile.data().isEmpty()) {
+                    resultArea.setText("分價量表資料抓取失敗或無資料");
+                    return;
+                }
+
+                // 同時抓即時報價（取得現價、最高、最低等）
+                Quote quote = service.fetchQuote(symbol, apiKey);
+
+                // 文字顯示 + 分析
+                StringBuilder sb = new StringBuilder();
+                sb.append(String.format("日期：%s\n", profile.date()));
+                sb.append(String.format("股票代碼：%s\n股票名稱：%s\n\n開盤價：%.0f\n最高價：%.0f\n最低價：%.0f\n現價：%.0f\n\n", quote.symbol(), quote.name(), quote.openPrice(), quote.highPrice(), quote.lowPrice(), quote.closePrice()));
+
+                // 依價格高到低排序（API 通常已排序，但保險起見）
+                List<VolumeByPrice> sortedData = profile.data().stream()
+                    .sorted((a, b) -> Double.compare(b.price(), a.price()))
+                    .toList();
+
+                // 逐筆顯示
+                for (VolumeByPrice v : sortedData) {
+                    sb.append(String.format("成交價：%.1f\n累計成交量：%d\n內盤累計成交量：%d\n外盤累計成交量：%d\n\n",
+                        v.price(), v.volume(), v.volumeAtBid(), v.volumeAtAsk()));
+                }
+
+                // 科學化分析
+                sb.append("【分價量表分析】\n\n");
+                if (!sortedData.isEmpty()) {
+                    // 計算 POC (最大量價位)
+                    VolumeByPrice poc = sortedData.stream()
+                        .max(Comparator.comparingLong(VolumeByPrice::volume))
+                        .orElse(sortedData.get(0));
+
+                    double askPct = poc.volume() > 0 ? (poc.volumeAtAsk() * 100.0 / poc.volume()) : 0;
+
+                    sb.append(String.format("POC（最大成交量價位）：%.1f 元（成交 %d 張，外盤比例 %.1f%%）\n",
+                        poc.price(), poc.volume(), askPct));
+
+                    if (askPct > 70) {
+                        sb.append("\n強力支撐區！多方積極承接，建議觀察守住此價可偏多操作！\n");
+                    } else if (askPct < 30) {
+                        sb.append("\n強力壓力區！賣壓沉重，需警惕繼續下殺！\n");
+                    } else {
+                        sb.append("\n中性換手區，價格易在此震盪盤整！\n");
+                    }
+
+                    // 現價與 POC 關係
+                    double currentPrice = quote.closePrice();
+                    if (currentPrice > poc.price() * 1.005) { // 現價高於 POC 0.5%
+                        sb.append("\n現價高於 POC：多頭控盤較強，偏多格局！\n");
+                    } else if (currentPrice < poc.price() * 0.995) {
+                        sb.append("\n現價低於 POC：空頭控盤較強，偏空格局！\n");
+                    } else {
+                        sb.append("\n現價接近 POC：多空平衡，易橫盤整理！\n");
+                    }
+
+                    // 低價區內盤重警訊
+                    VolumeByPrice lowPriceZone = sortedData.stream()
+                        .filter(v -> v.price() <= quote.lowPrice() + 5) // 低檔附近
+                        .max(Comparator.comparingLong(VolumeByPrice::volumeAtBid))
+                        .orElse(null);
+                    if (lowPriceZone != null && lowPriceZone.volumeAtBid() > lowPriceZone.volumeAtAsk() * 2) {
+                        sb.append("\n低價區內盤偏重：賣壓尚未完全釋放，需注意下殺風險！\n");
+                    }
+                }
+
+                resultArea.setText(sb.toString());
+
+                // 圖表區：橫向 Volume Profile（稍後你提供截圖後再實作 JFreeChart）
+                // 暫時顯示空圖或簡單文字提示
+                // chartPane.setContent(createEmptyChartPanel());  // 或 createVolumeProfileChart(sortedData, quote);
+            }));
     }
 
     // 通用圖表
@@ -723,8 +823,8 @@ public class MainApp extends Application {
 
                     // 計算區間最高價（所有 high 的 max）和最低價（所有 low 的 min）
                     // 用 Stream API：mapToDouble(Candle::high).max().orElse(0.0) - 高效 O(n)，method reference 簡潔
-                    double maxHigh = candles.stream().mapToDouble(Candle::high).max().orElse(0.0);  // 區間最高價
-                    double minLow = candles.stream().mapToDouble(Candle::low).min().orElse(0.0);  // 區間最低價
+                    double maxHigh = candles.stream().mapToDouble(Candle::high).max().orElse(0.0); // 區間最高價
+                    double minLow = candles.stream().mapToDouble(Candle::low).min().orElse(0.0); // 區間最低價
 
                     // 找出達到最高價的所有日期，並按遞減（從最新到最舊）排序
                     List<LocalDate> maxHighDates = candles.stream()
@@ -746,8 +846,48 @@ public class MainApp extends Application {
                             .map(LocalDate::toString)
                             .collect(Collectors.joining("、"));
 
-                    sb.append(String.format("區間最高價：%.1f（%s）\n", maxHigh, maxHighDateStr)); // 格式化添加（%.1f 保留1位小數）
-                    sb.append(String.format("區間最低價：%.1f（%s）\n", minLow, minLowDateStr)); // 格式化添加（%.1f 保留1位小數）
+                    sb.append(String.format("區間觸及最高價：%.1f（%s）\n", maxHigh, maxHighDateStr)); // 格式化添加（%.1f 保留1位小數）
+                    sb.append(String.format("區間觸及最低價：%.1f（%s）\n\n", minLow, minLowDateStr)); // 格式化添加（%.1f 保留1位小數）
+
+                    // 區間單日最大漲幅與最大跌幅
+                    double maxDailyGain = candles.stream()
+                            .mapToDouble(c -> c.change()) 
+                            .max()
+                            .orElse(0.0);
+
+                    double minDailyGain = candles.stream()
+                            .mapToDouble(c -> c.change())
+                            .min()
+                            .orElse(0.0);
+
+                    // 找出最大漲幅的所有日期（從新到舊）
+                    List<LocalDate> maxGainDates = candles.stream()
+                            .filter(c -> c.change() == maxDailyGain)
+                            .map(Candle::date)
+                            .sorted(Comparator.reverseOrder())
+                            .collect(Collectors.toList());
+                    String maxGainDateStr = maxGainDates.stream()
+                            .map(LocalDate::toString)
+                            .collect(Collectors.joining("、"));
+
+                    // 找出最大跌幅的所有日期（從新到舊）
+                    List<LocalDate> minGainDates = candles.stream()
+                            .filter(c -> c.change() == minDailyGain)
+                            .map(Candle::date)
+                            .sorted(Comparator.reverseOrder())
+                            .collect(Collectors.toList());
+                    String minGainDateStr = minGainDates.stream()
+                            .map(LocalDate::toString)
+                            .collect(Collectors.joining("、"));
+
+                    // 若漲跌為 0 或無資料，顯示為 0（避免顯示 -0）
+                    String maxGainDisplay = maxDailyGain > 0 ? String.format("%.1f", maxDailyGain) : "0";
+                    String minGainDisplay = minDailyGain < 0 ? String.format("%.1f", minDailyGain) : "0";
+
+                    sb.append(String.format("區間單日最大漲幅：%s（%s）\n", 
+                        maxGainDisplay, maxGainDates.isEmpty() ? "無" : maxGainDateStr));
+                    sb.append(String.format("區間單日最大跌幅：%s（%s）\n", 
+                        minGainDisplay, minGainDates.isEmpty() ? "無" : minGainDateStr));
 
                     resultArea.setText(sb.toString()); // 設定完整文字
                     resultArea.appendText(""); // 自動滾動到最底部
@@ -2292,10 +2432,10 @@ public class MainApp extends Application {
             currentChartPanel = panel;
         });
 
-        // 直接監聽 scene + window + 延遲 400ms 強制重繪
+        // 直接監聽 scene + window + 延遲 1200ms 強制重繪
         swingNode.sceneProperty().addListener((obs, oldScene, newScene) -> {
             if (newScene != null && newScene.getWindow() != null) {
-                PauseTransition finalForce = new PauseTransition(Duration.millis(400));
+                PauseTransition finalForce = new PauseTransition(Duration.millis(1200));
                 finalForce.setOnFinished(e -> {
                     Platform.runLater(() -> {
                         SwingUtilities.invokeLater(() -> {

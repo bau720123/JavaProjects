@@ -94,6 +94,58 @@ public class FugleService {
         }
     }
 
+    // 新增 Record：單一價位資料
+    public record VolumeByPrice(
+        double price,          // 成交價
+        long volume,           // 總成交量
+        long volumeAtBid,      // 內盤量 (主動賣)
+        long volumeAtAsk       // 外盤量 (主動買)
+    ) {}
+
+    // 新增 Record：完整分價量表回應
+    public record VolumeProfile(
+        String date,
+        String type,
+        String exchange,
+        String market,
+        String symbol,
+        List<VolumeByPrice> data
+    ) {}
+
+    public VolumeProfile fetchVolume(String symbol, String apiKey) {
+        String url = "https://api.fugle.tw/marketdata/v1.0/stock/intraday/volumes/" + symbol;
+        try {
+            Request request = new Request.Builder()
+                    .url(url)
+                    .header("X-API-KEY", apiKey)
+                    .build();
+
+            try (Response response = client.newCall(request).execute()) {
+                if (response.isSuccessful() && response.body() != null) {
+                    String body = response.body().string();
+                    VolumeProfile profile = mapper.readValue(body, VolumeProfile.class);
+                    // 即使 API 成功，若 data 為 null 或空，也視為無資料
+                    if (profile.data() != null && !profile.data().isEmpty()) {
+                        return profile; // 正確資料
+                    }
+                } else {
+                    System.err.println("分價量表 API 失敗，狀態碼：" + response.code());
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Fugle 分價量表 API 例外：" + e.getMessage());
+        }
+
+        return new VolumeProfile(
+            LocalDate.now().toString(),  // date
+            "EQUITY", // type
+            "TWSE", // exchange
+            "TSE", // market
+            symbol, // symbol
+            List.of() // data 空列表
+        );
+    }
+
     public List<Candle> fetchHistory(String symbol, int days, String apiKey) {
         try {
             LocalDate to = LocalDate.now();
