@@ -493,9 +493,10 @@ public final class MarketEventCalendar {
     // CRM (Salesforce - AI CRM)
     // NOW (ServiceNow - AI 工作流)
     // SNOW (Snowflake - AI 數據倉儲)
+    // ORCL (Oracle - AI 雲端資料庫與企業級解決方案)
     private static final Set<String> IMPORTANT_AI_SYMBOLS = Set.of(
         "NVDA", "AAPL", "META", "MSFT", "GOOGL", "AMZN",
-        "TSLA", "AMD", "PLTR", "CRM", "NOW", "SNOW"
+        "TSLA", "AMD", "PLTR", "CRM", "NOW", "SNOW", "ORCL"
     );
 
     // 檢查指定日期是否有重要 AI 股財報

@@ -574,38 +574,50 @@ public class MainApp extends Application {
 
             // 模擬自動點擊 currentChartPanel
             try {
-                Timer robotTimer = new Timer(800, e -> {
+                // Timer 延遲 400ms-800ms，等待 JavaFX 佈局完成，讓 ChartPanel 取得正確的螢幕座標。
+                javax.swing.Timer robotTimer = new javax.swing.Timer(400, e -> {
                     try {
-                        // 強制使用 java.awt.Robot（不是 JavaFX 的！）
-                        java.awt.Robot robot = new java.awt.Robot();
-
-                        // 取得 currentChartPanel 在螢幕上的絕對位置
+                        // 確保 currentChartPanel 已經在螢幕上可見且有尺寸
                         java.awt.Point screenLoc = currentChartPanel.getLocationOnScreen();
-                        int centerX = screenLoc.x + currentChartPanel.getWidth() / 2;
-                        int centerY = screenLoc.y + currentChartPanel.getHeight() / 2;
+                        int width = currentChartPanel.getWidth();
+                        int height = currentChartPanel.getHeight();
+                        
+                        if (screenLoc != null && width > 0 && height > 0) {
+                            java.awt.Robot robot = new java.awt.Robot();
+                            
+                            // 定點到圖表的中心點
+                            int centerX = screenLoc.x + width / 2;
+                            int centerY = screenLoc.y + height / 2;
 
-                        // 移動滑鼠到圖表中央（可見）
-                        robot.mouseMove(centerX, centerY);
-                        robot.delay(100);
+                            // 執行 Robot 操作：移動、點擊
+                            robot.mouseMove(centerX, centerY); // 移動滑鼠到圖表中央
+                            robot.delay(50); 
+                            robot.mousePress(java.awt.event.InputEvent.BUTTON1_DOWN_MASK);
+                            robot.delay(20);
+                            robot.mouseRelease(java.awt.event.InputEvent.BUTTON1_DOWN_MASK);
+                            
+                            // 讓滑鼠回到不會干擾圖表的位置
+                            // robot.mouseMove(centerX + 10, centerY + 10); 
+                            
+                            // System.out.println("Robot 點擊成功，Tooltip 已激活。");
 
-                        // 模擬左鍵點擊（這是 AWT 的寫法！）
-                        robot.mousePress(java.awt.event.InputEvent.BUTTON1_DOWN_MASK);
-                        robot.delay(50);
-                        robot.mouseRelease(java.awt.event.InputEvent.BUTTON1_DOWN_MASK);
-
-                        // 成功！現在 Tooltip 已被激活
-
+                        } else {
+                            // System.err.println("ChartPanel 尚未取得螢幕座標或尺寸，Robot 點擊跳過。");
+                        }
+                        
                     } catch (Exception ex) {
-                        System.err.println("自動激活失敗（可能無權限）：" + ex.getMessage());
+                        System.err.println("自動激活失敗（Robot 錯誤）：" + ex.getMessage());
                     }
-
-                    ((Timer) e.getSource()).stop();
+                    
+                    // 無論成功與否，停止 Timer
+                    ((javax.swing.Timer) e.getSource()).stop();
                 });
+                
                 robotTimer.setRepeats(false);
-                robotTimer.start();
+                robotTimer.start(); // 在 Swing EDT 啟動 Timer
 
             } catch (Exception ex) {
-                System.err.println("無法建立 AWT Robot：" + ex.getMessage());
+                System.err.println("Timer 啟動失敗：" + ex.getMessage());
             }
         });
 
