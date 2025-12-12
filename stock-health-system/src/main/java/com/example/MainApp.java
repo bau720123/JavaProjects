@@ -473,46 +473,40 @@ public class MainApp extends Application {
         resultArea.clear();
         resultArea.setText("載入中，請稍候...");
 
-        // 處裡非同步的操作，有點像是jQuery中的$.ajax(...)
         CompletableFuture.supplyAsync(() -> service.fetchVolume(symbol, apiKey))
-            .thenAccept(profile -> Platform.runLater(() -> {
-                if (profile.data() == null || profile.data().isEmpty()) {
+            .thenAccept(dataList -> Platform.runLater(() -> {
+                if (dataList.isEmpty()) {
                     resultArea.setText("分價量表資料抓取失敗或無資料");
                     return;
                 }
-
-                // 同時抓即時報價（取得現價、最高、最低等）
+                
+                // 同時抓即時報價
                 Quote quote = service.fetchQuote(symbol, apiKey);
-
-                // 文字顯示 + 分析
+                
                 StringBuilder sb = new StringBuilder();
-                sb.append(String.format("日期：%s\n", profile.date()));
-                sb.append(String.format("股票代碼：%s\n股票名稱：%s\n\n開盤價：%.0f\n最高價：%.0f\n最低價：%.0f\n現價：%.0f\n\n", quote.symbol(), quote.name(), quote.openPrice(), quote.highPrice(), quote.lowPrice(), quote.closePrice()));
+                sb.append(String.format("日期：%s\n", LocalDate.now())); // 無 date 欄位，用當日
+                sb.append(String.format("股票代碼：%s\n股票名稱：%s\n\n開盤價：%.0f\n最高價：%.0f\n最低價：%.0f\n現價：%.0f\n\n",
+                    quote.symbol(), quote.name(), quote.openPrice(), quote.highPrice(), quote.lowPrice(), quote.closePrice()));
 
-                // 依價格高到低排序（API 通常已排序，但保險起見）
-                List<VolumeByPrice> sortedData = profile.data().stream()
-                    .sorted((a, b) -> Double.compare(b.price(), a.price()))
-                    .toList();
-
-                // 逐筆顯示
-                for (VolumeByPrice v : sortedData) {
+                // 依序顯示資料
+                for (VolumeByPrice v : dataList) {
                     sb.append(String.format("成交價：%.1f\n累計成交量：%d\n內盤累計成交量：%d\n外盤累計成交量：%d\n\n",
                         v.price(), v.volume(), v.volumeAtBid(), v.volumeAtAsk()));
                 }
 
                 // 科學化分析
                 sb.append("【分價量表分析】\n\n");
-                if (!sortedData.isEmpty()) {
-                    // 計算 POC (最大量價位)
-                    VolumeByPrice poc = sortedData.stream()
+                if (!dataList.isEmpty()) {
+                    // 計算 POC
+                    VolumeByPrice poc = dataList.stream()
                         .max(Comparator.comparingLong(VolumeByPrice::volume))
-                        .orElse(sortedData.get(0));
-
+                        .orElse(dataList.get(0));
+                    
                     double askPct = poc.volume() > 0 ? (poc.volumeAtAsk() * 100.0 / poc.volume()) : 0;
-
+                    
                     sb.append(String.format("POC（最大成交量價位）：%.1f 元（成交 %d 張，外盤比例 %.1f%%）\n",
                         poc.price(), poc.volume(), askPct));
-
+                    
                     if (askPct > 70) {
                         sb.append("\n強力支撐區！多方積極承接，建議觀察守住此價可偏多操作！\n");
                     } else if (askPct < 30) {
@@ -520,32 +514,29 @@ public class MainApp extends Application {
                     } else {
                         sb.append("\n中性換手區，價格易在此震盪盤整！\n");
                     }
-
+                    
                     // 現價與 POC 關係
                     double currentPrice = quote.closePrice();
-                    if (currentPrice > poc.price() * 1.005) { // 現價高於 POC 0.5%
+                    if (currentPrice > poc.price() * 1.005) {
                         sb.append("\n現價高於 POC：多頭控盤較強，偏多格局！\n");
                     } else if (currentPrice < poc.price() * 0.995) {
                         sb.append("\n現價低於 POC：空頭控盤較強，偏空格局！\n");
                     } else {
                         sb.append("\n現價接近 POC：多空平衡，易橫盤整理！\n");
                     }
-
+                    
                     // 低價區內盤重警訊
-                    VolumeByPrice lowPriceZone = sortedData.stream()
-                        .filter(v -> v.price() <= quote.lowPrice() + 5) // 低檔附近
+                    VolumeByPrice lowPriceZone = dataList.stream()
+                        .filter(v -> v.price() <= quote.lowPrice() + 5)
                         .max(Comparator.comparingLong(VolumeByPrice::volumeAtBid))
                         .orElse(null);
+                    
                     if (lowPriceZone != null && lowPriceZone.volumeAtBid() > lowPriceZone.volumeAtAsk() * 2) {
                         sb.append("\n低價區內盤偏重：賣壓尚未完全釋放，需注意下殺風險！\n");
                     }
                 }
-
+                
                 resultArea.setText(sb.toString());
-
-                // 圖表區：橫向 Volume Profile（稍後你提供截圖後再實作 JFreeChart）
-                // 暫時顯示空圖或簡單文字提示
-                // chartPane.setContent(createEmptyChartPanel());  // 或 createVolumeProfileChart(sortedData, quote);
             }));
     }
 
