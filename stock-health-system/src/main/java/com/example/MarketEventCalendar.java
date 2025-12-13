@@ -436,6 +436,7 @@ public final class MarketEventCalendar {
 
     // 單次初始化：使用 java.net.http POST 呼叫
     private static synchronized JsonNode getEarningsCalendar() {
+        // 參考網址：https://www.macromicro.me/calendar#earnings
         if (earningsCalendar != null) return earningsCalendar;
 
         try {
@@ -481,22 +482,28 @@ public final class MarketEventCalendar {
     }
 
     // 重要 AI 相關股票符號（聚焦高影響力）
-    // NVDA (NVIDIA - AI 晶片龍頭)
-    // AAPL (Apple - AI 生態整合)
-    // META (Meta - AI 廣告/生成式)
-    // MSFT (Microsoft - Azure AI)
-    // GOOGL (Alphabet - Google AI)
-    // AMZN (Amazon - AWS AI)
-    // TSLA (Tesla - 自動駕駛 AI)
-    // AMD (AMD - AI 晶片競爭者)
-    // PLTR (Palantir - AI 數據分析)
-    // CRM (Salesforce - AI CRM)
-    // NOW (ServiceNow - AI 工作流)
-    // SNOW (Snowflake - AI 數據倉儲)
-    // ORCL (Oracle - AI 雲端資料庫與企業級解決方案)
+    // NVDA（NVIDIA - AI 晶片龍頭）
+    // AAPL（Apple - AI 生態整合）
+    // META（Meta - AI 廣告/生成式）
+    // MSFT（Microsoft - Azure AI）
+    // GOOGL（Alphabet - Google AI）
+    // AMZN（Amazon - AWS AI）
+    // TSLA（Tesla - 自動駕駛 AI）
+    // AMD（AMD - AI 晶片競爭者）
+    // PLTR（Palantir - AI 數據分析）
+    // CRM（Salesforce - AI CRM）
+    // NOW（ServiceNow - AI 工作流）
+    // SNOW（Snowflake - AI 數據倉儲）
+    // ORCL（Oracle - AI 雲端資料庫與企業級解決方案）
+    // AVGO（Broadcom - AI 網路與自訂 ASIC 晶片）
+    // QCOM（Qualcomm - 邊緣 AI 與行動裝置 AI 晶片）
+    // ASML（ASML - EUV 光刻機，AI 先進製程關鍵設備）
+    // MU（Micron - 高頻寬記憶體 HBM，AI 訓練必需）
+    // INTC（Intel - AI 晶片與晶圓代工競爭者）
     private static final Set<String> IMPORTANT_AI_SYMBOLS = Set.of(
         "NVDA", "AAPL", "META", "MSFT", "GOOGL", "AMZN",
-        "TSLA", "AMD", "PLTR", "CRM", "NOW", "SNOW", "ORCL"
+        "TSLA", "AMD", "PLTR", "CRM", "NOW", "SNOW",
+        "ORCL", "AVGO", "QCOM", "ASML", "MU", "INTC"
     );
 
     // 檢查指定日期是否有重要 AI 股財報
