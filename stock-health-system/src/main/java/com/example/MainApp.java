@@ -572,7 +572,7 @@ public class MainApp extends Application {
             double maxValue = Double.NEGATIVE_INFINITY;
 
             // 迴圈填充 dataset：從 data List 迭代，每個 data 轉日期字符串 + 收盤價。
-            // 目的：建 X=日期類別，Y=close 數值系列 "收盤價走勢"。
+            // 目的：建 X=日期類別，Y=close 數值系列 "歷史股價資訊"。
             for (int i = 0; i < data.size(); i++) {
                 Object item = data.get(i); // 取得單日資料記錄
                 double value = valueExtractor.applyAsDouble(item);
@@ -627,8 +627,8 @@ public class MainApp extends Application {
             double padding = (maxValue - minValue) * 0.05;
             if (padding == 0) padding = maxValue * 0.1;
 
-            // if (titlePrefix.contains("RSI")) {
-            if ("RSI 指標" .equals(titlePrefix)) {
+            // if (titlePrefix.contains("相對強弱指數")) {
+            if ("相對強弱指數" .equals(titlePrefix)) {
                 minValue = 0;
                 maxValue = 100;
             }
@@ -664,7 +664,7 @@ public class MainApp extends Application {
             swingNode.setContent(currentChartPanel);
 
             // 模擬自動點擊 currentChartPanel
-            try {
+            /*try {
                 // Timer 延遲 400ms-800ms，等待 JavaFX 佈局完成，讓 ChartPanel 取得正確的螢幕座標。
                 javax.swing.Timer robotTimer = new javax.swing.Timer(800, e -> {
                     try {
@@ -709,7 +709,7 @@ public class MainApp extends Application {
 
             } catch (Exception ex) {
                 System.err.println("Timer 啟動失敗：" + ex.getMessage());
-            }
+            }*/
         });
 
         return swingNode;
@@ -886,7 +886,7 @@ public class MainApp extends Application {
                     // K 線圖表
                     chartPane.setContent(createCommonLineChart(
                         candles,
-                        "收盤價走勢",
+                        "歷史股價資訊",
                         "價格",
                         Color.RED,
                         obj -> ((Candle) obj).close(),
@@ -1076,8 +1076,8 @@ public class MainApp extends Application {
                     // SMA 圖表
                     chartPane.setContent(createCommonLineChart(
                         smaList,
-                        "SMA 指標",
-                        "價格",
+                        "簡單移動平均線",
+                        "SMA",
                         Color.ORANGE,
                         obj -> ((SMA) obj).sma(),
                         obj -> ((SMA) obj).date() // 直接回傳 LocalDate
@@ -1200,7 +1200,7 @@ public class MainApp extends Application {
                     // MRSI 圖表
                     chartPane.setContent(createCommonLineChart(
                         rsiList,
-                        "RSI 指標",
+                        "相對強弱指數",
                         "RSI（0-100）",
                         Color.MAGENTA,
                         obj -> ((RSI) obj).rsi(),
