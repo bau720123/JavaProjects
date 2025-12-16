@@ -775,7 +775,7 @@ public class MainApp extends Application {
 
             // CategoryAxis：X 軸類別軸，處理日期標籤位置。
             CategoryAxis domainAxis = (CategoryAxis) plot.getDomainAxis();
-            domainAxis.setCategoryLabelPositions(CategoryLabelPositions.UP_45); // 日期標籤垂直顯示（UP_90），避免擁擠（依需調整為 STANDARD 或 DOWN_90）
+            domainAxis.setCategoryLabelPositions(CategoryLabelPositions.UP_90); // 日期標籤垂直顯示（UP_90），避免擁擠（依需調整為 STANDARD 或 DOWN_90）
 
             // 建立 ChartPanel 並設定大小
             currentChartPanel = new ChartPanel(chart);
@@ -2439,113 +2439,77 @@ public class MainApp extends Application {
         resultArea.setText("載入中，請稍候...");
 
         CompletableFuture.supplyAsync(() -> {
-            try {
-                LocalDate today = LocalDate.now();
-                LocalDate startDate = today.minusDays(days);
+            YahooFinanceService yahooService = new YahooFinanceService();
+            List<YahooFinanceService.YahooCandle> candles = yahooService.fetchHistory("^VIX", days);
 
-                long period1 = startDate.atStartOfDay(ZoneId.of("UTC")).toEpochSecond();
-                long period2 = today.plusDays(1).atStartOfDay(ZoneId.of("UTC")).toEpochSecond();
-
-                String url = String.format(
-                    "https://query1.finance.yahoo.com/v8/finance/chart/%%5EVIX" +
-                    "?period1=%d&period2=%d&interval=1d&events=history&includeAdjustedClose=true",
-                    period1, period2
-                );
-
-                Request request = new Request.Builder()
-                        .url(url)
-                        .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
-                        .build();
-
-                try (Response response = client.newCall(request).execute()) {
-                    if (!response.isSuccessful()) throw new RuntimeException("HTTP CODE：" + response.code());
-
-                    JsonNode root = mapper.readTree(response.body().string());
-                    JsonNode result = root.path("chart").path("result").get(0);
-                    JsonNode timestamps = result.path("timestamp");
-                    JsonNode meta = result.path("meta");
-                    JsonNode opens = result.path("indicators").path("quote").get(0).path("open");
-                    JsonNode highs = result.path("indicators").path("quote").get(0).path("high");
-                    JsonNode lows = result.path("indicators").path("quote").get(0).path("low");
-                    JsonNode closes = result.path("indicators").path("quote").get(0).path("close");
-
-                    List<VixCandle> candles = new ArrayList<>();
-                    double maxClose = Double.MIN_VALUE;
-                    double minClose = Double.MAX_VALUE;
-                    LocalDate maxDate = null, minDate = null;
-
-                    for (int i = 0; i < timestamps.size(); i++) {
-                        long ts = timestamps.get(i).asLong();
-                        LocalDate date = LocalDate.ofInstant(Instant.ofEpochSecond(ts), ZoneId.of("UTC"));
-
-                        double o = opens.get(i).asDouble(0);
-                        double h = highs.get(i).asDouble(0);
-                        double l = lows.get(i).asDouble(0);
-                        double c = closes.get(i).asDouble(0);
-
-                        if (o > 0 && h > 0 && l > 0 && c > 0 && date.isBefore(today.plusDays(1))) {
-                            candles.add(new VixCandle(date, o, h, l, c));
-                            if (c > maxClose) { maxClose = c; maxDate = date; }
-                            if (c < minClose) { minClose = c; minDate = date; }
-                        }
-                    }
-
-                    // 補今日即時價（若無收盤）
-                    double realtime = meta.path("regularMarketPrice").asDouble();
-                    if (realtime > 0 && (candles.isEmpty() || !candles.get(candles.size()-1).date().equals(today))) {
-                        candles.add(new VixCandle(today, realtime, realtime, realtime, realtime));
-                        if (realtime > maxClose) { maxClose = realtime; maxDate = today; }
-                        if (realtime < minClose) { minClose = realtime; minDate = today; }
-                    }
-
-                    return new VixResult(candles, maxClose, minClose, maxDate, minDate);
-
-                } catch (Exception e) {
-                    throw new RuntimeException("VIX API 失敗：" + e.getMessage());
-                }
-            } catch (Exception e) {
-                throw new RuntimeException("VIX 資料解析錯誤：" + e.getMessage());
+            if (candles.isEmpty()) {
+                throw new RuntimeException("無法取得 VIX 資料，請檢查網路或稍後再試");
             }
-        }).thenAcceptAsync(vix -> Platform.runLater(() -> {
-            if (vix.candles().isEmpty()) {
-                showAlert("無法取得 VIX 資料，請檢查網路");
-                return;
-            }
+
+            // 直接在背景執行緒計算統計值
+            double maxClose = candles.stream().mapToDouble(c -> c.close()).max().orElse(0.0);
+            double minClose = candles.stream().mapToDouble(c -> c.close()).min().orElse(0.0);
+
+            YahooFinanceService.YahooCandle maxCandle = candles.stream()
+                    .max(Comparator.comparingDouble(c -> c.close()))
+                    .orElse(candles.get(0));
+            YahooFinanceService.YahooCandle minCandle = candles.stream()
+                    .min(Comparator.comparingDouble(c -> c.close()))
+                    .orElse(candles.get(0));
+
+            // 用 Map 包裝傳回 UI 執行緒（避免自訂 record）
+            return Map.of(
+                "candles", candles,
+                "maxClose", maxClose,
+                "minClose", minClose,
+                "maxDate", maxCandle.date(),
+                "minDate", minCandle.date()
+            );
+
+        }).thenAcceptAsync(resultMap -> Platform.runLater(() -> {
+            @SuppressWarnings("unchecked")
+            List<YahooFinanceService.YahooCandle> candles =
+                    (List<YahooFinanceService.YahooCandle>) resultMap.get("candles");
+            double maxClose = (double) resultMap.get("maxClose");
+            double minClose = (double) resultMap.get("minClose");
+            LocalDate maxDate = (LocalDate) resultMap.get("maxDate");
+            LocalDate minDate = (LocalDate) resultMap.get("minDate");
 
             StringBuilder sb = new StringBuilder();
-            sb.append("VIX 恐慌指數 線圖已載入（近 ").append(vix.candles().size()).append(" 日走勢）。\n\n");
+            sb.append("VIX 恐慌指數 線圖已載入（近 ").append(candles.size()).append(" 日走勢）。\n\n");
 
-            for (VixCandle c : vix.candles()) {
+            // 直接使用 YahooFinanceService.YahooCandle 迭代
+            for (YahooFinanceService.YahooCandle c : candles) {
                 sb.append(String.format("日期：%s\n", c.date()))
-                .append(String.format("開盤指數：%.2f\n", c.open()))
-                .append(String.format("最高指數：%.2f\n", c.high()))
-                .append(String.format("最低指數：%.2f\n", c.low()))
-                .append(String.format("收盤指數：%.2f\n\n", c.close()));
+                  .append(String.format("開盤指數：%.2f\n", c.open()))
+                  .append(String.format("最高指數：%.2f\n", c.high()))
+                  .append(String.format("最低指數：%.2f\n", c.low()))
+                  .append(String.format("收盤指數：%.2f\n\n", c.close()));
             }
 
-            sb.append(String.format("區間最高指數：%.2f（%s）\n", vix.maxClose(), vix.maxDate()))
-            .append(String.format("區間最低指數：%.2f（%s）\n", vix.minClose(), vix.minDate()));
+            sb.append(String.format("區間最高指數：%.2f（%s）\n", maxClose, maxDate))
+              .append(String.format("區間最低指數：%.2f（%s）\n", minClose, minDate));
 
-            sb.append("\n＊恐慌指數\n\n");
-            sb.append("是衡量市場對未來30天標準普爾500指數波動性預期的指標。它被廣泛認為是市場恐慌和不確定性的指標，並提供了關於市場風險的有力信號。\n\n");
-            sb.append("＊常態區間\n\n");
-            sb.append("通常保持在10-20之間。\n\n");
-            sb.append("＊警戒區間\n\n");
-            sb.append("當超過20時，投資者應注意市場可能出現較大波動。\n\n");
-            sb.append("＊恐慌區間\n\n");
-            sb.append("當超過30，尤其是40以上，市場已經進入高度恐慌階段，並可能伴隨大規模拋售和市場崩盤風險。");
+            sb.append("\n＊恐慌指數\n\n")
+              .append("是衡量市場對未來30天標準普爾500指數波動性預期的指標。它被廣泛認為是市場恐慌和不確定性的指標，並提供了關於市場風險的有力信號。\n\n")
+              .append("＊常態區間\n\n")
+              .append("通常保持在10-20之間。\n\n")
+              .append("＊警戒區間\n\n")
+              .append("當超過20時，投資者應注意市場可能出現較大波動。\n\n")
+              .append("＊恐慌區間\n\n")
+              .append("當超過30，尤其是40以上，市場已經進入高度恐慌階段，並可能伴隨大規模拋售和市場崩盤風險。");
 
             resultArea.setText(sb.toString());
             resultArea.appendText(""); // 自動滾動到最底部
 
             // 恐慌指數圖表
             chartPane.setContent(createCommonLineChart(
-                vix.candles(), // 資料來源
+                candles, // 資料來源
                 "VIX",
                 "恐慌指數",
                 new Color(178, 34, 34),
-                candle -> ((VixCandle) candle).close(),
-                candle -> ((VixCandle) candle).date() // 直接回傳 LocalDate
+                candle -> ((YahooFinanceService.YahooCandle) candle).close(),
+                candle -> ((YahooFinanceService.YahooCandle) candle).date()
             ));
             resizeChartProportionally(); // 改用統一的等比例縮放方法
 
@@ -2554,10 +2518,6 @@ public class MainApp extends Application {
             return null;
         });
     }
-
-    // 輔助 record
-    record VixCandle(LocalDate date, double open, double high, double low, double close) {}
-    record VixResult(List<VixCandle> candles, double maxClose, double minClose, LocalDate maxDate, LocalDate minDate) {}
 
     // 等比例調整圖表尺寸（統一方法，避免程式碼重複）
     // 參數：無（自動從 scene 和 chartPane 讀取當前尺寸）
