@@ -999,28 +999,51 @@ public class MainApp extends Application {
                     sb.append(String.format("區間單日最大跌幅：%s（%s）\n", 
                         minGainDisplay, minGainDates.isEmpty() ? "無" : minGainDateStr));
 
-                    // === 新增：量價背離偵測（僅文字提醒，需至少30筆資料） ===
-                    if (candles.size() >= 30) {
-                        sb.append("\n【量價背離分析】\n");
+                    // 量價背離
+                    sb.append("\n＊什麼是量價背離＊\n\n");
+                    sb.append("量價背離是技術分析中最經典的反轉訊號之一，指價格走勢與成交量走勢方向相反，代表趨勢動能減弱，容易出現轉折。\n\n");
+                    sb.append("常見兩種型態：\n\n");
 
-                        int maxHighIndex = -1;  // 記錄第一次出現創高的索引（最舊）
-                        int minLowIndex = -1;   // 記錄第一次出現創低的索引（最舊）
+                    sb.append("＊頂背離（漲勢末期，最常見的空頭訊號）\n\n");
+                    sb.append("價格創新高（或持續上漲），但成交量卻縮小（或無法放大）。\n\n");
+                    sb.append("意思：追價買盤意願減弱，雖然價格還在漲，但缺乏量能支撐，主力可能在出貨。\n\n");
+                    sb.append("例子：股價連續拉紅K創新高，但每天成交量越來越小 → 後續容易回落或反轉下跌。\n\n");
+
+                    sb.append("＊底背離（跌勢末期，多頭訊號）\n\n");
+                    sb.append("價格創新低（或持續下跌），但成交量卻縮小（賣壓減弱）。\n\n");
+                    sb.append("意思：殺盤力量衰竭，雖然價格還在跌，但沒人願意再賣 → 容易反彈或止跌。\n\n");
+                    sb.append("例子：指數連續重挫，但成交量從天量變地量 → 常是底部訊號。\n\n");
+
+                    sb.append("【量價背離分析如下】\n");
+                    if (candles.size() >= 30) {
+                        int maxHighIndex = -1; // 頂背離：第一次出現（最舊）
                         long maxHighVolume = 0;
+
+                        // 底背離改用：從最後往前找第一個 volume > 0 的創低日
+                        int minLowIndex = -1;
                         long minLowVolume = 0;
 
+                        // 先找頂背離（維持原邏輯：最舊的那次創高）
                         for (int i = 0; i < candles.size(); i++) {
                             Candle c = candles.get(i);
                             if (c.high() == maxHigh && maxHighIndex == -1) {
                                 maxHighIndex = i;
                                 maxHighVolume = c.volume();
-                            }
-                            if (c.low() == minLow && minLowIndex == -1) {
-                                minLowIndex = i;
-                                minLowVolume = c.volume();
+                                break; // 只取第一次
                             }
                         }
 
-                        // 計算全區間平均成交量（避免極端值過度影響）
+                        // 底背離優化：從後往前找（最新優先，且 volume > 0）
+                        for (int i = candles.size() - 1; i >= 0; i--) {
+                            Candle c = candles.get(i);
+                            if (c.low() == minLow && c.volume() > 0) {
+                                minLowIndex = i;
+                                minLowVolume = c.volume();
+                                break; // 找到就停止（最新有量的創低日）
+                            }
+                        }
+
+                        // 計算全區間平均成交量
                         long avgVolume = (long) candles.stream()
                                 .mapToLong(Candle::volume)
                                 .average()
@@ -1028,32 +1051,30 @@ public class MainApp extends Application {
 
                         boolean hasDivergence = false;
 
-                        // 頂背離：創區間新高時，該日成交量明顯低於平均（<70%）
+                        // 頂背離
                         if (maxHighIndex != -1 && avgVolume > 0 && maxHighVolume < avgVolume * 0.7) {
                             LocalDate maxHighDate = candles.get(maxHighIndex).date();
-                            sb.append(String.format("⚠️ 頂背離警訊：%s 觸及區間最高價 %.1f，但成交量 %,d 僅為平均 %,d 的 %.0f%%（量縮明顯，追價動能不足）\n",
+                            sb.append(String.format("頂背離警訊：%s 觸及區間最高價 %.1f，但成交量 %,d 僅為平均 %,d 的 %.0f%%（量縮明顯，追價動能不足）\n",
                                     maxHighDate, maxHigh, maxHighVolume, avgVolume,
                                     (maxHighVolume * 100.0 / avgVolume)));
                             hasDivergence = true;
                         }
 
-                        // 底背離：創區間新低時，該日成交量明顯低於平均（<70%）
+                        // 底背離
                         if (minLowIndex != -1 && avgVolume > 0 && minLowVolume < avgVolume * 0.7) {
                             LocalDate minLowDate = candles.get(minLowIndex).date();
-                            sb.append(String.format("⚠️ 底背離警訊：%s 觸及區間最低價 %.1f，但成交量 %,d 僅為平均 %,d 的 %.0f%%（量縮明顯，賣壓衰竭）\n",
+                            sb.append(String.format("底背離警訊：%s 觸及區間最低價 %.1f，但成交量 %,d 僅為平均 %,d 的 %.0f%%（量縮明顯，賣壓衰竭）\n",
                                     minLowDate, minLow, minLowVolume, avgVolume,
                                     (minLowVolume * 100.0 / avgVolume)));
                             hasDivergence = true;
                         }
 
-                        // 若無明顯背離
                         if (!hasDivergence) {
                             sb.append("區間內無明顯量價背離現象（量價配合正常）。\n");
                         }
-
-                        sb.append("(偵測範圍：全部載入資料，僅供參考)\n");
+                    } else {
+                        sb.append("目前數據不夠，請讓資料面最其碼超過30天");
                     }
-                    // === 量價背離偵測結束 ===
 
                     resultArea.setText(sb.toString()); // 設定完整文字
                     resultArea.appendText(""); // 自動滾動到最底部

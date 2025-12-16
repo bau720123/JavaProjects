@@ -16,3 +16,7 @@ Thumbs.db
 
 # XML
 dependency-reduced-pom.xml
+
+# TEST
+bin/
+src/test
