@@ -50,11 +50,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import org.jfree.chart.renderer.category.BarRenderer;
 import org.jfree.chart.renderer.category.LineAndShapeRenderer;
+import org.jfree.chart.renderer.category.StackedBarRenderer;
+import org.jfree.chart.renderer.category.StandardBarPainter;
 import org.jfree.chart.renderer.xy.CandlestickRenderer;
 import org.jfree.chart.renderer.xy.XYLineAndShapeRenderer;
 
 import java.awt.Font;
 import java.awt.Color;
+import java.text.DecimalFormat;
 import java.text.NumberFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -537,7 +540,100 @@ public class MainApp extends Application {
                 }
                 
                 resultArea.setText(sb.toString());
+                chartPane.setContent(createVolumeProfileChart(dataList, quote));
             }));
+    }
+
+    // 分價量表圖
+    private Node createVolumeProfileChart(List<VolumeByPrice> dataList, Quote quote) {
+        System.out.println("dataList：" + dataList);
+        System.out.println("quote：" + quote);
+
+        SwingNode swingNode = new SwingNode();
+
+        SwingUtilities.invokeLater(() -> {
+            // === 新增：宣告 DecimalFormat，用來統一價格格式並避免浮點誤差 ===
+            DecimalFormat df = new DecimalFormat("#0.0");  // 強制顯示一位小數，如 915.0
+
+            DefaultCategoryDataset dataset = new DefaultCategoryDataset();
+
+            long maxVolume = dataList.stream()
+                    .mapToLong(VolumeByPrice::volume)
+                    .max()
+                    .orElse(1000L);
+            double xMax = maxVolume * 1.3;  // 多留空間
+
+            // 填資料：外盤黃、內盤灰
+            for (VolumeByPrice v : dataList) {
+                String priceKey = df.format(v.price());  // 這裡使用 df，統一格式
+                dataset.addValue(v.volumeAtAsk(), "外盤", priceKey);
+                dataset.addValue(v.volumeAtBid(), "內盤", priceKey);
+            }
+
+            JFreeChart chart = ChartFactory.createStackedBarChart(
+                null, "", "成交量", dataset,
+                PlotOrientation.HORIZONTAL, false, true, false
+            );
+
+            CategoryPlot plot = chart.getCategoryPlot();
+            plot.setBackgroundPaint(new Color(30, 30, 30));
+            plot.setRangeGridlinePaint(new Color(80, 80, 80));
+
+            StackedBarRenderer renderer = (StackedBarRenderer) plot.getRenderer();
+            renderer.setDefaultStroke(new BasicStroke(1.5f));
+            renderer.setSeriesPaint(0, new Color(255, 230, 0));   // 外盤：亮黃
+            renderer.setSeriesPaint(1, new Color(200, 200, 200)); // 內盤：淺灰
+            renderer.setBarPainter(new StandardBarPainter());
+
+            // === 強制顯示所有價位標籤 ===
+            CategoryAxis domainAxis = plot.getDomainAxis();
+            domainAxis.setCategoryMargin(0.1);
+            domainAxis.setLowerMargin(0.02);
+            domainAxis.setUpperMargin(0.02);
+            domainAxis.setTickLabelFont(new Font("Microsoft JhengHei", Font.BOLD, 15));
+            domainAxis.setTickLabelsVisible(true);
+
+            // 標記 高 / 開 / 現 + 顏色
+            for (VolumeByPrice v : dataList) {
+                String key = df.format(v.price());
+
+                if (Math.abs(v.price() - quote.highPrice()) < 0.1) {
+                    domainAxis.setTickLabelPaint(key, Color.RED);
+                } else if (Math.abs(v.price() - quote.openPrice()) < 0.1) {
+                    domainAxis.setTickLabelPaint(key, Color.CYAN);
+                } else if (Math.abs(v.price() - quote.closePrice()) < 0.1) {
+                    domainAxis.setTickLabelPaint(key, Color.GREEN);
+                    // 現價整條變藍色高亮
+                    renderer.setSeriesPaint(0, new Color(50, 180, 255));   // 外盤藍
+                    renderer.setSeriesPaint(1, new Color(120, 200, 255));  // 內盤淡藍
+                } else {
+                    domainAxis.setTickLabelPaint(key, Color.WHITE);
+                }
+            }
+
+            // X軸：成交量標題明確顯示
+            NumberAxis rangeAxis = (NumberAxis) plot.getRangeAxis();
+            rangeAxis.setLabel("成交量");
+            rangeAxis.setLabelFont(new Font("Microsoft JhengHei", Font.BOLD, 16));
+            rangeAxis.setLabelPaint(Color.WHITE);
+            rangeAxis.setTickLabelFont(new Font("Microsoft JhengHei", Font.PLAIN, 14));
+            rangeAxis.setRange(0, xMax);
+
+            ChartPanel chartPanel = new ChartPanel(chart);
+            chartPanel.setPreferredSize(new java.awt.Dimension(695, 400));
+
+            swingNode.setContent(chartPanel);
+            currentChartPanel = chartPanel;
+
+            Timer timer = new Timer(300, e -> {
+                chartPanel.revalidate();
+                chartPanel.repaint();
+                ((Timer) e.getSource()).stop();
+            });
+            timer.start();
+        });
+
+        return swingNode;
     }
 
     // 通用圖表
