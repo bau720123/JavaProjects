@@ -204,6 +204,15 @@
                             <!-- true: 安裝時會在桌面建立捷徑 -->
                             <!-- false: 不建立桌面捷徑 -->
 
+                            <!-- Windows 升級設定 -->
+                            <winUpgradeUuid>0c925faa-38fc-4db1-ab84-e9b8bf41710c</winUpgradeUuid>
+                            <!-- 
+                                重要！這個 UUID 必須：
+                                1. 所有版本都用同一個 UUID
+                                2. 格式固定: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+                                3. 可用線上工具生成: https://www.uuidgenerator.net/
+                            -->
+
                             <winMenu>true</winMenu>
                             <!-- 是否在開始選單建立捷徑 -->
                             <!-- true: 會在 Windows 開始選單建立程式捷徑 -->
