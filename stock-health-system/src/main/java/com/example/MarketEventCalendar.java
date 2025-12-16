@@ -410,6 +410,7 @@ public final class MarketEventCalendar {
         LocalDate thirdWednesday = firstWednesday.plusDays(14);
         return date.equals(thirdWednesday);
     }
+
     // 美股四巫日：3、6、9、12 月第三個星期五
     public static boolean isUSQuadrupleWitchingDay(LocalDate date) {
         int month = date.getMonthValue();
