@@ -11,7 +11,9 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Set;
 import java.util.HashSet;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.function.BiFunction;
 
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -149,8 +151,23 @@ public final class MarketEventCalendar {
         if (isUSQuadrupleWitchingDay(today)) {
             sb.append("今天是美股四巫日（Quadruple Witching）！成交量爆衝，隔週一台股易受影響\n");
         }
-        if (shouldRemindUSEarnings(today)) {
-            sb.append("近期有重要美股財報！（NVDA、AAPL、META等），請注意相關交易波動\n");
+
+        // 偵測財報
+        List<EarningsInfo> earnings = getUpcomingImportantEarnings(LocalDate.now());
+        if (!earnings.isEmpty()) {
+            sb.append("近期有重要美股財報！\n\n");
+
+            // 按日期排序，讓相同日期的股票集中顯示
+            earnings.stream()
+                    .sorted(Comparator.comparing(EarningsInfo::date).thenComparing(EarningsInfo::symbol))
+                    .forEach(e -> {
+                        sb.append("日期：")
+                        .append(e.date.format(DateTimeFormatter.ISO_LOCAL_DATE) + "\n")
+                        .append("股票名稱：")
+                        .append(e.symbol + "\n\n");
+                    });
+
+            sb.append("請注意相關交易波動\n");
         }
 
         // 美國經濟數據動態提醒（MoneyDJ）
@@ -406,31 +423,6 @@ public final class MarketEventCalendar {
         return date.equals(thirdFriday);
     }
 
-    // 美國科技股重要財報
-    public static boolean shouldRemindUSEarnings(LocalDate taiwanDate) {
-        JsonNode calendar = getEarningsCalendar();
-        JsonNode items = calendar.path("calendarItems");
-        if (items.isMissingNode() || items.isEmpty()) return false;
-
-        LocalDate tomorrow = taiwanDate.plusDays(1); // 明天
-        LocalDate dayAfterTomorrow = taiwanDate.plusDays(2); // 後天
-
-        // 今天有財報（當天盤後）
-        if (hasImportantEarnings(items, taiwanDate)) return true;
-
-        // 明天有財報（今晚盤後）
-        if (hasImportantEarnings(items, tomorrow)) return true;
-
-        // 如果明天是 星期六 (6) 或 星期日 (7) → 也就是「明天是週末」
-        // 這時就要檢查「後天」有沒有財報（因為週一開盤前會公布）
-        int dow = tomorrow.getDayOfWeek().getValue();
-        if ((dow == 6 || dow == 7) && hasImportantEarnings(items, dayAfterTomorrow)) {
-            return true;
-        }
-
-        return false;
-    }
-
     // 快取：MacroMicro API 回應（只呼叫一次）
     private static JsonNode earningsCalendar = null;
 
@@ -506,13 +498,44 @@ public final class MarketEventCalendar {
         "ORCL", "AVGO", "QCOM", "ASML", "MU", "INTC"
     );
 
-    // 檢查指定日期是否有重要 AI 股財報
-    private static boolean hasImportantEarnings(JsonNode items, LocalDate targetDate) {
+    // 在 class 內部新增一個私有記錄類（放在類別最下方或適當位置）
+    private static record EarningsInfo(String symbol, LocalDate date) {}
+
+    // 回傳所有即將影響的財報資訊
+    public static List<EarningsInfo> getUpcomingImportantEarnings(LocalDate taiwanDate) {
+        List<EarningsInfo> allEarnings = new ArrayList<>();
+
+        JsonNode calendar = getEarningsCalendar();
+        JsonNode items = calendar.path("calendarItems");
+        if (items.isMissingNode() || items.isEmpty()) {
+            return allEarnings;
+        }
+
+        LocalDate tomorrow = taiwanDate.plusDays(1); // 明天
+        LocalDate dayAfterTomorrow = taiwanDate.plusDays(2); // 後天
+
+        // 檢查今天（盤後公布）
+        allEarnings.addAll(findImportantEarnings(items, taiwanDate));
+
+        // 檢查明天（今晚盤後公布）
+        allEarnings.addAll(findImportantEarnings(items, tomorrow));
+
+        // 若明天是週末，則檢查後天（週一開盤前公布）
+        int dow = tomorrow.getDayOfWeek().getValue();
+        if ((dow == 6 || dow == 7)) { // 週六或週日
+            allEarnings.addAll(findImportantEarnings(items, dayAfterTomorrow));
+        }
+
+        return allEarnings;
+    }
+
+    // 搜尋重要的公司財報
+    private static List<EarningsInfo> findImportantEarnings(JsonNode items, LocalDate targetDate) {
+        List<EarningsInfo> found = new ArrayList<>();
         String dateKey = targetDate.format(DateTimeFormatter.ISO_LOCAL_DATE);
 
-        // 如果該日期根本沒有 key，表示那天沒有財報，直接返回 false
         if (!items.has(dateKey)) {
-            return false;
+            return found; // 空列表
         }
 
         JsonNode dayItems = items.get(dateKey);
@@ -520,11 +543,10 @@ public final class MarketEventCalendar {
             for (JsonNode item : dayItems) {
                 String symbol = item.path("symbol").asText();
                 if (IMPORTANT_AI_SYMBOLS.contains(symbol)) {
-                    System.out.println("[Earnings] 偵測到重要 AI 股財報：" + symbol + " @ " + dateKey);
-                    return true;
+                    found.add(new EarningsInfo(symbol, targetDate));
                 }
             }
         }
-        return false;
+        return found;
     }
 }

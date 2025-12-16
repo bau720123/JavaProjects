@@ -540,21 +540,20 @@ public class MainApp extends Application {
                 }
                 
                 resultArea.setText(sb.toString());
+
+                // 分價量圖
                 chartPane.setContent(createVolumeProfileChart(dataList, quote));
+                resizeChartProportionally(); // 改用統一的等比例縮放方法
             }));
     }
 
     // 分價量表圖
     private Node createVolumeProfileChart(List<VolumeByPrice> dataList, Quote quote) {
-        System.out.println("dataList：" + dataList);
-        System.out.println("quote：" + quote);
-
         SwingNode swingNode = new SwingNode();
 
         SwingUtilities.invokeLater(() -> {
-            // === 新增：宣告 DecimalFormat，用來統一價格格式並避免浮點誤差 ===
-            DecimalFormat df = new DecimalFormat("#0.0");  // 強制顯示一位小數，如 915.0
-
+            // DefaultCategoryDataset：JFreeChart 的資料集類別，用於類別型資料（如 X=日期字符串，Y=數值），支援多系列。
+            // 日期是離散類別（非連續時間），CategoryAxis 只顯示有資料的點，解決假日空白問題。
             DefaultCategoryDataset dataset = new DefaultCategoryDataset();
 
             long maxVolume = dataList.stream()
@@ -563,21 +562,31 @@ public class MainApp extends Application {
                     .orElse(1000L);
             double xMax = maxVolume * 1.3;  // 多留空間
 
-            // 填資料：外盤黃、內盤灰
+            //宣告 DecimalFormat，用來統一價格格式並避免浮點誤差
+            DecimalFormat df = new DecimalFormat("#0.0");  // 強制顯示一位小數，如 915.0
+
+            // 依據將價格加入Y軸
             for (VolumeByPrice v : dataList) {
                 String priceKey = df.format(v.price());  // 這裡使用 df，統一格式
-                dataset.addValue(v.volumeAtAsk(), "外盤", priceKey);
-                dataset.addValue(v.volumeAtBid(), "內盤", priceKey);
+                dataset.addValue(v.volumeAtAsk(), "外盤累積成交量", priceKey);
+                dataset.addValue(v.volumeAtBid(), "內盤累積成交量", priceKey);
             }
 
             JFreeChart chart = ChartFactory.createStackedBarChart(
-                null, "", "成交量", dataset,
-                PlotOrientation.HORIZONTAL, false, true, false
+                null,
+                "",
+                "成交量",
+                dataset,
+                PlotOrientation.HORIZONTAL,
+                false,
+                true,
+                false
             );
 
+            // CategoryPlot：JFreeChart 繪圖區域，處理 CategoryDataset 的線圖。
             CategoryPlot plot = chart.getCategoryPlot();
-            plot.setBackgroundPaint(new Color(30, 30, 30));
-            plot.setRangeGridlinePaint(new Color(80, 80, 80));
+            // plot.setBackgroundPaint(new Color(30, 30, 30));
+            plot.setRangeGridlinePaint(new Color(80, 80, 80)); // 格線顏色
 
             StackedBarRenderer renderer = (StackedBarRenderer) plot.getRenderer();
             renderer.setDefaultStroke(new BasicStroke(1.5f));
@@ -592,22 +601,29 @@ public class MainApp extends Application {
             domainAxis.setUpperMargin(0.02);
             domainAxis.setTickLabelFont(new Font("Microsoft JhengHei", Font.BOLD, 15));
             domainAxis.setTickLabelsVisible(true);
+            // domainAxis.setTickLabelPaint(new Color(220, 220, 220));  // 預設顏色（萬一有漏的）
 
             // 標記 高 / 開 / 現 + 顏色
             for (VolumeByPrice v : dataList) {
                 String key = df.format(v.price());
 
                 if (Math.abs(v.price() - quote.highPrice()) < 0.1) {
+                    // 最高價
                     domainAxis.setTickLabelPaint(key, Color.RED);
                 } else if (Math.abs(v.price() - quote.openPrice()) < 0.1) {
+                    // 開盤價
                     domainAxis.setTickLabelPaint(key, Color.CYAN);
                 } else if (Math.abs(v.price() - quote.closePrice()) < 0.1) {
+                    // 現價
                     domainAxis.setTickLabelPaint(key, Color.GREEN);
                     // 現價整條變藍色高亮
                     renderer.setSeriesPaint(0, new Color(50, 180, 255));   // 外盤藍
                     renderer.setSeriesPaint(1, new Color(120, 200, 255));  // 內盤淡藍
+                } else if (v.price() == quote.lowPrice()) {
+                    // 最低價
+                    domainAxis.setTickLabelPaint(key, Color.BLUE);
                 } else {
-                    domainAxis.setTickLabelPaint(key, Color.WHITE);
+                    domainAxis.setTickLabelPaint(key, Color.BLACK);
                 }
             }
 
@@ -615,23 +631,30 @@ public class MainApp extends Application {
             NumberAxis rangeAxis = (NumberAxis) plot.getRangeAxis();
             rangeAxis.setLabel("成交量");
             rangeAxis.setLabelFont(new Font("Microsoft JhengHei", Font.BOLD, 16));
-            rangeAxis.setLabelPaint(Color.WHITE);
+            rangeAxis.setLabelPaint(Color.BLACK);
             rangeAxis.setTickLabelFont(new Font("Microsoft JhengHei", Font.PLAIN, 14));
             rangeAxis.setRange(0, xMax);
 
-            ChartPanel chartPanel = new ChartPanel(chart);
-            chartPanel.setPreferredSize(new java.awt.Dimension(695, 400));
+            // 建立 ChartPanel 並設定大小
+            currentChartPanel = new ChartPanel(chart);
+            currentChartPanel.setPreferredSize(new java.awt.Dimension(695, 400));
+            swingNode.setContent(currentChartPanel);
 
-            swingNode.setContent(chartPanel);
-            currentChartPanel = chartPanel;
-
-            Timer timer = new Timer(300, e -> {
-                chartPanel.revalidate();
-                chartPanel.repaint();
+            // 延遲 repaint，確保圖表正確顯示
+            Timer timer = new Timer(200, e -> {
+                currentChartPanel.revalidate();
+                currentChartPanel.repaint();
                 ((Timer) e.getSource()).stop();
             });
+            timer.setRepeats(false);
             timer.start();
         });
+
+
+        // 延遲 setVisible，給 Swing 初始化時間
+        PauseTransition delay = new PauseTransition(Duration.millis(400));
+        delay.setOnFinished(e -> chartPane.setVisible(true));
+        delay.play();
 
         return swingNode;
     }
@@ -752,7 +775,7 @@ public class MainApp extends Application {
 
             // CategoryAxis：X 軸類別軸，處理日期標籤位置。
             CategoryAxis domainAxis = (CategoryAxis) plot.getDomainAxis();
-            domainAxis.setCategoryLabelPositions(CategoryLabelPositions.UP_90); // 日期標籤垂直顯示（UP_90），避免擁擠（依需調整為 STANDARD 或 DOWN_90）
+            domainAxis.setCategoryLabelPositions(CategoryLabelPositions.UP_45); // 日期標籤垂直顯示（UP_90），避免擁擠（依需調整為 STANDARD 或 DOWN_90）
 
             // 建立 ChartPanel 並設定大小
             currentChartPanel = new ChartPanel(chart);
