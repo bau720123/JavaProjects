@@ -85,10 +85,10 @@ public class MainApp extends Application {
     private final FugleService service = new FugleService(); // 使用 Fugle API 做資料存取
     private TextField symbolField; // 股票代號
     private PasswordField keyField; // API Key
-    private TextField daysField; // 天數輸入欄位（共用給歷史 K 線、RSI、MACD）
+    private TextField daysField; // 天數輸入欄位
     private TextArea resultArea; // 文字顯示區塊
     private ScrollPane chartPane; // 圖表顯示區塊
-    private BorderPane root; // 讓 queryHistory() 可存取
+    private BorderPane root;
     private ChartPanel currentChartPanel; // 存取 ChartPanel 成員，允許多次 repaint
     private Stage primaryStage; // 將 stage 升級為類別成員變數，讓 createLineChart 可存取
 
@@ -163,8 +163,8 @@ public class MainApp extends Application {
         queryVolumeBtn.setPrefWidth(120);
         queryVolumeBtn.setOnAction(e -> queryVolume());
 
-        // 查歷史 K 線
-        Button historyBtn = new Button("查歷史 K 線");
+        // 查歷史K線
+        Button historyBtn = new Button("查歷史K線");
         historyBtn.setPrefWidth(120);
         historyBtn.setOnAction(e -> queryHistory());
 
@@ -861,7 +861,7 @@ public class MainApp extends Application {
         LocalDate apply(T value); 
     }
 
-    // 查詢歷史 K 線邏輯
+    // 查詢歷史K線邏輯
     private void queryHistory() {
         String symbol = symbolField.getText().trim(); // 股票代號
         String apiKey = keyField.getText().trim(); // API Key
@@ -919,7 +919,7 @@ public class MainApp extends Application {
                         }
                     }
 
-                    StringBuilder sb = new StringBuilder(String.format("歷史 K 線圖已載入（近 %d 日走勢）。\n\n", candles.size()));
+                    StringBuilder sb = new StringBuilder(String.format("歷史K線圖已載入（近 %d 日走勢）。\n\n", candles.size()));
                     for (Candle c : candles) {
                         String tag = c.date().equals(today) && !hasToday ? "（即時演算）" : "";
                         sb.append(String.format("日期：%s%s\n開盤價：%.1f\n最高價：%.1f\n最低價：%.1f\n收盤價：%.1f\n成交量：%d\n漲跌：%.1f\n\n",
