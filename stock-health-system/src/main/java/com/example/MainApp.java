@@ -45,8 +45,6 @@ import org.jsoup.select.Elements;
 import com.example.FugleService.Bollinger;
 import com.example.FugleService.SMA;
 import com.example.FugleService.VolumeByPrice;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 import org.jfree.chart.renderer.category.BarRenderer;
 import org.jfree.chart.renderer.category.LineAndShapeRenderer;
@@ -62,7 +60,6 @@ import java.text.NumberFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.LinkedHashMap;
-import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
@@ -83,10 +80,6 @@ import java.util.Properties;
 import javafx.animation.Timeline;
 
 import java.awt.BasicStroke;
-
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.Response;
 
 public class MainApp extends Application {
     private final FugleService service = new FugleService(); // 使用 Fugle API 做資料存取
@@ -113,9 +106,6 @@ public class MainApp extends Application {
             System.err.println("無法載入版本資訊：" + e.getMessage());
         }
     }
-
-    private final OkHttpClient client = new OkHttpClient();
-    private final ObjectMapper mapper = new ObjectMapper();
 
     @Override
     public void start(Stage stage) {
@@ -208,6 +198,11 @@ public class MainApp extends Application {
         foreignNetBtn.setPrefWidth(120);
         foreignNetBtn.setOnAction(e -> queryForeignNetPosition());
 
+        // 查大盤加權指數 按鈕
+        Button weightedBtn = new Button("查大盤加權指數");
+        weightedBtn.setPrefWidth(120);
+        weightedBtn.setOnAction(e -> queryWeighted());
+
         // 查聯準會利率 按鈕
         Button fedRateBtn = new Button("查聯準會利率");
         fedRateBtn.setPrefWidth(120);
@@ -218,7 +213,7 @@ public class MainApp extends Application {
         vixBtn.setPrefWidth(120);
         vixBtn.setOnAction(e -> queryVix());
 
-        buttonBox.getChildren().addAll(queryBtn, queryVolumeBtn, historyBtn, smaBtn, rsiBtn, macdBtn, bollingerBtn, institutionalBtn, foreignNetBtn, fedRateBtn, vixBtn); // 添加子節點到容器的操作
+        buttonBox.getChildren().addAll(queryBtn, queryVolumeBtn, historyBtn, smaBtn, rsiBtn, macdBtn, bollingerBtn, institutionalBtn, foreignNetBtn, weightedBtn, fedRateBtn, vixBtn); // 添加子節點到容器的操作
 
         // 用 ScrollPane 包住 buttonBox
         ScrollPane buttonScrollPane = new ScrollPane(buttonBox);
@@ -2305,6 +2300,97 @@ public class MainApp extends Application {
                             "請檢查網路，或稍後再試（網站可能改版）");
                 });
             }
+        });
+    }
+
+    // 查 加權指數
+    private void queryWeighted() {
+        String daysText = daysField.getText().trim(); // 使用共用天數欄位
+        int days;
+
+        try {
+            days = Integer.parseInt(daysText);
+            if (days < 1) {
+                showAlert("天數必須為 1 以上");
+                return;
+            }
+        } catch (NumberFormatException e) {
+            showAlert("天數必須為有效數字（1 以上）");
+            return;
+        }
+
+        resultArea.clear();
+        resultArea.setText("載入中，請稍候...");
+
+        CompletableFuture.supplyAsync(() -> {
+            YahooFinanceService yahooService = new YahooFinanceService();
+            List<YahooFinanceService.YahooCandle> candles = yahooService.fetchHistory("^TWII", days);
+
+            if (candles.isEmpty()) {
+                throw new RuntimeException("無法取得 加權指數 資料，請檢查網路或稍後再試");
+            }
+
+            // 直接在背景執行緒計算統計值
+            double maxClose = candles.stream().mapToDouble(c -> c.close()).max().orElse(0.0);
+            double minClose = candles.stream().mapToDouble(c -> c.close()).min().orElse(0.0);
+
+            YahooFinanceService.YahooCandle maxCandle = candles.stream()
+                    .max(Comparator.comparingDouble(c -> c.close()))
+                    .orElse(candles.get(0));
+            YahooFinanceService.YahooCandle minCandle = candles.stream()
+                    .min(Comparator.comparingDouble(c -> c.close()))
+                    .orElse(candles.get(0));
+
+            // 用 Map 包裝傳回 UI 執行緒（避免自訂 record）
+            return Map.of(
+                "candles", candles,
+                "maxClose", maxClose,
+                "minClose", minClose,
+                "maxDate", maxCandle.date(),
+                "minDate", minCandle.date()
+            );
+
+        }).thenAcceptAsync(resultMap -> Platform.runLater(() -> {
+            @SuppressWarnings("unchecked")
+            List<YahooFinanceService.YahooCandle> candles =
+                    (List<YahooFinanceService.YahooCandle>) resultMap.get("candles");
+            double maxClose = (double) resultMap.get("maxClose");
+            double minClose = (double) resultMap.get("minClose");
+            LocalDate maxDate = (LocalDate) resultMap.get("maxDate");
+            LocalDate minDate = (LocalDate) resultMap.get("minDate");
+
+            StringBuilder sb = new StringBuilder();
+            sb.append("加權指數 線圖已載入（近 ").append(candles.size()).append(" 日走勢）。\n\n");
+
+            // 直接使用 YahooFinanceService.YahooCandle 迭代
+            for (YahooFinanceService.YahooCandle c : candles) {
+                sb.append(String.format("日期：%s\n", c.date()))
+                  .append(String.format("開盤指數：%.2f\n", c.open()))
+                  .append(String.format("最高指數：%.2f\n", c.high()))
+                  .append(String.format("最低指數：%.2f\n", c.low()))
+                  .append(String.format("收盤指數：%.2f\n\n", c.close()));
+            }
+
+            sb.append(String.format("區間最高指數：%.2f（%s）\n", maxClose, maxDate))
+              .append(String.format("區間最低指數：%.2f（%s）\n", minClose, minDate));
+
+            resultArea.setText(sb.toString());
+            resultArea.appendText(""); // 自動滾動到最底部
+
+            // 加權指數圖表
+            chartPane.setContent(createCommonLineChart(
+                candles, // 資料來源
+                "TWII",
+                "加權指數",
+                new Color(178, 34, 34),
+                candle -> ((YahooFinanceService.YahooCandle) candle).close(),
+                candle -> ((YahooFinanceService.YahooCandle) candle).date()
+            ));
+            resizeChartProportionally(); // 改用統一的等比例縮放方法
+
+        }), Platform::runLater).exceptionally(ex -> {
+            Platform.runLater(() -> showAlert(ex.getMessage()));
+            return null;
         });
     }
 
