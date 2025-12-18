@@ -43,10 +43,14 @@ public class YahooFinanceService {
             long period2 = today.plusDays(1).atStartOfDay(ZoneId.of("UTC")).toEpochSecond();
 
             String encodedSymbol = symbol.replace("^", "%5E"); // ^VIX → %5EVIX
-            String url = String.format(
+            /*String url = String.format(
                 "https://query1.finance.yahoo.com/v8/finance/chart/%s" +
                 "?period1=%d&period2=%d&interval=1d&events=history&includeAdjustedClose=true",
                 encodedSymbol, period1, period2
+            );*/
+            String url = String.format(
+                "https://query1.finance.yahoo.com/v8/finance/chart/%s" + "?interval=1d&range=%d" + "d",
+                encodedSymbol, days
             );
 
             Request request = new Request.Builder()

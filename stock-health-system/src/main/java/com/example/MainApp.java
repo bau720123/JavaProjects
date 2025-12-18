@@ -157,7 +157,7 @@ public class MainApp extends Application {
         stockPane.setAnimated(true); // 展開/收合動畫
 
         VBox stockBox = new VBox(8);
-        stockBox.setPadding(new Insets(5, 0, 5, 5)); // 左縮進 5px，產生層級感
+        stockBox.setPadding(new Insets(8, 0, 5, 6));
 
         Button queryBtn = new Button("即時報價");
         queryBtn.setPrefWidth(140);
@@ -170,6 +170,10 @@ public class MainApp extends Application {
         Button historyBtn = new Button("歷史K線");
         historyBtn.setPrefWidth(140);
         historyBtn.setOnAction(e -> queryHistory());
+
+        Button institutionalBtn = new Button("三大法人買賣超");
+        institutionalBtn.setPrefWidth(140);
+        institutionalBtn.setOnAction(e -> queryInstitutionalTrading());
 
         Button smaBtn = new Button("簡單移動平均線");
         smaBtn.setPrefWidth(140);
@@ -188,7 +192,7 @@ public class MainApp extends Application {
         bollingerBtn.setOnAction(e -> queryBollinger());
 
         stockBox.getChildren().addAll(
-            queryBtn, queryVolumeBtn, historyBtn, smaBtn,
+            queryBtn, queryVolumeBtn, historyBtn, institutionalBtn, smaBtn,
             rsiBtn, macdBtn, bollingerBtn
         );
 
@@ -209,11 +213,7 @@ public class MainApp extends Application {
         marketPane.setAnimated(true);
 
         VBox marketBox = new VBox(8);
-        marketBox.setPadding(new Insets(5, 0, 5, 5));
-
-        Button institutionalBtn = new Button("三大法人買賣超");
-        institutionalBtn.setPrefWidth(140);
-        institutionalBtn.setOnAction(e -> queryInstitutionalTrading());
+        marketBox.setPadding(new Insets(8, 0, 5, 6));
 
         Button foreignNetBtn = new Button("外資空單數");
         foreignNetBtn.setPrefWidth(140);
@@ -223,7 +223,7 @@ public class MainApp extends Application {
         weightedBtn.setPrefWidth(140);
         weightedBtn.setOnAction(e -> queryWeighted());
 
-        marketBox.getChildren().addAll(institutionalBtn, foreignNetBtn, weightedBtn);
+        marketBox.getChildren().addAll(foreignNetBtn, weightedBtn);
 
         // 用 ScrollPane 包起來
         ScrollPane marketScroll = new ScrollPane(marketBox);
@@ -242,7 +242,7 @@ public class MainApp extends Application {
         econPane.setAnimated(true);
 
         VBox econBox = new VBox(8);
-        econBox.setPadding(new Insets(5, 0, 5, 5));
+        econBox.setPadding(new Insets(8, 0, 5, 6));
 
         Button fedRateBtn = new Button("聯準會利率");
         fedRateBtn.setPrefWidth(140);
@@ -1135,6 +1135,232 @@ public class MainApp extends Application {
             });
     }
 
+    // 查三大法人買賣超
+    private void queryInstitutionalTrading() {
+        String symbol = symbolField.getText().trim();
+        if (symbol.isEmpty()) {
+            showAlert("請輸入股票代號");
+            return;
+        }
+
+        String daysText = daysField.getText().trim(); // 使用共用天數欄位
+        int days;
+
+        try {
+            days = Integer.parseInt(daysText);
+            if (days < 0) {
+                showAlert("天數必須為 0 以上");
+                return;
+            }
+        } catch (NumberFormatException e) {
+            showAlert("天數必須為有效數字（0 以上）");
+            return;
+        }
+
+        resultArea.clear();
+        resultArea.setText("載入中，請稍候...");
+
+        CompletableFuture.runAsync(() -> {
+            try {
+                Document doc = Jsoup.connect("https://stock.wearn.com/netbuy.asp?kind=" + symbol)
+                        .userAgent("Mozilla/5.0")
+                        .timeout(10000)
+                        .get();
+
+                Elements tables = doc.select("table.mobile_img");
+                if (tables.isEmpty()) throw new Exception("查無資料");
+
+                Elements rows = tables.first().select("tbody tr");
+
+                // 原始資料：最新在前（weearn.com 就是這樣）
+                List<String[]> rawData = new ArrayList<>();
+
+                for (int i = 2; i < rows.size(); i++) {
+                    Elements cells = rows.get(i).select("td");
+                    if (cells.size() < 4) continue;
+
+                    String rawDate = cells.get(0).text().trim();
+                    String trustStr = cells.get(1).text().trim().replace("+ ", "").replace(" ", "").replace(",", "");
+                    String dealerStr = cells.get(2).text().trim().replace("+ ", "").replace(" ", "").replace(",", "");
+                    String foreignStr = cells.get(3).text().trim().replace("+ ", "").replace(" ", "").replace(",", "");
+
+                    int trust = trustStr.isEmpty() || trustStr.equals("-") ? 0 : Integer.parseInt(trustStr);
+                    int dealer = dealerStr.isEmpty() || dealerStr.equals("-") ? 0 : Integer.parseInt(dealerStr);
+                    int foreign = foreignStr.isEmpty() || foreignStr.equals("-") ? 0 : Integer.parseInt(foreignStr);
+
+                    String standardDate = convertTwDateToStandard(rawDate);
+                    rawData.add(new String[]{standardDate, String.valueOf(trust), String.valueOf(dealer), String.valueOf(foreign)});
+                }
+
+                if (rawData.isEmpty()) throw new Exception("查無資料");
+
+                // 決定要幾筆（最近 N 天，或全部）
+                int count = (days == 0) ? rawData.size() : Math.min(rawData.size(), days);
+
+                // 取最新的 count 筆（最近 N 天）
+                List<String[]> recentData = rawData.subList(0, count);
+
+                // 顯示與圖表共用這份資料：最舊在前
+                List<String[]> displayAndChartData = new ArrayList<>(recentData);
+                Collections.reverse(displayAndChartData); // ← 關鍵！讓最舊在前面
+
+                // 準備容器
+                List<String> dates = new ArrayList<>();
+                List<Integer> trustList = new ArrayList<>();
+                List<Integer> dealerList = new ArrayList<>();
+                List<Integer> foreignList = new ArrayList<>();
+
+                // 極值追蹤
+                int maxTrust = Integer.MIN_VALUE, maxDealer = Integer.MIN_VALUE, maxForeign = Integer.MIN_VALUE;
+                int minTrust = Integer.MAX_VALUE, minDealer = Integer.MAX_VALUE, minForeign = Integer.MAX_VALUE;
+                String maxTrustDate = "", maxDealerDate = "", maxForeignDate = "";
+                String minTrustDate = "", minDealerDate = "", minForeignDate = "";
+
+                StringBuilder sb = new StringBuilder();
+                sb.append("三大法人買賣超資訊如下：\n\n");
+
+                for (String[] row : displayAndChartData) {
+                    int trust = Integer.parseInt(row[1]);
+                    int dealer = Integer.parseInt(row[2]);
+                    int foreign = Integer.parseInt(row[3]);
+
+                    dates.add(row[0]);
+                    trustList.add(trust);
+                    dealerList.add(dealer);
+                    foreignList.add(foreign);
+
+                    sb.append(String.format("日期：%s\n", row[0]));
+                    sb.append(String.format("外資：%,d\n", foreign));
+                    sb.append(String.format("投信：%,d\n", trust));
+                    sb.append(String.format("自營商：%,d\n\n", dealer));
+
+                    // 極值更新
+                    if (trust > maxTrust) { maxTrust = trust; maxTrustDate = row[0]; }
+                    if (dealer > maxDealer) { maxDealer = dealer; maxDealerDate = row[0]; }
+                    if (foreign > maxForeign) { maxForeign = foreign; maxForeignDate = row[0]; }
+                    if (trust < minTrust) { minTrust = trust; minTrustDate = row[0]; }
+                    if (dealer < minDealer) { minDealer = dealer; minDealerDate = row[0]; }
+                    if (foreign < minForeign) { minForeign = foreign; minForeignDate = row[0]; }
+                }
+
+                sb.append("[買超]\n\n");
+                sb.append(String.format("區間最大（投信）：%,d（%s）\n", maxTrust, maxTrustDate));
+                sb.append(String.format("區間最大（自營商）：%,d（%s）\n", maxDealer, maxDealerDate));
+                sb.append(String.format("區間最大（外資）：%,d（%s）\n", maxForeign, maxForeignDate));
+
+                sb.append("\n[賣超]\n\n");
+                sb.append(String.format("區間最大（投信）：%,d（%s）\n", minTrust, minTrustDate));
+                sb.append(String.format("區間最大（自營商）：%,d（%s）\n", minDealer, minDealerDate));
+                sb.append(String.format("區間最大（外資）：%,d（%s）\n", minForeign, minForeignDate));
+
+                String finalText = sb.toString();
+
+                Platform.runLater(() -> {
+                    resultArea.clear();
+                    resultArea.appendText(finalText);
+
+                    if (!dates.isEmpty()) {
+                        Node chart = createInstitutionalChart(dates, trustList, dealerList, foreignList);
+                        chartPane.setContent(chart);
+                        resizeChartProportionally(); // 改用統一的等比例縮放方法
+                    } else {
+                        chartPane.setContent(createEmptyChartPanel());
+                    }
+                });
+
+            } catch (Exception e) {
+                Platform.runLater(() -> {
+                    resultArea.clear();
+                    resultArea.appendText("【三大法人買賣超】抓取失敗\n" + e.getMessage() + "\n");
+                    chartPane.setContent(createEmptyChartPanel());
+                });
+            }
+        });
+    }
+
+    // 轉換民國日期 "114/11/26" → "2025-11-26"
+    private String convertTwDateToStandard(String twDate) {
+        try {
+            String[] parts = twDate.split("/");
+            if (parts.length != 3) return twDate;
+
+            int year = Integer.parseInt(parts[0]) + 1911; // 民國轉西元
+            String month = parts[1].length() == 1 ? "0" + parts[1] : parts[1];
+            String day = parts[2].length() == 1 ? "0" + parts[2] : parts[2];
+
+            return String.format("%d-%s-%s", year, month, day);
+        } catch (Exception e) {
+            return twDate; // 轉失敗就原樣回傳
+        }
+    }
+
+    private Node createInstitutionalChart(List<String> dates, List<Integer> trust, List<Integer> dealer, List<Integer> foreign) {
+        SwingNode swingNode = new SwingNode();
+
+        SwingUtilities.invokeLater(() -> {
+            DefaultCategoryDataset dataset = new DefaultCategoryDataset();
+
+            for (int i = 0; i < dates.size(); i++) {
+                dataset.addValue(foreign.get(i), "外資", dates.get(i));
+                dataset.addValue(trust.get(i), "投信", dates.get(i));
+                dataset.addValue(dealer.get(i), "自營商", dates.get(i));
+            }
+
+            JFreeChart chart = ChartFactory.createStackedBarChart(
+                "三大法人買賣超（張）",
+                "日期",
+                "買賣超（張）",
+                dataset,
+                PlotOrientation.VERTICAL,
+                true, true, false
+            );
+
+            // CategoryPlot：JFreeChart 繪圖區域，處理 CategoryDataset 的線圖。
+            CategoryPlot plot = (CategoryPlot) chart.getPlot();
+
+            // 設定字型以利解決亂碼問題
+            Font font = new Font("Microsoft JhengHei", Font.BOLD, 14);
+            chart.getTitle().setFont(new Font("Microsoft JhengHei", Font.BOLD, 14));
+            chart.getLegend().setItemFont(font);
+            plot.getDomainAxis().setLabelFont(font);
+            plot.getDomainAxis().setTickLabelFont(font);
+            plot.getRangeAxis().setLabelFont(font);
+            plot.getRangeAxis().setTickLabelFont(font);
+
+            plot.setBackgroundPaint(Color.WHITE);
+            plot.getDomainAxis().setCategoryLabelPositions(
+                CategoryLabelPositions.UP_90
+            );
+
+            // 顏色設定
+            plot.getRenderer().setSeriesPaint(0, new Color(0, 180, 0)); // 外資 綠
+            plot.getRenderer().setSeriesPaint(1, new Color(255, 100, 100)); // 投信 紅
+            plot.getRenderer().setSeriesPaint(2, new Color(100, 100, 255)); // 自營商 藍
+
+            ChartPanel chartPanel = new ChartPanel(chart);
+            chartPanel.setPreferredSize(new java.awt.Dimension(695, 400));
+            currentChartPanel = chartPanel;
+            swingNode.setContent(currentChartPanel);
+
+            // Timer：Swing 的計時器，單次延遲 200ms 觸發 ActionListener。
+            // 目的：解決 SwingNode 嵌入 JavaFX 時的初始渲染延遲（社區常見 bug，JFreeChart 需要時間初始化 plot）。
+            Timer timer = new Timer(200, e -> {
+                currentChartPanel.revalidate();
+                currentChartPanel.repaint();
+                ((Timer) e.getSource()).stop();
+            });
+            timer.setRepeats(false);
+            timer.start();
+        });
+
+        // 延遲 setVisible，給 Swing 初始化時間
+        PauseTransition delay = new PauseTransition(Duration.millis(400));
+        delay.setOnFinished(e -> chartPane.setVisible(true));
+        delay.play();
+
+        return swingNode;
+    }
+
     // 查詢 SMA 邏輯（使用共用 daysField）
     private void querySMA() {
         String symbol = symbolField.getText().trim(); // 股票代號
@@ -1967,232 +2193,6 @@ public class MainApp extends Application {
         return swingNode;
     }
 
-    // 查三大法人買賣超
-    private void queryInstitutionalTrading() {
-        String symbol = symbolField.getText().trim();
-        if (symbol.isEmpty()) {
-            showAlert("請輸入股票代號");
-            return;
-        }
-
-        String daysText = daysField.getText().trim(); // 使用共用天數欄位
-        int days;
-
-        try {
-            days = Integer.parseInt(daysText);
-            if (days < 0) {
-                showAlert("天數必須為 0 以上");
-                return;
-            }
-        } catch (NumberFormatException e) {
-            showAlert("天數必須為有效數字（0 以上）");
-            return;
-        }
-
-        resultArea.clear();
-        resultArea.setText("載入中，請稍候...");
-
-        CompletableFuture.runAsync(() -> {
-            try {
-                Document doc = Jsoup.connect("https://stock.wearn.com/netbuy.asp?kind=" + symbol)
-                        .userAgent("Mozilla/5.0")
-                        .timeout(10000)
-                        .get();
-
-                Elements tables = doc.select("table.mobile_img");
-                if (tables.isEmpty()) throw new Exception("查無資料");
-
-                Elements rows = tables.first().select("tbody tr");
-
-                // 原始資料：最新在前（weearn.com 就是這樣）
-                List<String[]> rawData = new ArrayList<>();
-
-                for (int i = 2; i < rows.size(); i++) {
-                    Elements cells = rows.get(i).select("td");
-                    if (cells.size() < 4) continue;
-
-                    String rawDate = cells.get(0).text().trim();
-                    String trustStr = cells.get(1).text().trim().replace("+ ", "").replace(" ", "").replace(",", "");
-                    String dealerStr = cells.get(2).text().trim().replace("+ ", "").replace(" ", "").replace(",", "");
-                    String foreignStr = cells.get(3).text().trim().replace("+ ", "").replace(" ", "").replace(",", "");
-
-                    int trust = trustStr.isEmpty() || trustStr.equals("-") ? 0 : Integer.parseInt(trustStr);
-                    int dealer = dealerStr.isEmpty() || dealerStr.equals("-") ? 0 : Integer.parseInt(dealerStr);
-                    int foreign = foreignStr.isEmpty() || foreignStr.equals("-") ? 0 : Integer.parseInt(foreignStr);
-
-                    String standardDate = convertTwDateToStandard(rawDate);
-                    rawData.add(new String[]{standardDate, String.valueOf(trust), String.valueOf(dealer), String.valueOf(foreign)});
-                }
-
-                if (rawData.isEmpty()) throw new Exception("查無資料");
-
-                // 決定要幾筆（最近 N 天，或全部）
-                int count = (days == 0) ? rawData.size() : Math.min(rawData.size(), days);
-
-                // 取最新的 count 筆（最近 N 天）
-                List<String[]> recentData = rawData.subList(0, count);
-
-                // 顯示與圖表共用這份資料：最舊在前
-                List<String[]> displayAndChartData = new ArrayList<>(recentData);
-                Collections.reverse(displayAndChartData); // ← 關鍵！讓最舊在前面
-
-                // 準備容器
-                List<String> dates = new ArrayList<>();
-                List<Integer> trustList = new ArrayList<>();
-                List<Integer> dealerList = new ArrayList<>();
-                List<Integer> foreignList = new ArrayList<>();
-
-                // 極值追蹤
-                int maxTrust = Integer.MIN_VALUE, maxDealer = Integer.MIN_VALUE, maxForeign = Integer.MIN_VALUE;
-                int minTrust = Integer.MAX_VALUE, minDealer = Integer.MAX_VALUE, minForeign = Integer.MAX_VALUE;
-                String maxTrustDate = "", maxDealerDate = "", maxForeignDate = "";
-                String minTrustDate = "", minDealerDate = "", minForeignDate = "";
-
-                StringBuilder sb = new StringBuilder();
-                sb.append("三大法人買賣超資訊如下：\n\n");
-
-                for (String[] row : displayAndChartData) {
-                    int trust = Integer.parseInt(row[1]);
-                    int dealer = Integer.parseInt(row[2]);
-                    int foreign = Integer.parseInt(row[3]);
-
-                    dates.add(row[0]);
-                    trustList.add(trust);
-                    dealerList.add(dealer);
-                    foreignList.add(foreign);
-
-                    sb.append(String.format("日期：%s\n", row[0]));
-                    sb.append(String.format("外資：%,d\n", foreign));
-                    sb.append(String.format("投信：%,d\n", trust));
-                    sb.append(String.format("自營商：%,d\n\n", dealer));
-
-                    // 極值更新
-                    if (trust > maxTrust) { maxTrust = trust; maxTrustDate = row[0]; }
-                    if (dealer > maxDealer) { maxDealer = dealer; maxDealerDate = row[0]; }
-                    if (foreign > maxForeign) { maxForeign = foreign; maxForeignDate = row[0]; }
-                    if (trust < minTrust) { minTrust = trust; minTrustDate = row[0]; }
-                    if (dealer < minDealer) { minDealer = dealer; minDealerDate = row[0]; }
-                    if (foreign < minForeign) { minForeign = foreign; minForeignDate = row[0]; }
-                }
-
-                sb.append("[買超]\n\n");
-                sb.append(String.format("區間最大（投信）：%,d（%s）\n", maxTrust, maxTrustDate));
-                sb.append(String.format("區間最大（自營商）：%,d（%s）\n", maxDealer, maxDealerDate));
-                sb.append(String.format("區間最大（外資）：%,d（%s）\n", maxForeign, maxForeignDate));
-
-                sb.append("\n[賣超]\n\n");
-                sb.append(String.format("區間最大（投信）：%,d（%s）\n", minTrust, minTrustDate));
-                sb.append(String.format("區間最大（自營商）：%,d（%s）\n", minDealer, minDealerDate));
-                sb.append(String.format("區間最大（外資）：%,d（%s）\n", minForeign, minForeignDate));
-
-                String finalText = sb.toString();
-
-                Platform.runLater(() -> {
-                    resultArea.clear();
-                    resultArea.appendText(finalText);
-
-                    if (!dates.isEmpty()) {
-                        Node chart = createInstitutionalChart(dates, trustList, dealerList, foreignList);
-                        chartPane.setContent(chart);
-                        resizeChartProportionally(); // 改用統一的等比例縮放方法
-                    } else {
-                        chartPane.setContent(createEmptyChartPanel());
-                    }
-                });
-
-            } catch (Exception e) {
-                Platform.runLater(() -> {
-                    resultArea.clear();
-                    resultArea.appendText("【三大法人買賣超】抓取失敗\n" + e.getMessage() + "\n");
-                    chartPane.setContent(createEmptyChartPanel());
-                });
-            }
-        });
-    }
-
-    // 轉換民國日期 "114/11/26" → "2025-11-26"
-    private String convertTwDateToStandard(String twDate) {
-        try {
-            String[] parts = twDate.split("/");
-            if (parts.length != 3) return twDate;
-
-            int year = Integer.parseInt(parts[0]) + 1911; // 民國轉西元
-            String month = parts[1].length() == 1 ? "0" + parts[1] : parts[1];
-            String day = parts[2].length() == 1 ? "0" + parts[2] : parts[2];
-
-            return String.format("%d-%s-%s", year, month, day);
-        } catch (Exception e) {
-            return twDate; // 轉失敗就原樣回傳
-        }
-    }
-
-    private Node createInstitutionalChart(List<String> dates, List<Integer> trust, List<Integer> dealer, List<Integer> foreign) {
-        SwingNode swingNode = new SwingNode();
-
-        SwingUtilities.invokeLater(() -> {
-            DefaultCategoryDataset dataset = new DefaultCategoryDataset();
-
-            for (int i = 0; i < dates.size(); i++) {
-                dataset.addValue(foreign.get(i), "外資", dates.get(i));
-                dataset.addValue(trust.get(i), "投信", dates.get(i));
-                dataset.addValue(dealer.get(i), "自營商", dates.get(i));
-            }
-
-            JFreeChart chart = ChartFactory.createStackedBarChart(
-                "三大法人買賣超（張）",
-                "日期",
-                "買賣超（張）",
-                dataset,
-                PlotOrientation.VERTICAL,
-                true, true, false
-            );
-
-            // CategoryPlot：JFreeChart 繪圖區域，處理 CategoryDataset 的線圖。
-            CategoryPlot plot = (CategoryPlot) chart.getPlot();
-
-            // 設定字型以利解決亂碼問題
-            Font font = new Font("Microsoft JhengHei", Font.BOLD, 14);
-            chart.getTitle().setFont(new Font("Microsoft JhengHei", Font.BOLD, 14));
-            chart.getLegend().setItemFont(font);
-            plot.getDomainAxis().setLabelFont(font);
-            plot.getDomainAxis().setTickLabelFont(font);
-            plot.getRangeAxis().setLabelFont(font);
-            plot.getRangeAxis().setTickLabelFont(font);
-
-            plot.setBackgroundPaint(Color.WHITE);
-            plot.getDomainAxis().setCategoryLabelPositions(
-                CategoryLabelPositions.UP_90
-            );
-
-            // 顏色設定
-            plot.getRenderer().setSeriesPaint(0, new Color(0, 180, 0)); // 外資 綠
-            plot.getRenderer().setSeriesPaint(1, new Color(255, 100, 100)); // 投信 紅
-            plot.getRenderer().setSeriesPaint(2, new Color(100, 100, 255)); // 自營商 藍
-
-            ChartPanel chartPanel = new ChartPanel(chart);
-            chartPanel.setPreferredSize(new java.awt.Dimension(695, 400));
-            currentChartPanel = chartPanel;
-            swingNode.setContent(currentChartPanel);
-
-            // Timer：Swing 的計時器，單次延遲 200ms 觸發 ActionListener。
-            // 目的：解決 SwingNode 嵌入 JavaFX 時的初始渲染延遲（社區常見 bug，JFreeChart 需要時間初始化 plot）。
-            Timer timer = new Timer(200, e -> {
-                currentChartPanel.revalidate();
-                currentChartPanel.repaint();
-                ((Timer) e.getSource()).stop();
-            });
-            timer.setRepeats(false);
-            timer.start();
-        });
-
-        // 延遲 setVisible，給 Swing 初始化時間
-        PauseTransition delay = new PauseTransition(Duration.millis(400));
-        delay.setOnFinished(e -> chartPane.setVisible(true));
-        delay.play();
-
-        return swingNode;
-    }
-
     // 查外資大盤空單數
     private void queryForeignNetPosition() {
         String daysText = daysField.getText().trim(); // 使用共用天數欄位
@@ -2323,11 +2323,15 @@ public class MainApp extends Application {
                 Platform.runLater(() -> {
                     resultArea.setText(finalText);
                     resultArea.appendText(""); // 自動滾動到最底部
+
+                    // 使用計數器確保日期正確對應
+                    java.util.concurrent.atomic.AtomicInteger indexCounter = new java.util.concurrent.atomic.AtomicInteger(0);
+
                     chartPane.setContent(createCommonLineChart(
                         finalNet, "外資大盤淨空單", "口數",
                         new Color(255, 140, 0),
                         obj -> ((Integer) obj).doubleValue(),
-                        obj -> LocalDate.parse(finalDates.get(finalNet.indexOf(obj)))
+                        obj -> LocalDate.parse(finalDates.get(indexCounter.getAndIncrement()))
                     ));
                     resizeChartProportionally(); // 改用統一的等比例縮放方法
                 });
