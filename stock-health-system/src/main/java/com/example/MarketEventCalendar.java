@@ -135,21 +135,21 @@ public final class MarketEventCalendar {
         StringBuilder sb = new StringBuilder();
 
         if (isFOMCDay(today)) {
-            sb.append("今天是美國聯準會 FOMC 利率決策日！（美股尾盤易大波動）\n");
+            sb.append("今天是美國聯準會 FOMC 利率決策日！（美股尾盤易大波動）\n\n");
         }
         if (isFTSERebalanceDay(today)) {
             sb.append("今天是 FTSE Russell 指數重組生效日！（全球被動資金調整）\n");
-            sb.append("台股權重股易出現巨量與異常波動，建議減倉觀望\n");
+            sb.append("台股權重股易出現巨量與異常波動，建議減倉觀望\n\n");
         }
         if (isMSCIReviewDay(today)) {
             sb.append("今天是 MSCI 季度/半年度權重調整生效日！（台股權重變動）\n");
-            sb.append("被動型基金集中調整，權值股容易出現異常拉抬或砸盤\n");
+            sb.append("被動型基金集中調整，權值股容易出現異常拉抬或砸盤\n\n");
         }
         if (isTaiwanFuturesSettlementDay(today)) {
-            sb.append("今天是台指期／選擇權結算日（三巫日）！尾盤容易劇烈震盪\n");
+            sb.append("今天是台指期／選擇權結算日（三巫日）！尾盤容易劇烈震盪\n\n");
         }
         if (isUSQuadrupleWitchingDay(today)) {
-            sb.append("今天是美股四巫日（Quadruple Witching）！成交量爆衝，隔週一台股易受影響\n");
+            sb.append("今天是美股四巫日（Quadruple Witching）！成交量爆衝，隔週一台股易受影響\n\n");
         }
 
         // 偵測財報
@@ -167,33 +167,33 @@ public final class MarketEventCalendar {
                         .append(e.symbol + "\n\n");
                     });
 
-            sb.append("請注意相關交易波動\n");
+            sb.append("請注意相關交易波動\n\n");
         }
 
         // 美國經濟數據動態提醒（MoneyDJ）
         if (isTodayCoreCPI()) {
             sb.append("今晚 20:30 美國核心CPI即將公布！\n");
-            sb.append("這是聯準會最重視的通膨指標，波動會非常大！\n");
+            sb.append("這是聯準會最重視的通膨指標，波動會非常大！\n\n");
         }
         if (isTodayPPI()) {
             sb.append("今晚 20:30 美國PPI即將公布！\n");
-            sb.append("上游通膨壓力預警，影響降息預期\n");
+            sb.append("上游通膨壓力預警，影響降息預期\n\n");
         }
         if (isTodayRetailSales()) {
             sb.append("今晚 20:30 美國零售銷售數據即將公布！\n");
-            sb.append("消費力強弱直接決定軟著陸機率\n");
+            sb.append("消費力強弱直接決定軟著陸機率\n\n");
         }
         if (isTodayInitialJoblessClaims()) {
             sb.append("今晚 20:30 美國失業金人數即將公布！\n");
-            sb.append("勞動市場最即時指標，連續惡化就是衰退警報\n");
+            sb.append("勞動市場最即時指標，連續惡化就是衰退警報\n\n");
         }
         if (isTodayUSNonFarmPayroll()) {
             sb.append("今晚 21:30 美國非農就業數據 (NFP) 即將公布！\n");
-            sb.append("美元、美股、台指夜盤將劇烈波動，隔天開盤請特別小心！\n");
+            sb.append("美元、美股、台指夜盤將劇烈波動，隔天開盤請特別小心！\n\n");
         }
         if (isTodayUSConsumerConfidence()) {
             sb.append("今晚 23:00 美國消費者信心指數 (CCI) 即將公布！\n");
-            sb.append("若低於預期，消費股與科技股易受壓！\n");
+            sb.append("若低於預期，消費股與科技股易受壓！\n\n");
         }
 
         // 美股休市提醒（含節日名稱顯示）

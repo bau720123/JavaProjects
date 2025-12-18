@@ -137,7 +137,7 @@ public class MainApp extends Application {
 
         // 天數輸入
         VBox daysVBox = new VBox(5);
-        Label daysLabel = new Label("天數：");
+        Label daysLabel = new Label("資料範圍：");
         daysField = new TextField("");
         daysField.setPromptText("天數");
         daysField.setPrefWidth(50);
@@ -146,92 +146,132 @@ public class MainApp extends Application {
         inputBox.getChildren().addAll(symbolVBox, keyVBox, daysVBox); // 添加子節點到容器的操作
         root.setTop(inputBox); // 將 inputBox 設定為根容器的頂部區域。結果：輸入區固定在上方視窗，無論視窗resize，BorderPane會自動拉伸中間/底部內容。
 
-        /* 下方左側版面配置（功能列表），使用 VBox 垂直排列 */
-        VBox buttonBox = new VBox(10); // 每個節點「垂直」之間間隔 10 像素
-        buttonBox.setAlignment(Pos.TOP_CENTER);
-        buttonBox.setPrefWidth(150);
-        // buttonBox.setPadding(new Insets(0, 0, 0, 10)); // 右側 10px 內邊距，避免太貼中間區塊
-        buttonBox.setPadding(new Insets(0, 0, 0, 0));
+        /* 下方左側版面配置（功能列表），改用 Accordion 實現可折疊群組 */
+        Accordion accordion = new Accordion();
+        accordion.setPrefWidth(155);
+        //accordion.setMaxWidth(180);
 
-        // 查即時報價
-        Button queryBtn = new Button("查即時報價");
-        queryBtn.setPrefWidth(120);
+        // 查股票
+        TitledPane stockPane = new TitledPane();
+        stockPane.setText("查股票");
+        stockPane.setAnimated(true); // 展開/收合動畫
+
+        VBox stockBox = new VBox(8);
+        stockBox.setPadding(new Insets(5, 0, 5, 5)); // 左縮進 5px，產生層級感
+
+        Button queryBtn = new Button("即時報價");
+        queryBtn.setPrefWidth(140);
         queryBtn.setOnAction(e -> queryQuote());
 
-        // 查分價量表
-        Button queryVolumeBtn = new Button("查分價量表");
-        queryVolumeBtn.setPrefWidth(120);
+        Button queryVolumeBtn = new Button("分價量表");
+        queryVolumeBtn.setPrefWidth(140);
         queryVolumeBtn.setOnAction(e -> queryVolume());
 
-        // 查歷史K線
-        Button historyBtn = new Button("查歷史K線");
-        historyBtn.setPrefWidth(120);
+        Button historyBtn = new Button("歷史K線");
+        historyBtn.setPrefWidth(140);
         historyBtn.setOnAction(e -> queryHistory());
 
-        // 查簡單移動平均線
-        Button smaBtn = new Button("查簡單移動平均線");
-        smaBtn.setPrefWidth(120);
+        Button smaBtn = new Button("簡單移動平均線");
+        smaBtn.setPrefWidth(140);
         smaBtn.setOnAction(e -> querySMA());
 
-        // 查相對強弱指數
-        Button rsiBtn = new Button("查相對強弱指數");
-        rsiBtn.setPrefWidth(120);
+        Button rsiBtn = new Button("相對強弱指數");
+        rsiBtn.setPrefWidth(140);
         rsiBtn.setOnAction(e -> queryRSI());
 
-        // 查移動平均線 按鈕
-        Button macdBtn = new Button("查移動平均線");
-        macdBtn.setPrefWidth(120);
+        Button macdBtn = new Button("移動平均線");
+        macdBtn.setPrefWidth(140);
         macdBtn.setOnAction(e -> queryMACD());
 
-        // 查布林通道 按鈕
-        Button bollingerBtn = new Button("查布林通道");
-        bollingerBtn.setPrefWidth(120);
+        Button bollingerBtn = new Button("布林通道");
+        bollingerBtn.setPrefWidth(140);
         bollingerBtn.setOnAction(e -> queryBollinger());
 
-        // 查三大法人買賣超 按鈕
-        Button institutionalBtn = new Button("查三大法人買賣超");
-        institutionalBtn.setPrefWidth(120);
+        stockBox.getChildren().addAll(
+            queryBtn, queryVolumeBtn, historyBtn, smaBtn,
+            rsiBtn, macdBtn, bollingerBtn
+        );
+
+        // 用 ScrollPane 包起來
+        ScrollPane stockScroll = new ScrollPane(stockBox);
+        stockScroll.setFitToWidth(true);
+        stockScroll.setFitToHeight(true);
+        stockScroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        stockScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        stockScroll.setStyle("-fx-background-color: transparent; -fx-padding: 0;");
+        // stockScroll.setPrefViewportHeight(200); // 可選：限制最大顯示高度，強制出現滾動條
+
+        stockPane.setContent(stockScroll);
+
+        // 查大盤
+        TitledPane marketPane = new TitledPane();
+        marketPane.setText("查大盤");
+        marketPane.setAnimated(true);
+
+        VBox marketBox = new VBox(8);
+        marketBox.setPadding(new Insets(5, 0, 5, 5));
+
+        Button institutionalBtn = new Button("三大法人買賣超");
+        institutionalBtn.setPrefWidth(140);
         institutionalBtn.setOnAction(e -> queryInstitutionalTrading());
 
-        // 查外資大盤空單數 按鈕
-        Button foreignNetBtn = new Button("查外資大盤空單數");
-        foreignNetBtn.setPrefWidth(120);
+        Button foreignNetBtn = new Button("外資空單數");
+        foreignNetBtn.setPrefWidth(140);
         foreignNetBtn.setOnAction(e -> queryForeignNetPosition());
 
-        // 查大盤加權指數 按鈕
-        Button weightedBtn = new Button("查大盤加權指數");
-        weightedBtn.setPrefWidth(120);
+        Button weightedBtn = new Button("加權指數");
+        weightedBtn.setPrefWidth(140);
         weightedBtn.setOnAction(e -> queryWeighted());
 
-        // 查聯準會利率 按鈕
-        Button fedRateBtn = new Button("查聯準會利率");
-        fedRateBtn.setPrefWidth(120);
+        marketBox.getChildren().addAll(institutionalBtn, foreignNetBtn, weightedBtn);
+
+        // 用 ScrollPane 包起來
+        ScrollPane marketScroll = new ScrollPane(marketBox);
+        marketScroll.setFitToWidth(true);
+        marketScroll.setFitToHeight(true);
+        marketScroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        marketScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        marketScroll.setStyle("-fx-background-color: transparent; -fx-padding: 0;");
+        // marketScroll.setPrefViewportHeight(150);
+
+        marketPane.setContent(marketScroll);
+
+        // 查經濟指數
+        TitledPane econPane = new TitledPane();
+        econPane.setText("查經濟指數");
+        econPane.setAnimated(true);
+
+        VBox econBox = new VBox(8);
+        econBox.setPadding(new Insets(5, 0, 5, 5));
+
+        Button fedRateBtn = new Button("聯準會利率");
+        fedRateBtn.setPrefWidth(140);
         fedRateBtn.setOnAction(e -> queryFedRateProbability());
 
-        // 查 VIX 恐慌指數 按鈕
-        Button vixBtn = new Button("查 VIX 恐慌指數");
-        vixBtn.setPrefWidth(120);
+        Button vixBtn = new Button("VIX 恐慌指數");
+        vixBtn.setPrefWidth(140);
         vixBtn.setOnAction(e -> queryVix());
 
-        buttonBox.getChildren().addAll(queryBtn, queryVolumeBtn, historyBtn, smaBtn, rsiBtn, macdBtn, bollingerBtn, institutionalBtn, foreignNetBtn, weightedBtn, fedRateBtn, vixBtn); // 添加子節點到容器的操作
+        econBox.getChildren().addAll(fedRateBtn, vixBtn);
 
-        // 用 ScrollPane 包住 buttonBox
-        ScrollPane buttonScrollPane = new ScrollPane(buttonBox);
-        buttonScrollPane.setFitToWidth(true); // 讓內容寬度自動適應 ScrollPane
-        buttonScrollPane.setFitToHeight(false); // 不要強制填滿高度
-        buttonScrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED); // 垂直滾輪：需要時出現
-        buttonScrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER); // 水平滾輪：永不顯示
+        // 用 ScrollPane 包起來
+        ScrollPane econScroll = new ScrollPane(econBox);
+        econScroll.setFitToWidth(true);
+        econScroll.setFitToHeight(true);
+        econScroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        econScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        econScroll.setStyle("-fx-background-color: transparent; -fx-padding: 0;");
+        // econScroll.setPrefViewportHeight(100);
 
-        // 美化 ScrollPane 背景與邊框
-        buttonScrollPane.setStyle(
-            "-fx-background-color: transparent; " +
-            "-fx-padding: 0; " +
-            "-fx-border-color: transparent;"
-        );
-        buttonScrollPane.setMaxHeight(Double.MAX_VALUE); // 允許垂直拉伸到父容器上限
+        econPane.setContent(econScroll);
 
-        // 最後把 ScrollPane 放進 BorderPane.left
-        root.setLeft(buttonScrollPane);
+        // 將所有群組加入 Accordion
+        accordion.getPanes().addAll(stockPane, marketPane, econPane);
+
+        // 程式啟動時預設展開「查股票」群組
+        accordion.setExpandedPane(stockPane);
+
+        root.setLeft(accordion);
 
         /* 下方右側版面配置（文字跟圖表顯示區），使用 HBox 水平排列 */
         HBox centerBox = new HBox(10); // 每個節點「水平」之間間隔 10 像素
@@ -243,7 +283,7 @@ public class MainApp extends Application {
         resultArea.setPrefRowCount(10); // 但JavaFX布局系統的響應式設計（responsive layout）會讓其根據視窗大小的變化來自動延展其高
         resultArea.setEditable(false); // 設定該文字區塊可否修改
         resultArea.setPrefWidth(200); // 寬度維持 200px
-        HBox.setMargin(resultArea, new Insets(0, 0, 0, 15));  // 新增：向左微移 20px，盡可能對齊上方區塊位置
+        HBox.setMargin(resultArea, new Insets(0, 0, 0, 10));  // 新增：向左微移 10px，盡可能對齊上方區塊位置
 
         // 圖表區塊
         chartPane = new ScrollPane(createEmptyChartPanel());
@@ -2665,10 +2705,10 @@ public class MainApp extends Application {
             currentChartPanel = panel;
         });
 
-        // 直接監聽 scene + window + 延遲 1200ms 強制重繪
+        // 直接監聽 scene + window + 延遲 2000ms 強制重繪
         swingNode.sceneProperty().addListener((obs, oldScene, newScene) -> {
             if (newScene != null && newScene.getWindow() != null) {
-                PauseTransition finalForce = new PauseTransition(Duration.millis(1200));
+                PauseTransition finalForce = new PauseTransition(Duration.millis(2000));
                 finalForce.setOnFinished(e -> {
                     Platform.runLater(() -> {
                         SwingUtilities.invokeLater(() -> {
