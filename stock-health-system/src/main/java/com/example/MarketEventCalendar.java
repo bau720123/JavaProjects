@@ -146,10 +146,10 @@ public final class MarketEventCalendar {
             sb.append("被動型基金集中調整，權值股容易出現異常拉抬或砸盤\n\n");
         }
         if (isTaiwanFuturesSettlementDay(today)) {
-            sb.append("今天是台指期／選擇權結算日（三巫日）！尾盤容易劇烈震盪\n\n");
+            sb.append("今天是台指期／選擇權結算日／三巫日（每月第三個星期三）！尾盤容易劇烈震盪\n\n");
         }
         if (isUSQuadrupleWitchingDay(today)) {
-            sb.append("今天是美股四巫日（Quadruple Witching）！成交量爆衝，隔週一台股易受影響\n\n");
+            sb.append("今天是美股四巫日（每 3、6、9、12 月的第三個星期五）！成交量爆衝，隔週一台股易受影響\n\n");
         }
 
         // 偵測財報
@@ -411,7 +411,7 @@ public final class MarketEventCalendar {
         return date.equals(thirdWednesday);
     }
 
-    // 美股四巫日：3、6、9、12 月第三個星期五
+    // 美股四巫日：每 3、6、9、12 月的第三個星期五
     public static boolean isUSQuadrupleWitchingDay(LocalDate date) {
         int month = date.getMonthValue();
         if (month != 3 && month != 6 && month != 9 && month != 12) return false;

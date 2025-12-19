@@ -62,6 +62,7 @@ import java.util.Date;
 import java.util.LinkedHashMap;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -223,7 +224,11 @@ public class MainApp extends Application {
         weightedBtn.setPrefWidth(140);
         weightedBtn.setOnAction(e -> queryWeighted());
 
-        marketBox.getChildren().addAll(foreignNetBtn, weightedBtn);
+        Button marginBtn = new Button("融資融券餘額");
+        marginBtn.setPrefWidth(140);
+        marginBtn.setOnAction(e -> queryMarginBalance());
+
+        marketBox.getChildren().addAll(foreignNetBtn, weightedBtn, marginBtn);
 
         // 用 ScrollPane 包起來
         ScrollPane marketScroll = new ScrollPane(marketBox);
@@ -2315,7 +2320,6 @@ public class MainApp extends Application {
                 sb.append(String.format("區間最低空單數：%,d（%s）\n",
                         lowestNet, String.join("、", lowestDates.stream().map(d -> d.replace("/", "-")).toList())));
 
-                // ====== 成功！直接更新 UI（不用 final 變數）======
                 String finalText = sb.toString();
                 List<String> finalDates = new ArrayList<>(chartDates);
                 List<Integer> finalNet = new ArrayList<>(ascendingNet);
@@ -2436,6 +2440,162 @@ public class MainApp extends Application {
             Platform.runLater(() -> showAlert(ex.getMessage()));
             return null;
         });
+    }
+
+    // 用來儲存融資融券資料的內部類別
+    private static class MarginRecord {
+        final String date;
+        final double marginBalance;
+        final double marginChange;
+        final long shortBalance;
+        final long shortChange;
+        final double price;
+        final double priceChangePct;
+        final double volume;
+
+        MarginRecord(String date, double marginBalance, double marginChange,
+                     long shortBalance, long shortChange,
+                     double price, double priceChangePct, double volume) {
+            this.date = date;
+            this.marginBalance = marginBalance;
+            this.marginChange = marginChange;
+            this.shortBalance = shortBalance;
+            this.shortChange = shortChange;
+            this.price = price;
+            this.priceChangePct = priceChangePct;
+            this.volume = volume;
+        }
+    }
+
+    // 查 融資券餘額數
+    private void queryMarginBalance() {
+        resultArea.clear();
+        resultArea.setText("載入中，請稍候...");
+
+        CompletableFuture.supplyAsync(() -> {
+            try {
+                Document doc = Jsoup.connect("https://histock.tw/stock/three.aspx?m=mg")
+                        .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
+                        .timeout(15000)
+                        .get();
+
+                Elements rows = doc.select("table.gvTB.gvTB_TWSE tbody tr");
+                if (rows.size() <= 1) {
+                    return null;
+                }
+
+                rows.remove(0); // 移除標題行
+
+                List<MarginRecord> records = new ArrayList<>();
+
+                for (Element row : rows) {
+                    Elements cells = row.select("td");
+                    if (cells.size() < 8) continue;
+
+                    String dateStr = cells.get(0).text().trim(); // "12/18"
+                    String[] parts = dateStr.split("/");
+                    int month = Integer.parseInt(parts[0]);
+                    int day = Integer.parseInt(parts[1]);
+                    LocalDate fullDate = LocalDate.of(LocalDate.now().getYear(), month, day);
+
+                    double marginBal = Double.parseDouble(cells.get(1).text().trim().replace(",", ""));
+                    double marginChg = Double.parseDouble(cells.get(2).text().trim().replace(",", ""));
+                    long shortBal = Long.parseLong(cells.get(3).text().trim().replace(",", ""));
+                    long shortChg = Long.parseLong(cells.get(4).text().trim().replace(",", ""));
+                    double price = Double.parseDouble(cells.get(5).text().trim().replace(",", ""));
+                    String pctStr = cells.get(6).text().trim().replace("%", "").replace(",", "");
+                    double pricePct = pctStr.isEmpty() ? 0.0 : Double.parseDouble(pctStr);
+                    double vol = Double.parseDouble(cells.get(7).text().trim().replace(",", ""));
+
+                    records.add(new MarginRecord(
+                        fullDate.format(DateTimeFormatter.ofPattern("yyyy-MM-dd")),
+                        marginBal, marginChg, shortBal, shortChg,
+                        price, pricePct, vol
+                    ));
+                }
+
+                Collections.reverse(records); // 舊的在前
+                
+                return records;
+
+            } catch (Exception ex) {
+                ex.printStackTrace();
+                return null;
+            }
+        }).thenAccept(records -> Platform.runLater(() -> {
+            if (records == null || records.isEmpty()) {
+                resultArea.setText("融資融券餘額資料載入失敗，請稍後再試。");
+                chartPane.setContent(createEmptyChartPanel());
+                return;
+            }
+
+            StringBuilder sb = new StringBuilder("融資融券餘額已載入。\n\n");
+
+            double maxMargin = records.stream().mapToDouble(r -> r.marginBalance).max().orElse(0);
+            double minMargin = records.stream().mapToDouble(r -> r.marginBalance).min().orElse(0);
+            double maxMarginChg = records.stream().mapToDouble(r -> r.marginChange).max().orElse(0);
+            double minMarginChg = records.stream().mapToDouble(r -> r.marginChange).min().orElse(0);
+
+            List<String> maxMarginDates = records.stream()
+                    .filter(r -> r.marginBalance == maxMargin)
+                    .map(r -> r.date)
+                    .toList();
+            List<String> minMarginDates = records.stream()
+                    .filter(r -> r.marginBalance == minMargin)
+                    .map(r -> r.date)
+                    .toList();
+            List<String> maxChgDates = records.stream()
+                    .filter(r -> r.marginChange == maxMarginChg)
+                    .map(r -> r.date)
+                    .toList();
+            List<String> minChgDates = records.stream()
+                    .filter(r -> r.marginChange == minMarginChg)
+                    .map(r -> r.date)
+                    .toList();
+
+            for (MarginRecord r : records) {
+                sb.append(String.format("日期：%s\n", r.date));
+                sb.append(String.format("融資餘額（億）：%.1f\n", r.marginBalance));
+                sb.append(String.format("融資增加（億）：%.1f\n", r.marginChange));
+                sb.append(String.format("融券餘額（張）：%,d\n", r.shortBalance));
+                sb.append(String.format("融券增加（張）：%,d\n", r.shortChange));
+                sb.append(String.format("價格：%.2f\n", r.price));
+                sb.append(String.format("比例：%.2f%%\n", r.priceChangePct));
+                sb.append(String.format("成交量（億）：%.1f\n\n", r.volume));
+            }
+
+            sb.append(String.format("區間融資餘額最高：%.1f（%s）\n",
+                    maxMargin, String.join("、", maxMarginDates)));
+            sb.append(String.format("區間融資餘額最低：%.1f（%s）\n\n",
+                    minMargin, String.join("、", minMarginDates)));
+
+            sb.append(String.format("區間融資增加最多：%.1f（%s）\n",
+                    maxMarginChg, String.join("、", maxChgDates)));
+            sb.append(String.format("區間融資減少最多：%.1f（%s）\n\n",
+                    minMarginChg, String.join("、", minChgDates)));
+
+            MarginRecord latest = records.get(records.size() - 1); // 最新一筆
+
+            if (latest.marginBalance >= 3500) {
+                sb.append("融資過熱風險高\n\n");
+            }
+            if (latest.marginChange >= 30) {
+                sb.append("散戶追價積極\n\n");
+            }
+
+            resultArea.setText(sb.toString());
+            resultArea.appendText(""); // 自動滾動到最底部
+
+            chartPane.setContent(createCommonLineChart(
+                    records,
+                    "融資融券餘額進出行情",
+                    "融資餘額（億元）",
+                    new Color(0, 150, 136),
+                    obj -> ((MarginRecord) obj).marginBalance,
+                    obj -> LocalDate.parse(((MarginRecord) obj).date)
+            ));
+            resizeChartProportionally(); // 改用統一的等比例縮放方法
+        }));
     }
 
     // 查聯準會利率
