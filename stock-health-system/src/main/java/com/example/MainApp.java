@@ -12,6 +12,7 @@ import javafx.scene.control.Alert.AlertType;
 import javafx.scene.image.Image;
 import javafx.scene.layout.*;
 import javafx.stage.Stage;
+import javafx.stage.StageStyle;
 import javafx.animation.KeyFrame;
 import javafx.animation.KeyValue;
 import javafx.animation.PauseTransition;
@@ -228,7 +229,15 @@ public class MainApp extends Application {
         marginBtn.setPrefWidth(140);
         marginBtn.setOnAction(e -> queryMarginBalance());
 
-        marketBox.getChildren().addAll(foreignNetBtn, weightedBtn, marginBtn);
+        Button marginRateBtn = new Button("融資維持率");
+        marginRateBtn.setPrefWidth(140);
+        marginRateBtn.setOnAction(e -> queryMarginRate());
+
+        Button comprehensiveAlertBtn = new Button("市場綜合警訊");
+        comprehensiveAlertBtn.setPrefWidth(140);
+        comprehensiveAlertBtn.setOnAction(e -> queryComprehensiveAlert());
+
+        marketBox.getChildren().addAll(foreignNetBtn, weightedBtn, marginBtn, marginRateBtn, comprehensiveAlertBtn);
 
         // 用 ScrollPane 包起來
         ScrollPane marketScroll = new ScrollPane(marketBox);
@@ -2469,6 +2478,20 @@ public class MainApp extends Application {
 
     // 查 融資券餘額數
     private void queryMarginBalance() {
+        String daysText = daysField.getText().trim(); // 使用共用天數欄位
+        int days;
+
+        try {
+            days = Integer.parseInt(daysText);
+            if (days < 0) {
+                showAlert("天數必須為 0 包含以上");
+                return;
+            }
+        } catch (NumberFormatException e) {
+            showAlert("天數必須為有效數字（0 包含 以上）");
+            return;
+        }
+
         resultArea.clear();
         resultArea.setText("載入中，請稍候...");
 
@@ -2480,7 +2503,7 @@ public class MainApp extends Application {
                         .get();
 
                 Elements rows = doc.select("table.gvTB.gvTB_TWSE tbody tr");
-                if (rows.size() <= 1) {
+                if (rows.size() <= 1) { // 只有標題行或無資料
                     return null;
                 }
 
@@ -2492,7 +2515,7 @@ public class MainApp extends Application {
                     Elements cells = row.select("td");
                     if (cells.size() < 8) continue;
 
-                    String dateStr = cells.get(0).text().trim(); // "12/18"
+                    String dateStr = cells.get(0).text().trim();
                     String[] parts = dateStr.split("/");
                     int month = Integer.parseInt(parts[0]);
                     int day = Integer.parseInt(parts[1]);
@@ -2514,6 +2537,11 @@ public class MainApp extends Application {
                     ));
                 }
 
+                // 根據 days 過濾：取最近 N 天（從頭取前 N 筆）
+                if (days > 0 && days < records.size()) {
+                    records = records.subList(0, days); // 取最新的 days 筆
+                }
+
                 Collections.reverse(records); // 舊的在前
                 
                 return records;
@@ -2529,13 +2557,29 @@ public class MainApp extends Application {
                 return;
             }
 
-            StringBuilder sb = new StringBuilder("融資融券餘額已載入。\n\n");
+            StringBuilder sb = new StringBuilder(
+                String.format("融資融券餘額已載入（顯示最近 %d 天）。\n\n",
+                    days == 0 ? records.size() : days)
+            );
 
             double maxMargin = records.stream().mapToDouble(r -> r.marginBalance).max().orElse(0);
             double minMargin = records.stream().mapToDouble(r -> r.marginBalance).min().orElse(0);
             double maxMarginChg = records.stream().mapToDouble(r -> r.marginChange).max().orElse(0);
             double minMarginChg = records.stream().mapToDouble(r -> r.marginChange).min().orElse(0);
 
+            // 逐筆顯示
+            for (MarginRecord r : records) {
+                sb.append(String.format("日期：%s\n", r.date));
+                sb.append(String.format("融資餘額（億）：%.1f\n", r.marginBalance));
+                sb.append(String.format("融資增加（億）：%.1f\n", r.marginChange));
+                sb.append(String.format("融券餘額（張）：%,d\n", r.shortBalance));
+                sb.append(String.format("融券增加（張）：%,d\n", r.shortChange));
+                sb.append(String.format("價格：%.2f\n", r.price));
+                sb.append(String.format("比例：%.2f%%\n", r.priceChangePct));
+                sb.append(String.format("成交量（億）：%.1f\n\n", r.volume));
+            }
+
+            // 區間統計
             List<String> maxMarginDates = records.stream()
                     .filter(r -> r.marginBalance == maxMargin)
                     .map(r -> r.date)
@@ -2552,17 +2596,6 @@ public class MainApp extends Application {
                     .filter(r -> r.marginChange == minMarginChg)
                     .map(r -> r.date)
                     .toList();
-
-            for (MarginRecord r : records) {
-                sb.append(String.format("日期：%s\n", r.date));
-                sb.append(String.format("融資餘額（億）：%.1f\n", r.marginBalance));
-                sb.append(String.format("融資增加（億）：%.1f\n", r.marginChange));
-                sb.append(String.format("融券餘額（張）：%,d\n", r.shortBalance));
-                sb.append(String.format("融券增加（張）：%,d\n", r.shortChange));
-                sb.append(String.format("價格：%.2f\n", r.price));
-                sb.append(String.format("比例：%.2f%%\n", r.priceChangePct));
-                sb.append(String.format("成交量（億）：%.1f\n\n", r.volume));
-            }
 
             sb.append(String.format("區間融資餘額最高：%.1f（%s）\n",
                     maxMargin, String.join("、", maxMarginDates)));
@@ -2595,6 +2628,320 @@ public class MainApp extends Application {
                     obj -> LocalDate.parse(((MarginRecord) obj).date)
             ));
             resizeChartProportionally(); // 改用統一的等比例縮放方法
+        }));
+    }
+
+    // 融資維持率記錄類別（與 MarginRecord 平級）
+    private static class MarginRateRecord {
+        final String date;
+        final double maintenanceRate;
+        final double index;
+
+        MarginRateRecord(String date, double maintenanceRate, double index) {
+            this.date = date;
+            this.maintenanceRate = maintenanceRate;
+            this.index = index;
+        }
+    }
+
+    // 查 融資維持率
+    private void queryMarginRate() {
+        String daysText = daysField.getText().trim(); // 使用共用天數欄位
+        int days;
+
+        try {
+            days = Integer.parseInt(daysText);
+            if (days < 0) {
+                showAlert("天數必須為 0 包含以上");
+                return;
+            }
+        } catch (NumberFormatException e) {
+            showAlert("天數必須為有效數字（0 包含 以上）");
+            return;
+        }
+
+        resultArea.clear();
+        resultArea.setText("載入中，請稍候...");
+
+        CompletableFuture.supplyAsync(() -> {
+            try {
+                Document doc = Jsoup.connect("https://www.istock.tw/post/twmarginrequirement_more")
+                        .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
+                        .timeout(15000)
+                        .get();
+
+                Elements rows = doc.select("table.ecostyle1 tbody tr");
+                if (rows.size() <= 1) { // 只有標題行或無資料
+                    return null;
+                }
+
+                // 移除標題行
+                rows.remove(0);
+
+                List<MarginRateRecord> records = new ArrayList<>();
+
+                for (Element row : rows) {
+                    Elements cells = row.select("td");
+                    if (cells.size() < 3) continue;
+
+                    String date = cells.get(0).text().trim(); // 已為 yyyy-MM-dd 格式，直接使用
+                    String rateStr = cells.get(1).text().trim().replace("%", "");
+                    double maintenanceRate = Double.parseDouble(rateStr);
+                    double index = Double.parseDouble(cells.get(2).text().trim().replace(",", ""));
+
+                    records.add(new MarginRateRecord(date, maintenanceRate, index));
+                }
+
+                // 根據 days 過濾：取最近 N 天（從頭取前 N 筆）
+                if (days > 0 && days < records.size()) {
+                    records = records.subList(0, days); // 取最新的 days 筆
+                }
+
+                // 再反轉成舊的在前（顯示習慣）
+                Collections.reverse(records); // 舊的在前
+
+                return records;
+
+            } catch (Exception ex) {
+                ex.printStackTrace();
+                return null;
+            }
+        }).thenAccept(records -> Platform.runLater(() -> {
+            if (records == null || records.isEmpty()) {
+                resultArea.setText("融資維持率資料載入失敗，請稍後再試。");
+                chartPane.setContent(createEmptyChartPanel());
+                return;
+            }
+
+            StringBuilder sb = new StringBuilder(
+                String.format("融資維持率已載入（顯示最近 %d 天）。\n\n",
+                    days == 0 ? records.size() : days)
+            );
+
+            // 逐筆顯示
+            for (MarginRateRecord r : records) {
+                sb.append(String.format("日期：%s\n", r.date));
+                sb.append(String.format("維持率：%.2f%%\n", r.maintenanceRate));
+                sb.append(String.format("加權指數：%.2f\n\n", r.index));
+            }
+
+            // 區間統計
+            double maxRate = records.stream().mapToDouble(r -> r.maintenanceRate).max().orElse(0);
+            double minRate = records.stream().mapToDouble(r -> r.maintenanceRate).min().orElse(0);
+            double maxIndex = records.stream().mapToDouble(r -> r.index).max().orElse(0);
+            double minIndex = records.stream().mapToDouble(r -> r.index).min().orElse(0);
+
+            sb.append(String.format("區間融資維持率最高：%.2f%%\n", maxRate));
+            sb.append(String.format("區間融資維持率最低：%.2f%%\n\n", minRate));
+            sb.append(String.format("區間加權指數最高：%.2f\n", maxIndex));
+            sb.append(String.format("區間加權指數最低：%.2f\n\n", minIndex));
+
+            // 警訊判斷（最新一筆）
+            MarginRateRecord latest = records.get(records.size() - 1);
+
+            if (latest.maintenanceRate >= 146) {
+                sb.append("目前融資維持率正常\n\n");
+            } else if (latest.maintenanceRate < 146 && latest.maintenanceRate >= 135) {
+                sb.append("目前融資維持率相對低迷\n\n");
+            } else if (latest.maintenanceRate < 135) {
+                sb.append("目前融資維持率低下，容易觸發連環斷頭、恐慌殺盤\n\n");
+            }
+
+            resultArea.setText(sb.toString());
+            resultArea.appendText(""); // 自動滾動到底
+
+            chartPane.setContent(createCommonLineChart(
+                    records,
+                    "大盤融資維持率",
+                    "維持率 (%)",
+                    new Color(0, 150, 136), // 翠綠色
+                    obj -> ((MarginRateRecord) obj).maintenanceRate,
+                    obj -> LocalDate.parse(((MarginRateRecord) obj).date)
+            ));
+            resizeChartProportionally(); // 改用統一的等比例縮放方法
+        }));
+    }
+
+    // 實驗用：模擬最新融資餘額資料（使用你提供的真實數據）
+    private List<MarginRecord> fetchLatestMarginData() {
+        List<MarginRecord> records = new ArrayList<>();
+
+        // 你提供的真實融資餘額資料（12/01 ~ 12/18）
+        records.add(new MarginRecord("2025-12-01", 3193.6, 21.8, 301654, -1540, 27342.53, -1.03, 4773.1));
+        records.add(new MarginRecord("2025-12-02", 3197.4, 3.8, 305582, 3928, 27564.27, 0.81, 4704.4));
+        records.add(new MarginRecord("2025-12-03", 3214.3, 16.9, 302856, -2726, 27793.04, 0.83, 4406.2));
+        records.add(new MarginRecord("2025-12-04", 3228.3, 14.0, 299991, -2865, 27795.71, 0.01, 3890.8));
+        records.add(new MarginRecord("2025-12-05", 3229.2, 0.9, 303648, 3657, 27980.89, 0.67, 4459.2));
+        records.add(new MarginRecord("2025-12-08", 3247.4, 18.2, 310486, 6838, 28303.78, 1.15, 4247.4));
+        records.add(new MarginRecord("2025-12-09", 3268.8, 21.5, 313708, 3222, 28182.60, -0.43, 5101.1));
+        records.add(new MarginRecord("2025-12-10", 3276.9, 8.1, 303179, -10529, 28400.73, 0.77, 4930.8));
+        records.add(new MarginRecord("2025-12-11", 3266.7, -10.2, 307829, 4650, 28024.75, -1.32, 5188.9));
+        records.add(new MarginRecord("2025-12-12", 3293.5, 26.8, 307405, -424, 28198.02, 0.62, 4757.2));
+        records.add(new MarginRecord("2025-12-15", 3318.6, 25.1, 304195, -3210, 27866.94, -1.17, 4375.9));
+        records.add(new MarginRecord("2025-12-16", 3287.9, -30.7, 296807, -7387, 27536.66, -1.19, 5258.5));
+        records.add(new MarginRecord("2025-12-17", 3321.7, 33.9, 302030, 5223, 27525.17, -0.04, 5078.6));
+        records.add(new MarginRecord("2025-12-18", 3323.8, 2.1, 300546, -1484, 27468.53, -0.21, 4471.4));
+
+        // 最新的在最後
+        return records;
+    }
+
+    // 實驗用：模擬最新維持率資料（使用你提供的真實數據）
+    private List<MarginRateRecord> fetchLatestMarginRateData() {
+        List<MarginRateRecord> records = new ArrayList<>();
+
+        // 你提供的真實維持率資料（12/01 ~ 12/18）
+        records.add(new MarginRateRecord("2025-12-01", 171.63, 27342.50));
+        records.add(new MarginRateRecord("2025-12-02", 171.27, 27564.30));
+        records.add(new MarginRateRecord("2025-12-03", 171.52, 27793.00));
+        records.add(new MarginRateRecord("2025-12-04", 171.33, 27795.70));
+        records.add(new MarginRateRecord("2025-12-05", 172.44, 27980.90));
+        records.add(new MarginRateRecord("2025-12-08", 173.78, 28303.80));
+        records.add(new MarginRateRecord("2025-12-09", 173.79, 28182.60));
+        records.add(new MarginRateRecord("2025-12-10", 174.16, 28400.70));
+        records.add(new MarginRateRecord("2025-12-11", 173.21, 28024.80));
+        records.add(new MarginRateRecord("2025-12-12", 174.32, 28198.00));
+        records.add(new MarginRateRecord("2025-12-15", 172.69, 27866.90));
+        records.add(new MarginRateRecord("2025-12-16", 169.16, 27536.70));
+        records.add(new MarginRateRecord("2025-12-17", 169.39, 27525.20));
+        records.add(new MarginRateRecord("2025-12-18", 168.29, 27468.50));
+
+        return records;
+    }
+
+    private void queryComprehensiveAlert() {
+        // 顯示「分析中」遮罩 3 秒
+        Alert loadingAlert = new Alert(AlertType.INFORMATION);
+        loadingAlert.setTitle("市場綜合警訊");
+        loadingAlert.setHeaderText(null);
+        loadingAlert.setContentText("正在綜合分析市場警訊，請稍候...");
+        loadingAlert.setGraphic(null);
+
+        Stage loadingStage = (Stage) loadingAlert.getDialogPane().getScene().getWindow();
+        loadingStage.getIcons().add(new Image(Objects.requireNonNull(getClass().getResourceAsStream("/icon.png"))));
+
+        // 禁用右上角 X 按鈕（使用者無法手動關閉）
+        // loadingStage.setOnCloseRequest(e -> e.consume());
+
+        // 移除所有按鈕（包括「確定」）
+        // loadingAlert.getButtonTypes().clear();
+
+        PauseTransition delay = new PauseTransition(Duration.seconds(3));
+        delay.setOnFinished(e -> {
+            loadingAlert.close();
+            performComprehensiveAnalysis();
+        });
+
+        loadingAlert.show();
+        delay.play();
+    }
+
+    private void queryComprehensiveAlert_new() {
+        // 自訂不可關閉的「分析中」視窗（Stage 方式，避開 Alert/Dialog bug）
+        Stage loadingStage = new Stage();
+        loadingStage.initStyle(StageStyle.UNDECORATED); // 無標題列、無邊框、無 X
+        loadingStage.setAlwaysOnTop(true); // 置頂，避免被其他視窗蓋住
+
+        VBox loadingBox = new VBox(15);
+        loadingBox.setAlignment(Pos.CENTER);
+        loadingBox.setPadding(new Insets(30));
+        // loadingBox.setMaxWidth(400);
+        // loadingBox.setMaxHeight(200);
+
+        // 自訂樣式顯示
+        loadingBox.setStyle(
+            "-fx-background-color: rgba(255, 255, 255, 0.9); " +
+            "-fx-border-color: #cccccc; " +
+            "-fx-border-width: 2; " +
+            "-fx-border-radius: 10; " +
+            "-fx-background-radius: 10;"
+        );
+
+        Label loadingLabel = new Label("正在綜合分析市場警訊，請稍候...");
+        loadingLabel.setStyle("-fx-font-size: 16px; -fx-font-weight: bold;");
+
+        ProgressIndicator progress = new ProgressIndicator();
+        progress.setPrefSize(50, 50);
+
+        loadingBox.getChildren().addAll(loadingLabel, progress);
+
+        Scene scene = new Scene(loadingBox);
+        loadingStage.setScene(scene);
+        // loadingStage.setWidth(350);
+        // loadingStage.setHeight(150);
+
+        // 置中於主視窗
+        Stage mainStage = (Stage) resultArea.getScene().getWindow();
+        loadingStage.initOwner(mainStage);
+        loadingStage.setX(mainStage.getX() + mainStage.getWidth() / 2 - 175);
+        loadingStage.setY(mainStage.getY() + mainStage.getHeight() / 2 - 75);
+
+        // 完全禁用任何關閉方式
+        loadingStage.setOnCloseRequest(e -> e.consume());
+
+        // 故意延遲 3 秒後自動關閉並執行分析
+        PauseTransition delay = new PauseTransition(Duration.seconds(3));
+        delay.setOnFinished(e -> {
+            loadingStage.close(); // 穩定關閉
+            performComprehensiveAnalysis();
+        });
+
+        loadingStage.show();
+        delay.play();
+    }
+
+    private void performComprehensiveAnalysis() {
+        CompletableFuture.supplyAsync(() -> {
+            List<MarginRecord> marginRecords = fetchLatestMarginData();
+            List<MarginRateRecord> rateRecords = fetchLatestMarginRateData();
+
+            if (marginRecords == null || marginRecords.isEmpty() ||
+                rateRecords == null || rateRecords.isEmpty()) {
+                return "資料載入失敗，無法進行綜合分析。";
+            }
+
+            // 取最新一筆
+            MarginRecord latestMargin = marginRecords.get(marginRecords.size() - 1);
+            MarginRateRecord latestRate = rateRecords.get(rateRecords.size() - 1);
+
+            StringBuilder analysis = new StringBuilder();
+            analysis.append("【市場綜合警訊分析】\n\n");
+            analysis.append(String.format("分析日期：%s\n", latestRate.date));
+            analysis.append(String.format("加權指數：%.2f\n", latestRate.index));
+            analysis.append(String.format("融資餘額：%.1f 億元\n", latestMargin.marginBalance));
+            analysis.append(String.format("融資單日增減：%.1f 億元\n", latestMargin.marginChange));
+            analysis.append(String.format("融資維持率：%.2f%%\n\n", latestRate.maintenanceRate));
+
+            // 警訊判斷
+            boolean indexDown = latestMargin.priceChangePct < 0;
+            boolean marginUp = latestMargin.marginChange > 0;
+
+            if (latestRate.maintenanceRate >= 160) {
+                analysis.append("🟢 維持率健康（≥160%），斷頭風險低\n");
+            } else if (latestRate.maintenanceRate < 160 && latestRate.maintenanceRate >= 140) {
+                analysis.append("🟡 維持率進入注意區（<160%）\n");
+            } else {
+                analysis.append("🔴 維持率危險（<140%），斷頭潮風險極高！\n");
+            }
+
+            if (latestMargin.marginBalance >= 3500) {
+                analysis.append("🔴 融資餘額過熱（≥3500億元）\n");
+            }
+
+            if (indexDown && marginUp) {
+                analysis.append("🔴 【頂背離警訊】指數下跌但融資增加，散戶接刀，後續賣壓恐放大！\n");
+            }
+
+            if (!indexDown && marginUp && latestMargin.marginChange >= 20) {
+                analysis.append("🟡 指數上漲且融資大增，追價熱情高，需防過熱\n");
+            }
+
+            analysis.append("\n目前市場處於：高檔震盪回落階段（伴隨頂背離特徵）");
+
+            return analysis.toString();
+
+        }).thenAccept(result -> Platform.runLater(() -> {
+            showAlert(result, AlertType.INFORMATION);
         }));
     }
 
