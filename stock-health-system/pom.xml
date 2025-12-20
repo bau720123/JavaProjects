@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.example</groupId>
     <artifactId>stock-health</artifactId>
-    <version>2.0.0</version>
+    <version>3.0.0</version>
 
     <properties>
         <maven.compiler.source>25</maven.compiler.source>
@@ -152,9 +152,9 @@
                             <!-- 應用程式基本資訊 -->
 
                             <name>StockHealth</name>  <!-- 安裝後的程式名稱,也是 .exe 檔名的前綴 -->
-                            <mainJar>stock-health-2.0.0.jar</mainJar>  <!-- 主要的 JAR 檔名(從 input 目錄讀取) -->
+                            <mainJar>stock-health-3.0.0.jar</mainJar>  <!-- 主要的 JAR 檔名(從 input 目錄讀取) -->
                             <mainClass>com.example.Launcher</mainClass>  <!-- 程式的主類別(入口點) -->
-                            <type>EXE</type>  <!-- 打包類型: EXE=安裝檔, MSI=Windows 安裝程式, APP-IMAGE=免安裝版 -->
+                            <type>MSI</type>  <!-- 打包類型: EXE=安裝檔, MSI=Windows 安裝程式, APP-IMAGE=免安裝版 -->
                             
 
                             <!-- Java 執行參數 -->
@@ -187,7 +187,7 @@
 
                             <appVersion>${project.version}</appVersion>
                             <!-- 應用程式版本號,從 pom.xml 的 <version> 讀取 -->
-                            <!-- 例如: 2.0.0 → StockHealth-2.0.0.exe -->
+                            <!-- 例如: 3.0.0 → StockHealth-3.0.0.exe -->
 
                             <icon>${project.basedir}/src/main/resources/icon.ico</icon>
                             <!-- 應用程式圖示檔案路徑 -->
@@ -205,7 +205,7 @@
                             <!-- false: 不建立桌面捷徑 -->
 
                             <!-- Windows 升級設定 -->
-                            <winUpgradeUuid>0c925faa-38fc-4db1-ab84-e9b8bf41710c</winUpgradeUuid>
+                            <!-- <winUpgradeUuid>0c925faa-38fc-4db1-ab84-e9b8bf41710c</winUpgradeUuid>  -->
                             <!-- 
                                 重要！這個 UUID 必須：
                                 1. 所有版本都用同一個 UUID
