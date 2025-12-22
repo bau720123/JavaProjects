@@ -335,7 +335,9 @@ public class MainApp extends Application {
         });
 
         // 取消自動聚焦，將焦點移到根容器，不然會預設聚焦在 "股票代號" 那個欄位
-        Platform.runLater(() -> root.requestFocus());
+        Platform.runLater(() -> {
+            root.requestFocus();
+        });
 
         stage.show();
 
@@ -382,6 +384,12 @@ public class MainApp extends Application {
         resultArea.clear();
         resultArea.setText("載入中，請稍候...");
 
+        // 顯示載入提示，並取得 Alert 物件
+        // Alert loading = showLoading("即時報價載入中", "正在查詢即時報價，請稍候...");
+
+        // 顯示載入提示，並取得 Stage 物件
+        // Stage loading = showCustomLoading("載入中，請稍候...");
+
         // 處裡非同步的操作，有點像是jQuery中的$.ajax(...)
         CompletableFuture.supplyAsync(() -> service.fetchQuote(symbol, apiKey))
             .thenAccept(quote -> Platform.runLater(() -> {
@@ -403,18 +411,24 @@ public class MainApp extends Application {
                         sb.append(String.format("    價格：%.0f\n    張數：%d\n\n", ba.price(), ba.size()));
                     }
 
-                    resultArea.setText(sb.toString());
+                    resultArea.setText(sb.toString()); // 設定完整文字
 
                     // 柱狀圖
                     chartPane.setContent(createQuoteBarChart(quote));
                     resizeChartProportionally(); // 改用統一的等比例縮放方法
+
+                    // loading.close();
                 } else {
                     resultArea.setText("查詢失敗，請稍後再試\n若 API 不可用，請稍後再使用。");
+                    // loading.close();
                 }
             }))
             .exceptionally(ex -> {
                 // exceptionally 像是 "非同步catch"，上游supplyAsync拋錯（如Fugle Key無效）時，自動恢復null並秀Alert—避免整個CompletableFuture崩潰，若直接showAlert，會造成整個應用程式crash
-                Platform.runLater(() -> showAlert("系統異常，請稍後再試：" + ex.getMessage()));
+                Platform.runLater(() -> {
+                    showAlert("系統異常，請稍後再試：" + ex.getMessage());
+                    // loading.close(); // 例外時關閉
+                });
                 return null;
             });
     }
@@ -588,7 +602,7 @@ public class MainApp extends Application {
                     }
                 }
                 
-                resultArea.setText(sb.toString());
+                resultArea.setText(sb.toString()); // 設定完整文字
 
                 // 分價量圖
                 chartPane.setContent(createVolumeProfileChart(dataList, quote));
@@ -1144,7 +1158,9 @@ public class MainApp extends Application {
             }))
             .exceptionally(ex -> {
                 // exceptionally 像是 "非同步catch"，上游supplyAsync拋錯（如Fugle Key無效）時，自動恢復null並秀Alert—避免整個CompletableFuture崩潰，若直接showAlert，會造成整個應用程式crash
-                Platform.runLater(() -> showAlert("系統異常，請稍後再試：" + ex.getMessage()));
+                Platform.runLater(() -> {
+                    showAlert("系統異常，請稍後再試：" + ex.getMessage());
+                });
                 return null;
             });
     }
@@ -1665,7 +1681,7 @@ public class MainApp extends Application {
                     sb.append("＊市場趨勢\n\n");
                     sb.append("RSI 值越高，表示過去一段期間的上漲機率較大；值越小，則下跌機率較大。");
 
-                    resultArea.setText(sb.toString());  // 設定完整文字
+                    resultArea.setText(sb.toString()); // 設定完整文字
                     resultArea.appendText(""); // 自動滾動到最底部
 
                     // MRSI 圖表
@@ -1684,7 +1700,9 @@ public class MainApp extends Application {
             }))
             .exceptionally(ex -> {
                 // exceptionally 像是 "非同步catch"，上游supplyAsync拋錯（如Fugle Key無效）時，自動恢復null並秀Alert—避免整個CompletableFuture崩潰，若直接showAlert，會造成整個應用程式crash
-                Platform.runLater(() -> showAlert("系統異常，請稍後再試：" + ex.getMessage()));
+                Platform.runLater(() -> {
+                    showAlert("系統異常，請稍後再試：" + ex.getMessage());
+                });
                 return null;
             });
     }
@@ -1838,7 +1856,7 @@ public class MainApp extends Application {
                     sb.append("＊死亡交叉\n\n");
                     sb.append("當移動平均線（MACD）慢慢往下交叉信號線（signalLine）時發生。這通常被視為一個賣出訊號，表示下跌趨勢可能增強。");
 
-                    resultArea.setText(sb.toString());  // 設定完整文字
+                    resultArea.setText(sb.toString()); // 設定完整文字
                     resultArea.appendText(""); // 自動滾動到最底部
 
                     // MACD 圖表
@@ -1860,7 +1878,9 @@ public class MainApp extends Application {
             }))
             .exceptionally(ex -> {
                 // exceptionally 像是 "非同步catch"，上游supplyAsync拋錯（如Fugle Key無效）時，自動恢復null並秀Alert—避免整個CompletableFuture崩潰，若直接showAlert，會造成整個應用程式crash
-                Platform.runLater(() -> showAlert("系統異常，請稍後再試：" + ex.getMessage()));
+                Platform.runLater(() -> {
+                    showAlert("系統異常，請稍後再試：" + ex.getMessage());
+                });
                 return null;
             });
     }
@@ -2016,7 +2036,7 @@ public class MainApp extends Application {
                 sb.append("＊買入訊號：當股價觸及下軌並有反彈跡象時，可能是一個買入訊號\n\n");
                 sb.append("＊賣出訊號：當股價觸及上軌並有回落跡象時，可能是一個賣出訊號。");
 
-                resultArea.setText(sb.toString());
+                resultArea.setText(sb.toString()); // 設定完整文字
                 resultArea.appendText(""); // 自動滾動到最底部
 
                 Node chartNode = createBollingerWithCandlesChart(candles, bbList);
@@ -2025,7 +2045,9 @@ public class MainApp extends Application {
             }))
             .exceptionally(ex -> {
                 // exceptionally 像是 "非同步catch"，上游supplyAsync拋錯（如Fugle Key無效）時，自動恢復null並秀Alert—避免整個CompletableFuture崩潰，若直接showAlert，會造成整個應用程式crash
-                Platform.runLater(() -> showAlert("系統異常，請稍後再試：" + ex.getMessage()));
+                Platform.runLater(() -> {
+                    showAlert("系統異常，請稍後再試：" + ex.getMessage());
+                });
                 return null;
             });
     }
@@ -2235,7 +2257,9 @@ public class MainApp extends Application {
 
                 Element table = doc.selectFirst("table.taifexphoto");
                 if (table == null) {
-                    Platform.runLater(() -> showAlert("找不到外資空單表格，網站可能改版了！"));
+                    Platform.runLater(() -> {
+                        showAlert("找不到外資空單表格，網站可能改版了！");
+                    });
                     return;
                 }
 
@@ -2264,7 +2288,9 @@ public class MainApp extends Application {
                 }
 
                 if (originalDates.isEmpty()) {
-                    Platform.runLater(() -> showAlert("沒有抓到任何外資空單資料！"));
+                    Platform.runLater(() -> {
+                        showAlert("沒有抓到任何外資空單資料！");
+                    });
                     return;
                 }
 
@@ -2431,7 +2457,7 @@ public class MainApp extends Application {
             sb.append(String.format("區間最高指數：%.2f（%s）\n", maxClose, maxDate))
               .append(String.format("區間最低指數：%.2f（%s）\n", minClose, minDate));
 
-            resultArea.setText(sb.toString());
+            resultArea.setText(sb.toString()); // 設定完整文字
             resultArea.appendText(""); // 自動滾動到最底部
 
             // 加權指數圖表
@@ -2446,7 +2472,9 @@ public class MainApp extends Application {
             resizeChartProportionally(); // 改用統一的等比例縮放方法
 
         }), Platform::runLater).exceptionally(ex -> {
-            Platform.runLater(() -> showAlert(ex.getMessage()));
+            Platform.runLater(() -> {
+                showAlert("系統異常，請稍後再試：" + ex.getMessage());
+            });
             return null;
         });
     }
@@ -2616,7 +2644,7 @@ public class MainApp extends Application {
                 sb.append("散戶追價積極\n\n");
             }
 
-            resultArea.setText(sb.toString());
+            resultArea.setText(sb.toString()); // 設定完整文字
             resultArea.appendText(""); // 自動滾動到最底部
 
             chartPane.setContent(createCommonLineChart(
@@ -2747,8 +2775,8 @@ public class MainApp extends Application {
                 sb.append("目前融資維持率低下，容易觸發連環斷頭、恐慌殺盤\n\n");
             }
 
-            resultArea.setText(sb.toString());
-            resultArea.appendText(""); // 自動滾動到底
+            resultArea.setText(sb.toString()); // 設定完整文字
+            resultArea.appendText(""); // 自動滾動到最底部
 
             chartPane.setContent(createCommonLineChart(
                     records,
@@ -3136,7 +3164,7 @@ public class MainApp extends Application {
               .append("＊恐慌區間\n\n")
               .append("當超過30，尤其是40以上，市場已經進入高度恐慌階段，並可能伴隨大規模拋售和市場崩盤風險。");
 
-            resultArea.setText(sb.toString());
+            resultArea.setText(sb.toString()); // 設定完整文字
             resultArea.appendText(""); // 自動滾動到最底部
 
             // 恐慌指數圖表
@@ -3151,7 +3179,9 @@ public class MainApp extends Application {
             resizeChartProportionally(); // 改用統一的等比例縮放方法
 
         }), Platform::runLater).exceptionally(ex -> {
-            Platform.runLater(() -> showAlert(ex.getMessage()));
+            Platform.runLater(() -> {
+                showAlert("系統異常，請稍後再試：" + ex.getMessage());
+            });
             return null;
         });
     }
@@ -3283,6 +3313,75 @@ public class MainApp extends Application {
         });
 
         return dialog;
+    }
+
+    /**
+     * 顯示「載入中」提示視窗（可自訂標題與內容）
+     * @param title   視窗標題
+     * @param content 提示文字
+     * @return Alert 物件，讓呼叫端可在完成後 close()
+     */
+    private Alert showLoading(String title, String content) {
+        Alert loadingAlert = new Alert(AlertType.INFORMATION);
+        loadingAlert.setTitle(title);
+        loadingAlert.setHeaderText(null);
+        loadingAlert.setContentText(content);
+        loadingAlert.setGraphic(null);
+
+        // 設定圖示
+        Stage stage = (Stage) loadingAlert.getDialogPane().getScene().getWindow();
+        stage.getIcons().add(new Image(Objects.requireNonNull(getClass().getResourceAsStream("/icon.png"))));
+
+        loadingAlert.show();
+        return loadingAlert; // 返回 Alert，讓呼叫端可 close()
+    }
+
+    /**
+     * 顯示「載入中」提示視窗（可自訂標題與內容）
+     * @param content 提示文字
+     * @return loadingStage 物件，讓呼叫端可在完成後 close()
+     */
+    private Stage showCustomLoading(String content) {
+        // 自訂不可關閉的「分析中」視窗（Stage 方式，避開 Alert/Dialog bug）
+        Stage loadingStage = new Stage();
+        loadingStage.initStyle(StageStyle.UNDECORATED); // 無標題列、無邊框、無 X
+        loadingStage.setAlwaysOnTop(true); // 置頂，避免被其他視窗蓋住
+
+        VBox loadingBox = new VBox(15);
+        loadingBox.setAlignment(Pos.CENTER);
+        loadingBox.setPadding(new Insets(30));
+
+        // 自訂樣式顯示
+        loadingBox.setStyle(
+            "-fx-background-color: rgba(255, 255, 255, 0.9); " +
+            "-fx-border-color: #cccccc; " +
+            "-fx-border-width: 2; " +
+            "-fx-border-radius: 10; " +
+            "-fx-background-radius: 10;"
+        );
+
+        Label loadingLabel = new Label(content);
+        loadingLabel.setStyle("-fx-font-size: 16px; -fx-font-weight: bold;");
+
+        ProgressIndicator progress = new ProgressIndicator();
+        progress.setPrefSize(50, 50);
+
+        loadingBox.getChildren().addAll(loadingLabel, progress);
+
+        Scene scene = new Scene(loadingBox);
+        loadingStage.setScene(scene);
+
+        // 置中於主視窗
+        Stage mainStage = (Stage) resultArea.getScene().getWindow();
+        loadingStage.initOwner(mainStage);
+        loadingStage.setX(mainStage.getX() + mainStage.getWidth() / 2);
+        loadingStage.setY(mainStage.getY() + mainStage.getHeight() / 2);
+
+        // 完全禁用任何關閉方式
+        loadingStage.setOnCloseRequest(e -> e.consume());
+
+        loadingStage.show();
+        return loadingStage; // 返回 loadingStage，讓呼叫端可 close()
     }
 
     // JVM 的要求：所有 Java 應用程式必須有一個 public static void main(String[] args) 作為啟動入口
