@@ -46,6 +46,7 @@ import org.jsoup.select.Elements;
 import com.example.FugleService.Bollinger;
 import com.example.FugleService.SMA;
 import com.example.FugleService.VolumeByPrice;
+import com.example.HiStockService.MarginRecord;
 
 import org.jfree.chart.renderer.category.BarRenderer;
 import org.jfree.chart.renderer.category.LineAndShapeRenderer;
@@ -2479,32 +2480,9 @@ public class MainApp extends Application {
         });
     }
 
-    // 用來儲存融資融券資料的內部類別
-    private static class MarginRecord {
-        final String date;
-        final double marginBalance;
-        final double marginChange;
-        final long shortBalance;
-        final long shortChange;
-        final double price;
-        final double priceChangePct;
-        final double volume;
+    private final HiStockService hiStockService = new HiStockService(); // 加入成員變數
 
-        MarginRecord(String date, double marginBalance, double marginChange,
-                     long shortBalance, long shortChange,
-                     double price, double priceChangePct, double volume) {
-            this.date = date;
-            this.marginBalance = marginBalance;
-            this.marginChange = marginChange;
-            this.shortBalance = shortBalance;
-            this.shortChange = shortChange;
-            this.price = price;
-            this.priceChangePct = priceChangePct;
-            this.volume = volume;
-        }
-    }
-
-    // 查 融資券餘額數
+    // 查 融資融券餘額
     private void queryMarginBalance() {
         String daysText = daysField.getText().trim(); // 使用共用天數欄位
         int days;
@@ -2516,7 +2494,7 @@ public class MainApp extends Application {
                 return;
             }
         } catch (NumberFormatException e) {
-            showAlert("天數必須為有效數字（0 包含 以上）");
+            showAlert("天數必須為有效數字（0 包含以上）");
             return;
         }
 
@@ -2524,60 +2502,18 @@ public class MainApp extends Application {
         resultArea.setText("載入中，請稍候...");
 
         CompletableFuture.supplyAsync(() -> {
-            try {
-                Document doc = Jsoup.connect("https://histock.tw/stock/three.aspx?m=mg")
-                        .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
-                        .timeout(15000)
-                        .get();
+            List<HiStockService.MarginRecord> records = hiStockService.fetchMarginBalance();
 
-                Elements rows = doc.select("table.gvTB.gvTB_TWSE tbody tr");
-                if (rows.size() <= 1) { // 只有標題行或無資料
-                    return null;
-                }
-
-                rows.remove(0); // 移除標題行
-
-                List<MarginRecord> records = new ArrayList<>();
-
-                for (Element row : rows) {
-                    Elements cells = row.select("td");
-                    if (cells.size() < 8) continue;
-
-                    String dateStr = cells.get(0).text().trim();
-                    String[] parts = dateStr.split("/");
-                    int month = Integer.parseInt(parts[0]);
-                    int day = Integer.parseInt(parts[1]);
-                    LocalDate fullDate = LocalDate.of(LocalDate.now().getYear(), month, day);
-
-                    double marginBal = Double.parseDouble(cells.get(1).text().trim().replace(",", ""));
-                    double marginChg = Double.parseDouble(cells.get(2).text().trim().replace(",", ""));
-                    long shortBal = Long.parseLong(cells.get(3).text().trim().replace(",", ""));
-                    long shortChg = Long.parseLong(cells.get(4).text().trim().replace(",", ""));
-                    double price = Double.parseDouble(cells.get(5).text().trim().replace(",", ""));
-                    String pctStr = cells.get(6).text().trim().replace("%", "").replace(",", "");
-                    double pricePct = pctStr.isEmpty() ? 0.0 : Double.parseDouble(pctStr);
-                    double vol = Double.parseDouble(cells.get(7).text().trim().replace(",", ""));
-
-                    records.add(new MarginRecord(
-                        fullDate.format(DateTimeFormatter.ofPattern("yyyy-MM-dd")),
-                        marginBal, marginChg, shortBal, shortChg,
-                        price, pricePct, vol
-                    ));
-                }
-
-                // 根據 days 過濾：取最近 N 天（從頭取前 N 筆）
-                if (days > 0 && days < records.size()) {
-                    records = records.subList(0, days); // 取最新的 days 筆
-                }
-
-                Collections.reverse(records); // 舊的在前
-                
-                return records;
-
-            } catch (Exception ex) {
-                ex.printStackTrace();
+            if (records.isEmpty()) {
                 return null;
             }
+
+            // 取最新的 days 筆（records 已是最舊在前、最新在後）
+            if (days > 0 && days < records.size()) {
+                records = records.subList(records.size() - days, records.size());
+            }
+
+            return records;
         }).thenAccept(records -> Platform.runLater(() -> {
             if (records == null || records.isEmpty()) {
                 resultArea.setText("融資融券餘額資料載入失敗，請稍後再試。");
@@ -2590,39 +2526,42 @@ public class MainApp extends Application {
                     days == 0 ? records.size() : days)
             );
 
-            double maxMargin = records.stream().mapToDouble(r -> r.marginBalance).max().orElse(0);
-            double minMargin = records.stream().mapToDouble(r -> r.marginBalance).min().orElse(0);
-            double maxMarginChg = records.stream().mapToDouble(r -> r.marginChange).max().orElse(0);
-            double minMarginChg = records.stream().mapToDouble(r -> r.marginChange).min().orElse(0);
+            double maxMargin = records.stream().mapToDouble(r -> r.marginBalance()).max().orElse(0);
+            double minMargin = records.stream().mapToDouble(r -> r.marginBalance()).min().orElse(0);
+            double maxMarginChg = records.stream().mapToDouble(r -> r.marginChange()).max().orElse(0);
+            double minMarginChg = records.stream().mapToDouble(r -> r.marginChange()).min().orElse(0);
 
             // 逐筆顯示
-            for (MarginRecord r : records) {
-                sb.append(String.format("日期：%s\n", r.date));
-                sb.append(String.format("融資餘額（億）：%.1f\n", r.marginBalance));
-                sb.append(String.format("融資增加（億）：%.1f\n", r.marginChange));
-                sb.append(String.format("融券餘額（張）：%,d\n", r.shortBalance));
-                sb.append(String.format("融券增加（張）：%,d\n", r.shortChange));
-                sb.append(String.format("價格：%.2f\n", r.price));
-                sb.append(String.format("比例：%.2f%%\n", r.priceChangePct));
-                sb.append(String.format("成交量（億）：%.1f\n\n", r.volume));
+            for (HiStockService.MarginRecord r : records) {
+                sb.append(String.format("日期：%s\n", r.date()));
+                sb.append(String.format("融資餘額（億）：%.1f\n", r.marginBalance()));
+                sb.append(String.format("融資增加（億）：%.1f\n", r.marginChange()));
+                sb.append(String.format("融券餘額（張）：%,d\n", r.shortBalance()));
+                sb.append(String.format("融券增加（張）：%,d\n", r.shortChange()));
+                sb.append(String.format("價格：%.2f\n", r.price()));
+                sb.append(String.format("比例：%.2f%%\n", r.priceChangePct()));
+                sb.append(String.format("成交量（億）：%.1f\n\n", r.volume()));
             }
 
             // 區間統計
             List<String> maxMarginDates = records.stream()
-                    .filter(r -> r.marginBalance == maxMargin)
-                    .map(r -> r.date)
+                    .filter(r -> Math.abs(r.marginBalance() - maxMargin) < 0.01)
+                    .map(r -> r.date())
                     .toList();
+
             List<String> minMarginDates = records.stream()
-                    .filter(r -> r.marginBalance == minMargin)
-                    .map(r -> r.date)
+                    .filter(r -> Math.abs(r.marginBalance() - minMargin) < 0.01)
+                    .map(r -> r.date())
                     .toList();
+
             List<String> maxChgDates = records.stream()
-                    .filter(r -> r.marginChange == maxMarginChg)
-                    .map(r -> r.date)
+                    .filter(r -> Math.abs(r.marginChange() - maxMarginChg) < 0.01)
+                    .map(r -> r.date())
                     .toList();
+
             List<String> minChgDates = records.stream()
-                    .filter(r -> r.marginChange == minMarginChg)
-                    .map(r -> r.date)
+                    .filter(r -> Math.abs(r.marginChange() - minMarginChg) < 0.01)
+                    .map(r -> r.date())
                     .toList();
 
             sb.append(String.format("區間融資餘額最高：%.1f（%s）\n",
@@ -2635,16 +2574,15 @@ public class MainApp extends Application {
             sb.append(String.format("區間融資減少最多：%.1f（%s）\n\n",
                     minMarginChg, String.join("、", minChgDates)));
 
-            MarginRecord latest = records.get(records.size() - 1); // 最新一筆
-
-            if (latest.marginBalance >= 3500) {
+            HiStockService.MarginRecord latest = records.get(records.size() - 1); // 最新一筆
+            if (latest.marginBalance() >= 3500) {
                 sb.append("融資過熱風險高\n\n");
             }
-            if (latest.marginChange >= 30) {
+            if (latest.marginChange() >= 30) {
                 sb.append("散戶追價積極\n\n");
             }
 
-            resultArea.setText(sb.toString()); // 設定完整文字
+            resultArea.setText(sb.toString());
             resultArea.appendText(""); // 自動滾動到最底部
 
             chartPane.setContent(createCommonLineChart(
@@ -2652,8 +2590,8 @@ public class MainApp extends Application {
                     "融資融券餘額進出行情",
                     "融資餘額（億元）",
                     new Color(0, 150, 136),
-                    obj -> ((MarginRecord) obj).marginBalance,
-                    obj -> LocalDate.parse(((MarginRecord) obj).date)
+                    obj -> ((HiStockService.MarginRecord) obj).marginBalance(),
+                    obj -> LocalDate.parse(((HiStockService.MarginRecord) obj).date())
             ));
             resizeChartProportionally(); // 改用統一的等比例縮放方法
         }));
@@ -2936,13 +2874,13 @@ public class MainApp extends Application {
             analysis.append("【市場綜合警訊分析】\n\n");
             analysis.append(String.format("分析日期：%s\n", latestRate.date));
             analysis.append(String.format("加權指數：%.2f\n", latestRate.index));
-            analysis.append(String.format("融資餘額：%.1f 億元\n", latestMargin.marginBalance));
-            analysis.append(String.format("融資單日增減：%.1f 億元\n", latestMargin.marginChange));
+            analysis.append(String.format("融資餘額：%.1f 億元\n", latestMargin.marginBalance()));
+            analysis.append(String.format("融資單日增減：%.1f 億元\n", latestMargin.marginChange()));
             analysis.append(String.format("融資維持率：%.2f%%\n\n", latestRate.maintenanceRate));
 
             // 警訊判斷
-            boolean indexDown = latestMargin.priceChangePct < 0;
-            boolean marginUp = latestMargin.marginChange > 0;
+            boolean indexDown = latestMargin.priceChangePct() < 0;
+            boolean marginUp = latestMargin.marginChange() > 0;
 
             if (latestRate.maintenanceRate >= 160) {
                 analysis.append("🟢 維持率健康（≥160%），斷頭風險低\n");
@@ -2952,7 +2890,7 @@ public class MainApp extends Application {
                 analysis.append("🔴 維持率危險（<140%），斷頭潮風險極高！\n");
             }
 
-            if (latestMargin.marginBalance >= 3500) {
+            if (latestMargin.marginBalance() >= 3500) {
                 analysis.append("🔴 融資餘額過熱（≥3500億元）\n");
             }
 
@@ -2960,7 +2898,7 @@ public class MainApp extends Application {
                 analysis.append("🔴 【頂背離警訊】指數下跌但融資增加，散戶接刀，後續賣壓恐放大！\n");
             }
 
-            if (!indexDown && marginUp && latestMargin.marginChange >= 20) {
+            if (!indexDown && marginUp && latestMargin.marginChange() >= 20) {
                 analysis.append("🟡 指數上漲且融資大增，追價熱情高，需防過熱\n");
             }
 
