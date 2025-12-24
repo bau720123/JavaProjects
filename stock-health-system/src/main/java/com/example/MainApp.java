@@ -445,37 +445,35 @@ public class MainApp extends Application {
                                 }
 
                                 if (!useUserInput) {
-                                    // 動態補最近四季 TTM EPS
+                                    // 季度陣列：index 0=Q4, 1=Q3, 2=Q2, 3=Q1（從新到舊，便於找基準）
                                     double[] currentQuarters = { epsData.q4Current(), epsData.q3Current(), epsData.q2Current(), epsData.q1Current() };
                                     double[] previousQuarters = { epsData.q4Previous(), epsData.q3Previous(), epsData.q2Previous(), epsData.q1Previous() };
 
-                                    for (int i = 0; i < 4; i++) {
+                                    for (int i = 0; i < 4; i++) { // i=0: Q4, i=1: Q3, ...
                                         if (currentQuarters[i] != 0.0) {
                                             // 如果有當年季度的資料，就用當下的
                                             ttmEps += currentQuarters[i];
                                             System.err.println("使用當年度 Q" + (4-i) + "：" + currentQuarters[i]);
                                         } else {
-                                            // 缺季：優先用比例調整
-                                            double estimated = 0.0;
-
-                                            // 找前一季（i+1）作為基準
-                                            int prevQuarterIndex = i + 1;
-                                            if (prevQuarterIndex < 4 && currentQuarters[prevQuarterIndex] != 0.0 
-                                                && previousQuarters[i] != 0.0 && previousQuarters[prevQuarterIndex] != 0.0) {
-                                                
-                                                double ratio = previousQuarters[i] / previousQuarters[prevQuarterIndex]; // 上一年比例
-                                                estimated = currentQuarters[prevQuarterIndex] * ratio;
-                                                System.err.println("比例調整 Q" + (4-i) + "：使用 " + ratio + " × " + currentQuarters[prevQuarterIndex] + " = " + estimated);
-                                            } else if (previousQuarters[i] != 0.0) {
-                                                // 比例無法算，直接補上一年（fallback）
-                                                estimated = previousQuarters[i];
-                                                System.err.println("直接補上一年 Q" + (4-i) + "：" + estimated);
+                                            // 找最近的前一季作為基準（從 i+1 開始往前找）
+                                            boolean foundRatio = false;
+                                            for (int j = i + 1; j < 4; j++) {
+                                                if (currentQuarters[j] != 0.0 && previousQuarters[j] != 0.0 && previousQuarters[i] != 0.0) {
+                                                    double ratio = previousQuarters[i] / previousQuarters[j];
+                                                    double estimated = currentQuarters[j] * ratio;
+                                                    ttmEps += estimated;
+                                                    foundRatio = true;
+                                                    System.err.println("比例調整 Q" + (4-i) + "：" + ratio + " × " + currentQuarters[j] + " = " + estimated);
+                                                    break;
+                                                }
                                             }
-
-                                            ttmEps += estimated;
+                                            if (!foundRatio && previousQuarters[i] != 0.0) {
+                                                // fallback：直接補上一年
+                                                ttmEps += previousQuarters[i];
+                                                System.err.println("直接補上一年 Q" + (4-i) + "：" + previousQuarters[i]);
+                                            }
                                         }
                                     }
-
                                 }
 
                                 // 目前股價（使用現價）
