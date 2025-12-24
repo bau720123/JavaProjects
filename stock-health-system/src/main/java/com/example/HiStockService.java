@@ -108,7 +108,79 @@ public class HiStockService {
         }
     }
 
-    // 未來擴充用（EPS、歷史本益比、三大法人等）
-    // public List<EpsRecord> fetchEps(String symbol) { ... }
-    // public List<PerRecord> fetchHistoricalPer(String symbol) { ... }
+    /**
+     * 季度EPS 記錄（只取最新兩年）
+     */
+    public record QuarterlyEps(
+            int currentYear, // 最新年度
+            int previousYear, // 上一年度
+            double q1Current,
+            double q2Current,
+            double q3Current,
+            double q4Current, // 若無則 0.0
+            double q1Previous,
+            double q2Previous,
+            double q3Previous,
+            double q4Previous,
+            double annualCurrent, // 最新年累計（若未滿則為已公布累計）
+            double annualPrevious // 上一年全年
+    ) {}
+
+    /**
+     * 取得個股季度EPS（最新兩年）
+     * @param symbol 股票代號（如 "2308"）
+     * @return QuarterlyEps，若抓取失敗或無資料回傳 null
+     */
+    public QuarterlyEps fetchQuarterlyEps(String symbol) {
+        try {
+            String url = "https://histock.tw/stock/" + symbol + "/%E6%AF%8F%E8%82%A1%E7%9B%88%E9%A4%98";
+            Document doc = Jsoup.connect(url)
+                    .userAgent(USER_AGENT)
+                    .timeout(TIMEOUT_MS)
+                    .get();
+
+            Element table = doc.selectFirst("table.tb-stock.text-center.tbBasic");
+            if (table == null) {
+                return null;
+            }
+
+            Elements rows = table.select("tbody tr");
+            if (rows.size() < 6) {
+                return null;
+            }
+
+            // 年度標題（第一行）
+            Elements headerCells = rows.get(0).select("th");
+            if (headerCells.size() < 3) return null;
+
+            int currentYear = Integer.parseInt(headerCells.get(headerCells.size() - 1).text().trim());
+            int previousYear = Integer.parseInt(headerCells.get(headerCells.size() - 2).text().trim());
+
+            double[] current = new double[5];
+            double[] previous = new double[5];
+
+            for (int i = 0; i < 5; i++) {
+                Element row = rows.get(i + 1); // 從第 2 行開始（Q1）
+                Elements cells = row.select("td");
+                if (cells.size() < 2) continue;
+
+                String currStr = cells.get(cells.size() - 1).text().trim();
+                current[i] = "-".equals(currStr) ? 0.0 : parseDouble(currStr);
+
+                String prevStr = cells.get(cells.size() - 2).text().trim();
+                previous[i] = "-".equals(prevStr) ? 0.0 : parseDouble(prevStr);
+            }
+
+            return new QuarterlyEps(
+                    currentYear, previousYear,
+                    current[0], current[1], current[2], current[3],
+                    previous[0], previous[1], previous[2], previous[3],
+                    current[4], previous[4]
+            );
+
+        } catch (Exception e) {
+            System.err.println("HiStock EPS 抓取失敗 [" + symbol + "]：" + e.getMessage());
+            return null;
+        }
+    }
 }

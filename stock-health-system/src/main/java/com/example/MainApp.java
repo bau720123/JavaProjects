@@ -64,7 +64,6 @@ import java.util.Date;
 import java.util.LinkedHashMap;
 import java.time.LocalDate;
 import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -411,6 +410,116 @@ public class MainApp extends Application {
                     for (BidAsk ba : quote.asks()) {
                         sb.append(String.format("    價格：%.0f\n    張數：%d\n\n", ba.price(), ba.size()));
                     }
+
+                    // EPS 計算與估值參考
+                    CompletableFuture.supplyAsync(() -> hiStockService.fetchQuarterlyEps(symbol))
+                        .thenAccept(epsData -> Platform.runLater(() -> {
+                            sb.append("【估值參考】\n");
+
+                            if (epsData != null) {
+                                double ttmEps = 0.0;
+                                boolean useUserInput = false;
+
+                                // 彈出輸入對話框
+                                String stockInfo = quote.name() + "（" + quote.symbol() + "）";
+                                TextInputDialog dialog = createStyledInputDialog(
+                                    "全年度每股盈餘（EPS）（可選）",
+                                    "輸入 " + stockInfo + " 的 全年度每股盈餘(EPS)",
+                                    "請輸入法人預估的全年度 EPS（如 21.95）\n留空或填 0 則自動使用最近四季 TTM 計算"
+                                );
+
+                                Optional<String> result = dialog.showAndWait();
+                                if (result.isPresent()) {
+                                    String input = result.get().trim();
+                                    if (!input.isEmpty()) {
+                                        try {
+                                            double inputEps = Double.parseDouble(input);
+                                            if (inputEps > 0) {
+                                                ttmEps = inputEps;
+                                                useUserInput = true;
+                                            }
+                                        } catch (NumberFormatException ex) {
+                                            // 輸入無效，維持使用當前股價
+                                        }
+                                    }
+                                }
+
+                                if (!useUserInput) {
+                                    // 動態補最近四季 TTM EPS
+                                    double[] currentQuarters = { epsData.q4Current(), epsData.q3Current(), epsData.q2Current(), epsData.q1Current() };
+                                    double[] previousQuarters = { epsData.q4Previous(), epsData.q3Previous(), epsData.q2Previous(), epsData.q1Previous() };
+
+                                    for (int i = 0; i < 4; i++) {
+                                        if (currentQuarters[i] != 0.0) {
+                                            ttmEps += currentQuarters[i];
+                                        } else if (previousQuarters[i] != 0.0) {
+                                            ttmEps += previousQuarters[i];
+                                        }
+                                    }
+                                }
+
+                                // 目前股價（使用現價）
+                                double currentPrice = quote.closePrice();
+
+                                // 目前本益比（TTM）
+                                double currentPer = ttmEps > 0 ? currentPrice / ttmEps : 0; // 目前價格 除以 最近四季 EPS
+
+                                // 台灣加權指數長期歷史平均本益比約 16-18倍。
+                                // 電子類股（佔台股權重最高）歷史平均約 20-25倍。
+                                // 當個股本益比落在 25倍以下，通常被視為「相對便宜」或「有安全邊際」，尤其在熊市或景氣低谷時，很多優質股會回落至此區間。
+                                double cheapPrice = ttmEps * 25;
+
+
+                                // 台灣科技股（尤其是半導體、AI供應鏈）在溫和成長期，市場常給 30-40倍 的本益比。
+                                // 這是「歷史平均 + 成長溢價」的平衡點：
+                                // 傳統電子業平均25-30倍
+                                // 加上雙位數獲利成長（10-20%），市場願多給5-10倍溢價 → 35-40倍
+                                double fairPrice = ttmEps * 35;
+
+                                // 當市場進入題材熱潮（如AI、5G、電動車、疫情概念），成長股本益比常被推到 45-60倍甚至更高。
+                                // 歷史經驗：50倍以上通常是「市場極度樂觀」的訊號，獲利成長必須持續超預期才能支撐，否則容易壓縮（俗稱「昂貴追價風險高」）。
+                                // 許多財經節目或論壇會說「本益比超過45-50倍要小心」，因為歷史上多次大修正都從高本益比區開始。
+                                double expensivePrice = ttmEps * 50;
+
+                                sb.append(String.format("最近四季 EPS (TTM)：%.2f 元\n", ttmEps));
+                                sb.append(String.format("目前本益比：%.1f 倍\n\n", currentPer));
+
+                                // 位階判斷
+                                if (currentPer > 45) {
+                                    sb.append("目前處昂貴區（本益比 > 45倍）\n");
+                                } else if (currentPer > 35) {
+                                    sb.append("目前略貴（本益比 35~45倍）\n");
+                                } else if (currentPer > 25) {
+                                    sb.append("目前合理區（本益比 25~35倍）\n");
+                                } else if (currentPer > 0) {
+                                    sb.append("目前相對便宜（本益比 ≤ 25倍）\n");
+                                } else {
+                                    sb.append("（EPS 為負或無資料，無法計算本益比）\n");
+                                }
+
+                                sb.append(String.format("便宜價（25倍）：%.0f 元\n", cheapPrice));
+                                sb.append(String.format("合理價（35倍）：%.0f 元\n", fairPrice));
+                                sb.append(String.format("昂貴價（50倍）：%.0f 元\n", expensivePrice));
+
+                                // 樂觀預估全年 EPS（僅當 Q4 未出時顯示）
+                                if (!useUserInput && epsData.q4Current() == 0.0) {
+                                    double currentCumulative = epsData.q1Current() + epsData.q2Current() + epsData.q3Current();
+                                    double previousCumulative = epsData.q1Previous() + epsData.q2Previous() + epsData.q3Previous();
+                                    double yoyGrowth = previousCumulative > 0 ? (currentCumulative - previousCumulative) / previousCumulative : 0;
+
+                                    double q4Base = epsData.q4Previous(); // 去年 Q4
+                                    double adjustedQ4 = q4Base * (1 + yoyGrowth * 0.6); // 成長率打 6 折
+                                    double estimatedAnnual = currentCumulative + adjustedQ4;
+
+                                    sb.append(String.format("\n程式樂觀預估 %d 年全年 EPS：%.2f 元\n", epsData.currentYear(), estimatedAnnual));
+                                    sb.append(String.format("→ 若實現，潛在昂貴價可達 %.0f 元\n", estimatedAnnual * 50));
+                                }
+                            } else {
+                                sb.append("EPS 資料暫無法取得（可能網路問題或網站改版）\n");
+                            }
+
+                            resultArea.setText(sb.toString());
+                        }));
 
                     resultArea.setText(sb.toString()); // 設定完整文字
 
