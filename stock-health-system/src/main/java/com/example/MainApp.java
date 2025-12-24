@@ -451,17 +451,37 @@ public class MainApp extends Application {
 
                                     for (int i = 0; i < 4; i++) {
                                         if (currentQuarters[i] != 0.0) {
+                                            // 如果有當年季度的資料，就用當下的
                                             ttmEps += currentQuarters[i];
-                                        } else if (previousQuarters[i] != 0.0) {
-                                            ttmEps += previousQuarters[i];
+                                            System.err.println("使用當年度 Q" + (4-i) + "：" + currentQuarters[i]);
+                                        } else {
+                                            // 缺季：優先用比例調整
+                                            double estimated = 0.0;
+
+                                            // 找前一季（i+1）作為基準
+                                            int prevQuarterIndex = i + 1;
+                                            if (prevQuarterIndex < 4 && currentQuarters[prevQuarterIndex] != 0.0 
+                                                && previousQuarters[i] != 0.0 && previousQuarters[prevQuarterIndex] != 0.0) {
+                                                
+                                                double ratio = previousQuarters[i] / previousQuarters[prevQuarterIndex]; // 上一年比例
+                                                estimated = currentQuarters[prevQuarterIndex] * ratio;
+                                                System.err.println("比例調整 Q" + (4-i) + "：使用 " + ratio + " × " + currentQuarters[prevQuarterIndex] + " = " + estimated);
+                                            } else if (previousQuarters[i] != 0.0) {
+                                                // 比例無法算，直接補上一年（fallback）
+                                                estimated = previousQuarters[i];
+                                                System.err.println("直接補上一年 Q" + (4-i) + "：" + estimated);
+                                            }
+
+                                            ttmEps += estimated;
                                         }
                                     }
+
                                 }
 
                                 // 目前股價（使用現價）
                                 double currentPrice = quote.closePrice();
 
-                                // 目前本益比（TTM）
+                                // 本益比 TTM (Trailing Twelve Months) 是一種滾動計算的本益比，它使用公司「最近 12 個月（過去四個季度）的實際獲利」來評估當前股價，相比傳統的年度本益比，能更即時反映公司最新的獲利能力，剔除季節性影響，數據時效性強，是港股美股常用的估值指標。
                                 double currentPer = ttmEps > 0 ? currentPrice / ttmEps : 0; // 目前價格 除以 最近四季 EPS
 
                                 // 台灣加權指數長期歷史平均本益比約 16-18倍。
