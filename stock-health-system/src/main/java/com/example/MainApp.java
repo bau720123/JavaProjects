@@ -2573,17 +2573,64 @@ public class MainApp extends Application {
             StringBuilder sb = new StringBuilder();
             sb.append("加權指數 線圖已載入（近 ").append(candles.size()).append(" 日走勢）。\n\n");
 
+            // 計算漲跌（第一筆無漲跌）
+            double previousClose = 0.0; // 第一筆前無參考
+
+            // 用來統計最大漲跌與日期
+            double maxRise = Double.NEGATIVE_INFINITY;
+            double maxFall = Double.POSITIVE_INFINITY;
+            List<LocalDate> maxRiseDates = new ArrayList<>();
+            List<LocalDate> maxFallDates = new ArrayList<>();
+
             // 直接使用 YahooFinanceService.YahooCandle 迭代
             for (YahooFinanceService.YahooCandle c : candles) {
+                double change = 0.0;
+                double changePct = 0.0;
+                if (previousClose != 0.0) {
+                    change = c.close() - previousClose;
+                    changePct = (change / previousClose) * 100;
+
+                    // 更新最大漲幅
+                    if (change > maxRise) {
+                        maxRise = change;
+                        maxRiseDates.clear();
+                        maxRiseDates.add(c.date());
+                    } else if (Math.abs(change - maxRise) < 0.01) { // 同值
+                        maxRiseDates.add(c.date());
+                    }
+
+                    // 更新最大跌幅
+                    if (change < maxFall) {
+                        maxFall = change;
+                        maxFallDates.clear();
+                        maxFallDates.add(c.date());
+                    } else if (Math.abs(change - maxFall) < 0.01) {
+                        maxFallDates.add(c.date());
+                    }
+                }
+                previousClose = c.close();
+
                 sb.append(String.format("日期：%s\n", c.date()))
                   .append(String.format("開盤指數：%.2f\n", c.open()))
                   .append(String.format("最高指數：%.2f\n", c.high()))
                   .append(String.format("最低指數：%.2f\n", c.low()))
-                  .append(String.format("收盤指數：%.2f\n\n", c.close()));
+                  .append(String.format("收盤指數：%.2f\n", c.close()))
+                  .append(String.format("漲跌：%.2f\n", change))
+                  .append(String.format("漲跌幅：%.2f%%\n\n", changePct));
             }
 
             sb.append(String.format("區間最高指數：%.2f（%s）\n", maxClose, maxDate))
-              .append(String.format("區間最低指數：%.2f（%s）\n", minClose, minDate));
+              .append(String.format("區間最低指數：%.2f（%s）\n\n", minClose, minDate));
+
+            // 區間單日最大漲跌幅
+            if (maxRise > 0) { // 有上漲
+                sb.append(String.format("區間單日最大漲幅：%.2f（%s）\n",
+                        maxRise, String.join("、", maxRiseDates.stream().map(LocalDate::toString).toList())));
+            }
+            if (maxFall < 0) { // 有下跌
+                sb.append(String.format("區間單日最大跌幅：%.2f（%s）\n",
+                        maxFall, String.join("、", maxFallDates.stream().map(LocalDate::toString).toList())));
+            }
 
             resultArea.setText(sb.toString()); // 設定完整文字
             resultArea.appendText(""); // 自動滾動到最底部
