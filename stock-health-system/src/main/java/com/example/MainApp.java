@@ -223,7 +223,23 @@ public class MainApp extends Application {
 
         Button weightedBtn = new Button("加權指數");
         weightedBtn.setPrefWidth(140);
-        weightedBtn.setOnAction(e -> queryWeighted());
+        weightedBtn.setOnAction(e -> queryYahooFinance("TWII", "加權指數"));
+
+        Button DowJonesBtn = new Button("道瓊工業指數");
+        DowJonesBtn.setPrefWidth(140);
+        DowJonesBtn.setOnAction(e -> queryYahooFinance("DJI", "道瓊工業指數"));
+
+        Button SP500dBtn = new Button("標普500指數");
+        SP500dBtn.setPrefWidth(140);
+        SP500dBtn.setOnAction(e -> queryYahooFinance("GSPC", "標普500指數"));
+
+        Button NasDaqdBtn = new Button("那斯達克指數");
+        NasDaqdBtn.setPrefWidth(140);
+        NasDaqdBtn.setOnAction(e -> queryYahooFinance("IXIC", "那斯達克指數"));
+
+        Button PHLXSemiconductorBtn = new Button("費城半導體指數");
+        PHLXSemiconductorBtn.setPrefWidth(140);
+        PHLXSemiconductorBtn.setOnAction(e -> queryYahooFinance("SOX", "費城半導體指數"));
 
         Button marginBtn = new Button("融資融券餘額");
         marginBtn.setPrefWidth(140);
@@ -237,7 +253,7 @@ public class MainApp extends Application {
         comprehensiveAlertBtn.setPrefWidth(140);
         comprehensiveAlertBtn.setOnAction(e -> queryComprehensiveAlert());
 
-        marketBox.getChildren().addAll(foreignNetBtn, weightedBtn, marginBtn, marginRateBtn, comprehensiveAlertBtn);
+        marketBox.getChildren().addAll(foreignNetBtn, weightedBtn, DowJonesBtn, SP500dBtn, NasDaqdBtn, PHLXSemiconductorBtn, marginBtn, marginRateBtn, comprehensiveAlertBtn);
 
         // 用 ScrollPane 包起來
         ScrollPane marketScroll = new ScrollPane(marketBox);
@@ -395,20 +411,20 @@ public class MainApp extends Application {
             .thenAccept(quote -> Platform.runLater(() -> {
                 if (quote != null) {
                     StringBuilder sb = new StringBuilder();
-                    sb.append(String.format("股票代碼：%s\n股票名稱：%s\n\n上個收盤價：%.0f\n開盤價：%.0f\n最高價：%.0f\n最低價：%.0f\n現價：%.0f\n均價：%.2f\n漲跌：%.0f\n幅度：%.2f\n累計成交量：%d \n累計內盤成交量：%d \n累計外盤成交量：%d \n累計成交筆數：%d \n",
+                    sb.append(String.format("股票代碼：%s\n股票名稱：%s\n\n上個收盤價：%.2f\n開盤價：%.2f\n最高價：%.2f\n最低價：%.2f\n現價：%.2f\n均價：%.2f\n漲跌：%.2f\n幅度：%.2f\n累計成交量：%d \n累計內盤成交量：%d \n累計外盤成交量：%d \n累計成交筆數：%d \n",
                             quote.symbol(), quote.name(), quote.previousClose(), quote.openPrice(), quote.highPrice(), quote.lowPrice(), quote.closePrice(),
                             quote.avgPrice(), quote.change(), quote.changePercent(), quote.tradeVolume(), quote.tradeVolumeAtBid(), quote.tradeVolumeAtAsk(), quote.transaction()));
 
                     // 委買價區段內容
                     sb.append("\n【委買價】\n\n");
                     for (BidAsk ba : quote.bids()) {
-                        sb.append(String.format("    價格：%.0f\n    張數：%d\n\n", ba.price(), ba.size()));
+                        sb.append(String.format("    價格：%.2f\n    張數：%d\n\n", ba.price(), ba.size()));
                     }
 
                     // 委賣價區段內容
                     sb.append("【委賣價】\n\n");
                     for (BidAsk ba : quote.asks()) {
-                        sb.append(String.format("    價格：%.0f\n    張數：%d\n\n", ba.price(), ba.size()));
+                        sb.append(String.format("    價格：%.2f\n    張數：%d\n\n", ba.price(), ba.size()));
                     }
 
                     // EPS 計算與估值參考
@@ -500,7 +516,7 @@ public class MainApp extends Application {
                                 double expensivePrice = ttmEps * 50;
 
                                 sb.append(String.format("最近四季 EPS (TTM)：%.2f 元\n", ttmEps));
-                                sb.append(String.format("目前本益比：%.1f 倍\n\n", currentPer));
+                                sb.append(String.format("目前本益比：%.2f 倍\n\n", currentPer));
 
                                 // 位階判斷
                                 if (currentPer > 45) {
@@ -571,11 +587,17 @@ public class MainApp extends Application {
             DefaultCategoryDataset dataset = new DefaultCategoryDataset();
 
             // 取整數
-            int open = (int) Math.round(quote.openPrice());
-            int high = (int) Math.round(quote.highPrice());
-            int low = (int) Math.round(quote.lowPrice());
-            int close = (int) Math.round(quote.closePrice());
-            int avg = (int) Math.round(quote.avgPrice());
+            // int open = (int) Math.round(quote.openPrice());
+            // int high = (int) Math.round(quote.highPrice());
+            // int low = (int) Math.round(quote.lowPrice());
+            // int close = (int) Math.round(quote.closePrice());
+            // int avg = (int) Math.round(quote.avgPrice());
+
+            double open = quote.openPrice();
+            double high = quote.highPrice();
+            double low = quote.lowPrice();
+            double close = quote.closePrice();
+            double avg = quote.avgPrice();
 
             // X 軸類別標籤名稱
             dataset.addValue(open, "價格", "開盤價");
@@ -679,12 +701,12 @@ public class MainApp extends Application {
                 
                 StringBuilder sb = new StringBuilder();
                 sb.append(String.format("日期：%s\n", LocalDate.now())); // 無 date 欄位，用當日
-                sb.append(String.format("股票代碼：%s\n股票名稱：%s\n\n開盤價：%.0f\n最高價：%.0f\n最低價：%.0f\n現價：%.0f\n\n",
+                sb.append(String.format("股票代碼：%s\n股票名稱：%s\n\n開盤價：%.2f\n最高價：%.2f\n最低價：%.2f\n現價：%.2f\n\n",
                     quote.symbol(), quote.name(), quote.openPrice(), quote.highPrice(), quote.lowPrice(), quote.closePrice()));
 
                 // 依序顯示資料
                 for (VolumeByPrice v : dataList) {
-                    sb.append(String.format("成交價：%.1f\n累計成交量：%d\n內盤累計成交量：%d\n外盤累計成交量：%d\n\n",
+                    sb.append(String.format("成交價：%.2f\n累計成交量：%d\n內盤累計成交量：%d\n外盤累計成交量：%d\n\n",
                         v.price(), v.volume(), v.volumeAtBid(), v.volumeAtAsk()));
                 }
 
@@ -698,7 +720,7 @@ public class MainApp extends Application {
                     
                     double askPct = poc.volume() > 0 ? (poc.volumeAtAsk() * 100.0 / poc.volume()) : 0;
                     
-                    sb.append(String.format("POC（最大成交量價位）：%.1f 元（成交 %d 張，外盤比例 %.1f%%）\n",
+                    sb.append(String.format("POC（最大成交量價位）：%.2f 元（成交 %d 張，外盤比例 %.2f%%）\n",
                         poc.price(), poc.volume(), askPct));
                     
                     if (askPct > 70) {
@@ -754,7 +776,7 @@ public class MainApp extends Application {
             double xMax = maxVolume * 1.3;  // 多留空間
 
             //宣告 DecimalFormat，用來統一價格格式並避免浮點誤差
-            DecimalFormat df = new DecimalFormat("#0.0");  // 強制顯示一位小數，如 915.0
+            DecimalFormat df = new DecimalFormat("#0.00");  // 強制顯示兩位小數，如 915.00
 
             // 依據將價格加入Y軸
             for (VolumeByPrice v : dataList) {
@@ -1118,7 +1140,7 @@ public class MainApp extends Application {
                     StringBuilder sb = new StringBuilder(String.format("歷史K線圖已載入（近 %d 日走勢）。\n\n", candles.size()));
                     for (Candle c : candles) {
                         String tag = c.date().equals(today) && !hasToday ? "（即時演算）" : "";
-                        sb.append(String.format("日期：%s%s\n開盤價：%.1f\n最高價：%.1f\n最低價：%.1f\n收盤價：%.1f\n成交量：%d\n漲跌：%.1f\n\n",
+                        sb.append(String.format("日期：%s%s\n開盤價：%.2f\n最高價：%.2f\n最低價：%.2f\n收盤價：%.2f\n成交量：%d\n漲跌：%.2f\n\n",
                             c.date(), tag, c.open(), c.high(), c.low(), c.close(), c.volume(), c.change()));
                     }
 
@@ -1147,8 +1169,8 @@ public class MainApp extends Application {
                             .map(LocalDate::toString)
                             .collect(Collectors.joining("、"));
 
-                    sb.append(String.format("區間觸及最高價：%.1f（%s）\n", maxHigh, maxHighDateStr)); // 格式化添加（%.1f 保留1位小數）
-                    sb.append(String.format("區間觸及最低價：%.1f（%s）\n\n", minLow, minLowDateStr)); // 格式化添加（%.1f 保留1位小數）
+                    sb.append(String.format("區間觸及最高價：%.2f（%s）\n", maxHigh, maxHighDateStr)); // 格式化添加（%.2f 保留1位小數）
+                    sb.append(String.format("區間觸及最低價：%.2f（%s）\n\n", minLow, minLowDateStr)); // 格式化添加（%.2f 保留1位小數）
 
                     // 區間單日最大漲幅與最大跌幅
                     double maxDailyGain = candles.stream()
@@ -1182,8 +1204,8 @@ public class MainApp extends Application {
                             .collect(Collectors.joining("、"));
 
                     // 若漲跌為 0 或無資料，顯示為 0（避免顯示 -0）
-                    String maxGainDisplay = maxDailyGain > 0 ? String.format("%.1f", maxDailyGain) : "0";
-                    String minGainDisplay = minDailyGain < 0 ? String.format("%.1f", minDailyGain) : "0";
+                    String maxGainDisplay = maxDailyGain > 0 ? String.format("%.2f", maxDailyGain) : "0";
+                    String minGainDisplay = minDailyGain < 0 ? String.format("%.2f", minDailyGain) : "0";
 
                     sb.append(String.format("區間單日最大漲幅：%s（%s）\n", 
                         maxGainDisplay, maxGainDates.isEmpty() ? "無" : maxGainDateStr));
@@ -1245,7 +1267,7 @@ public class MainApp extends Application {
                         // 頂背離
                         if (maxHighIndex != -1 && avgVolume > 0 && maxHighVolume < avgVolume * 0.7) {
                             LocalDate maxHighDate = candles.get(maxHighIndex).date();
-                            sb.append(String.format("頂背離警訊：%s 觸及區間最高價 %.1f，但成交量 %,d 僅為平均 %,d 的 %.0f%%（量縮明顯，追價動能不足）\n",
+                            sb.append(String.format("頂背離警訊：%s 觸及區間最高價 %.2f，但成交量 %,d 僅為平均 %,d 的 %.0f%%（量縮明顯，追價動能不足）\n",
                                     maxHighDate, maxHigh, maxHighVolume, avgVolume,
                                     (maxHighVolume * 100.0 / avgVolume)));
                             hasDivergence = true;
@@ -1254,7 +1276,7 @@ public class MainApp extends Application {
                         // 底背離
                         if (minLowIndex != -1 && avgVolume > 0 && minLowVolume < avgVolume * 0.7) {
                             LocalDate minLowDate = candles.get(minLowIndex).date();
-                            sb.append(String.format("底背離警訊：%s 觸及區間最低價 %.1f，但成交量 %,d 僅為平均 %,d 的 %.0f%%（量縮明顯，賣壓衰竭）\n",
+                            sb.append(String.format("底背離警訊：%s 觸及區間最低價 %.2f，但成交量 %,d 僅為平均 %,d 的 %.0f%%（量縮明顯，賣壓衰竭）\n",
                                     minLowDate, minLow, minLowVolume, avgVolume,
                                     (minLowVolume * 100.0 / avgVolume)));
                             hasDivergence = true;
@@ -1390,7 +1412,8 @@ public class MainApp extends Application {
                     sb.append(String.format("日期：%s\n", row[0]));
                     sb.append(String.format("外資：%,d\n", foreign));
                     sb.append(String.format("投信：%,d\n", trust));
-                    sb.append(String.format("自營商：%,d\n\n", dealer));
+                    sb.append(String.format("自營商：%,d\n", dealer));
+                    sb.append(String.format("合計：%,d\n\n", foreign + dealer + trust));
 
                     // 極值更新
                     if (trust > maxTrust) { maxTrust = trust; maxTrustDate = row[0]; }
@@ -2514,8 +2537,8 @@ public class MainApp extends Application {
         });
     }
 
-    // 查 加權指數
-    private void queryWeighted() {
+    // 查 YahooFinance
+    private void queryYahooFinance(String symbol, String symbolName) {
         String daysText = daysField.getText().trim(); // 使用共用天數欄位
         int days;
 
@@ -2535,10 +2558,10 @@ public class MainApp extends Application {
 
         CompletableFuture.supplyAsync(() -> {
             YahooFinanceService yahooService = new YahooFinanceService();
-            List<YahooFinanceService.YahooCandle> candles = yahooService.fetchHistory("^TWII", days);
+            List<YahooFinanceService.YahooCandle> candles = yahooService.fetchHistory("^" + symbol, days);
 
             if (candles.isEmpty()) {
-                throw new RuntimeException("無法取得 加權指數 資料，請檢查網路或稍後再試");
+                throw new RuntimeException("無法取得 " + symbolName + " 資料，請檢查網路或稍後再試");
             }
 
             // 直接在背景執行緒計算統計值
@@ -2571,7 +2594,7 @@ public class MainApp extends Application {
             LocalDate minDate = (LocalDate) resultMap.get("minDate");
 
             StringBuilder sb = new StringBuilder();
-            sb.append("加權指數 線圖已載入（近 ").append(candles.size()).append(" 日走勢）。\n\n");
+            sb.append(symbolName + " 線圖已載入（近 ").append(candles.size()).append(" 日走勢）。\n\n");
 
             // 計算漲跌（第一筆無漲跌）
             double previousClose = 0.0; // 第一筆前無參考
@@ -2638,8 +2661,8 @@ public class MainApp extends Application {
             // 加權指數圖表
             chartPane.setContent(createCommonLineChart(
                 candles, // 資料來源
-                "TWII",
-                "加權指數",
+                symbol,
+                symbolName,
                 new Color(178, 34, 34),
                 candle -> ((YahooFinanceService.YahooCandle) candle).close(),
                 candle -> ((YahooFinanceService.YahooCandle) candle).date()
@@ -2708,13 +2731,13 @@ public class MainApp extends Application {
             // 逐筆顯示
             for (HiStockService.MarginRecord r : records) {
                 sb.append(String.format("日期：%s\n", r.date()));
-                sb.append(String.format("融資餘額（億）：%.1f\n", r.marginBalance()));
-                sb.append(String.format("融資增加（億）：%.1f\n", r.marginChange()));
+                sb.append(String.format("融資餘額（億）：%.2f\n", r.marginBalance()));
+                sb.append(String.format("融資增加（億）：%.2f\n", r.marginChange()));
                 sb.append(String.format("融券餘額（張）：%,d\n", r.shortBalance()));
                 sb.append(String.format("融券增加（張）：%,d\n", r.shortChange()));
                 sb.append(String.format("價格：%.2f\n", r.price()));
                 sb.append(String.format("比例：%.2f%%\n", r.priceChangePct()));
-                sb.append(String.format("成交量（億）：%.1f\n\n", r.volume()));
+                sb.append(String.format("成交量（億）：%.2f\n\n", r.volume()));
             }
 
             // 區間統計
@@ -2738,14 +2761,14 @@ public class MainApp extends Application {
                     .map(r -> r.date())
                     .toList();
 
-            sb.append(String.format("區間融資餘額最高：%.1f（%s）\n",
+            sb.append(String.format("區間融資餘額最高：%.2f（%s）\n",
                     maxMargin, String.join("、", maxMarginDates)));
-            sb.append(String.format("區間融資餘額最低：%.1f（%s）\n\n",
+            sb.append(String.format("區間融資餘額最低：%.2f（%s）\n\n",
                     minMargin, String.join("、", minMarginDates)));
 
-            sb.append(String.format("區間融資增加最多：%.1f（%s）\n",
+            sb.append(String.format("區間融資增加最多：%.2f（%s）\n",
                     maxMarginChg, String.join("、", maxChgDates)));
-            sb.append(String.format("區間融資減少最多：%.1f（%s）\n\n",
+            sb.append(String.format("區間融資減少最多：%.2f（%s）\n\n",
                     minMarginChg, String.join("、", minChgDates)));
 
             HiStockService.MarginRecord latest = records.get(records.size() - 1); // 最新一筆
@@ -3048,8 +3071,8 @@ public class MainApp extends Application {
             analysis.append("【市場綜合警訊分析】\n\n");
             analysis.append(String.format("分析日期：%s\n", latestRate.date));
             analysis.append(String.format("加權指數：%.2f\n", latestRate.index));
-            analysis.append(String.format("融資餘額：%.1f 億元\n", latestMargin.marginBalance()));
-            analysis.append(String.format("融資單日增減：%.1f 億元\n", latestMargin.marginChange()));
+            analysis.append(String.format("融資餘額：%.2f 億元\n", latestMargin.marginBalance()));
+            analysis.append(String.format("融資單日增減：%.2f 億元\n", latestMargin.marginChange()));
             analysis.append(String.format("融資維持率：%.2f%%\n\n", latestRate.maintenanceRate));
 
             // 警訊判斷

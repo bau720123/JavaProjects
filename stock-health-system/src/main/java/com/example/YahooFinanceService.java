@@ -38,16 +38,17 @@ public class YahooFinanceService {
         try {
             LocalDate today = LocalDate.now();
             LocalDate startDate = today.minusDays(days - 1); // 包含今天，所以減 days-1
+            String encodedSymbol = symbol.replace("^", "%5E"); // ^VIX → %5EVIX
 
             long period1 = startDate.atStartOfDay(ZoneId.of("UTC")).toEpochSecond();
             long period2 = today.plusDays(1).atStartOfDay(ZoneId.of("UTC")).toEpochSecond();
 
-            String encodedSymbol = symbol.replace("^", "%5E"); // ^VIX → %5EVIX
-            /*String url = String.format(
-                "https://query1.finance.yahoo.com/v8/finance/chart/%s" +
-                "?period1=%d&period2=%d&interval=1d&events=history&includeAdjustedClose=true",
-                encodedSymbol, period1, period2
-            );*/
+            // String url = String.format(
+            //     "https://query1.finance.yahoo.com/v8/finance/chart/%s" +
+            //     "?period1=%d&period2=%d&interval=1d&events=history&includeAdjustedClose=true",
+            //     encodedSymbol, period1, period2
+            // );
+
             String url = String.format(
                 "https://query1.finance.yahoo.com/v8/finance/chart/%s" + "?interval=1d&range=%d" + "d",
                 encodedSymbol, days
@@ -99,9 +100,9 @@ public class YahooFinanceService {
                     }
                 }
 
-                // 補充今日即時價格（如果歷史資料未包含今天）
+                // 補充今日即時價格（如果加權指數歷史資料未包含今天）
                 double realtime = meta.path("regularMarketPrice").asDouble(0.0);
-                if (realtime > 0.0) {
+                if (realtime > 0.0 && encodedSymbol.equals("TWII")) {
                     boolean hasToday = candles.stream().anyMatch(c -> c.date().equals(today));
                     if (!hasToday) {
                         candles.add(new YahooCandle(today, realtime, realtime, realtime, realtime));

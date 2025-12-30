@@ -324,7 +324,7 @@ public class FugleService {
                 }
             }
         } catch (Exception e) {
-            System.err.println("布林通道資料抓取失敗: " + e.getMessage());
+            System.err.println("布林通道資料抓取失敗：" + e.getMessage());
         }
         return List.of();
     }

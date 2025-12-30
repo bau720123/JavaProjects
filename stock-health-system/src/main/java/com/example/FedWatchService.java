@@ -37,7 +37,7 @@ public class FedWatchService {
                 .build();
             return client.send(request, HttpResponse.BodyHandlers.ofString());
         } catch (Exception e) {
-            System.err.println("FRED API 呼叫失敗 [" + seriesId + "]: " + e.getMessage());
+            System.err.println("FRED API 呼叫失敗 [" + seriesId + "]：" + e.getMessage());
             return null;
         }
     }
@@ -152,7 +152,7 @@ public class FedWatchService {
                             try {
                                 probability = Double.parseDouble(cleaned);
                             } catch (NumberFormatException e) {
-                                System.err.println("無法解析的機率格式，預設為 0: " + curr);
+                                System.err.println("無法解析的機率格式，預設為 0：" + curr);
                                 probability = 0.0;
                             }
                         }
