@@ -464,6 +464,8 @@ public class MainApp extends Application {
                                     // 季度陣列：index 0=Q4, 1=Q3, 2=Q2, 3=Q1（從新到舊，便於找基準）
                                     double[] currentQuarters = { epsData.q4Current(), epsData.q3Current(), epsData.q2Current(), epsData.q1Current() };
                                     double[] previousQuarters = { epsData.q4Previous(), epsData.q3Previous(), epsData.q2Previous(), epsData.q1Previous() };
+                                    System.err.println("當年度：" + epsData.q4Current() + ", " + epsData.q3Current() + ", " + epsData.q2Current() + ", " + epsData.q1Current());
+                                    System.err.println("上個年度：" + epsData.q4Previous() + ", " + epsData.q3Previous() + ", " + epsData.q2Previous() + ", " + epsData.q1Previous());
 
                                     for (int i = 0; i < 4; i++) { // i=0: Q4, i=1: Q3, ...
                                         if (currentQuarters[i] != 0.0) {
@@ -479,7 +481,7 @@ public class MainApp extends Application {
                                                     double estimated = currentQuarters[j] * ratio;
                                                     ttmEps += estimated;
                                                     foundRatio = true;
-                                                    System.err.println("比例調整 Q" + (4-i) + "：" + ratio + " × " + currentQuarters[j] + " = " + estimated);
+                                                    System.err.println("使用比例調整 Q" + (4-i) + "：" + ratio + " × " + currentQuarters[j] + " = " + estimated);
                                                     break;
                                                 }
                                             }

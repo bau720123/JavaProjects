@@ -153,8 +153,34 @@ public class HiStockService {
             Elements headerCells = rows.get(0).select("th");
             if (headerCells.size() < 3) return null;
 
-            int currentYear = Integer.parseInt(headerCells.get(headerCells.size() - 1).text().trim());
-            int previousYear = Integer.parseInt(headerCells.get(headerCells.size() - 2).text().trim());
+            int systemYear = LocalDate.now().getYear(); // 例如 2026
+
+            // 判斷 headerCells 中是否有當年度（systemYear）的資料
+            boolean hasCurrentYear = false;
+            for (int i = 1; i < headerCells.size(); i++) { // 從 1 開始跳過「季別/年度」
+                String text = headerCells.get(i).text().trim();
+                if (!text.isEmpty()) {
+                    try {
+                        int year = Integer.parseInt(text);
+                        if (year == systemYear) {
+                            hasCurrentYear = true;
+                            break;
+                        }
+                    } catch (NumberFormatException e) {
+                        // 非數字，忽略
+                    }
+                }
+            }
+
+            // 根據是否有當年度決定 indexLocate
+            int indexLocate = hasCurrentYear ? 1 : 2;
+
+            System.err.println("hasCurrentYear：" + hasCurrentYear + ", indexLocate：" + indexLocate);
+
+            int currentYear = Integer.parseInt(headerCells.get(headerCells.size() - indexLocate).text().trim());
+            int previousYear = Integer.parseInt(headerCells.get(headerCells.size() - (indexLocate + 1)).text().trim());
+
+            System.err.println("currentYear：" + currentYear + ", previousYear：" + previousYear);
 
             double[] current = new double[5];
             double[] previous = new double[5];
@@ -164,10 +190,10 @@ public class HiStockService {
                 Elements cells = row.select("td");
                 if (cells.size() < 2) continue;
 
-                String currStr = cells.get(cells.size() - 1).text().trim();
+                String currStr = cells.get(cells.size() - indexLocate).text().trim();
                 current[i] = "-".equals(currStr) ? 0.0 : parseDouble(currStr);
 
-                String prevStr = cells.get(cells.size() - 2).text().trim();
+                String prevStr = cells.get(cells.size() - (indexLocate + 1)).text().trim();
                 previous[i] = "-".equals(prevStr) ? 0.0 : parseDouble(prevStr);
             }
 
