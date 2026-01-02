@@ -180,7 +180,7 @@ public class HiStockService {
             int currentYear = Integer.parseInt(headerCells.get(headerCells.size() - indexLocate).text().trim());
             int previousYear = Integer.parseInt(headerCells.get(headerCells.size() - (indexLocate + 1)).text().trim());
 
-            System.err.println("currentYear：" + currentYear + ", previousYear：" + previousYear);
+            System.err.println("systemYear：" + systemYear + ", currentYear：" + currentYear + ", previousYear：" + previousYear);
 
             double[] current = new double[5];
             double[] previous = new double[5];
@@ -208,5 +208,82 @@ public class HiStockService {
             System.err.println("HiStock EPS 抓取失敗 [" + symbol + "]：" + e.getMessage());
             return null;
         }
+    }
+
+    /**
+     * 回傳歷史本益比分位資訊
+     * 若爬蟲失敗，回傳 null，使用預設固定倍數並提示
+     */
+    public static class HistoricalPE {
+        public double cheapPE;    // 20% 分位
+        public double fairPE;     // 50% 分位
+        public double expensivePE; // 80% 分位
+        public int dataCount;    // 有效數據筆數
+    }
+
+    public HistoricalPE fetchHistoricalPE(String symbol) {
+        String url = "https://histock.tw/stock/" + symbol + "/%E6%9C%AC%E7%9B%8A%E6%AF%94";
+        try {
+            Document doc = Jsoup.connect(url)
+                    .userAgent("Mozilla/5.0")
+                    .timeout(10000)
+                    .get();
+
+            Elements rows = doc.select("table.tb-stock.tb-outline.tbBasic tbody tr");
+            List<Double> peList = new ArrayList<>();
+
+            for (Element row : rows) {
+                if (row.hasClass("row") || row.hasClass("alt-row")) {  // 跳過表頭
+                    Elements tds = row.select("td");
+                    // 每行10個td，偶數索引(1,3,5,7,9) 才是本益比值 (Java索引從0開始，所以1,3,5,7,9)
+                    System.err.println("tds.size()：" + tds.size());
+                    for (int i = 1; i < tds.size(); i += 2) {
+                        String text = tds.get(i).text().trim();
+                        if (!text.equals("--") && text.matches("\\d+\\.\\d+")) {
+                            System.err.println("歷史本益比：" + Double.parseDouble(text));
+                            peList.add(Double.parseDouble(text));
+                        }
+                    }
+                }
+            }
+
+            if (peList.size() < 10) {
+                System.err.println("歷史本益比數據不足：" + peList.size());
+                return null;
+            }
+
+            System.err.println("資料大小：" + peList.size());
+            Collections.sort(peList);
+
+            HistoricalPE result = new HistoricalPE();
+            result.dataCount = peList.size();
+            result.cheapPE = getPercentile(peList, 20);
+            result.fairPE = getPercentile(peList, 50);
+            result.expensivePE = getPercentile(peList, 80);
+
+            return result;
+
+        } catch (Exception e) {
+            System.err.println("抓取歷史本益比失敗：" + e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * 線性插值計算分位數（標準統計方法）
+     */
+    private static double getPercentile(List<Double> sortedList, double percentile) {
+        int n = sortedList.size();
+        double position = (percentile / 100.0) * (n - 1);
+        int lowerIndex = (int) position;
+        double fraction = position - lowerIndex;
+
+        if (lowerIndex + 1 >= n) {
+            return sortedList.get(n - 1);
+        }
+
+        double lower = sortedList.get(lowerIndex);
+        double upper = sortedList.get(lowerIndex + 1);
+        return lower + fraction * (upper - lower);
     }
 }

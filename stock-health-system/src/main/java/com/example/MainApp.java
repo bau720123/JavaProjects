@@ -46,6 +46,7 @@ import org.jsoup.select.Elements;
 import com.example.FugleService.Bollinger;
 import com.example.FugleService.SMA;
 import com.example.FugleService.VolumeByPrice;
+import com.example.HiStockService.HistoricalPE;
 import com.example.HiStockService.MarginRecord;
 
 import org.jfree.chart.renderer.category.BarRenderer;
@@ -430,7 +431,7 @@ public class MainApp extends Application {
                     // EPS 計算與估值參考
                     CompletableFuture.supplyAsync(() -> hiStockService.fetchQuarterlyEps(symbol))
                         .thenAccept(epsData -> Platform.runLater(() -> {
-                            sb.append("【估值參考】\n");
+                            sb.append("【估值參考】\n\n");
 
                             if (epsData != null) {
                                 double ttmEps = 0.0;
@@ -500,42 +501,44 @@ public class MainApp extends Application {
                                 // 本益比 TTM (Trailing Twelve Months) 是一種滾動計算的本益比，它使用公司「最近 12 個月（過去四個季度）的實際獲利」來評估當前股價，相比傳統的年度本益比，能更即時反映公司最新的獲利能力，剔除季節性影響，數據時效性強，是港股美股常用的估值指標。
                                 double currentPer = ttmEps > 0 ? currentPrice / ttmEps : 0; // 目前價格 除以 最近四季 EPS
 
-                                // 台灣加權指數長期歷史平均本益比約 16-18倍。
-                                // 電子類股（佔台股權重最高）歷史平均約 20-25倍。
-                                // 當個股本益比落在 25倍以下，通常被視為「相對便宜」或「有安全邊際」，尤其在熊市或景氣低谷時，很多優質股會回落至此區間。
-                                double cheapPrice = ttmEps * 25;
+                                // 歷史本益比分位估值參考
+                                double cheapPrice;
+                                double fairPrice;
+                                double expensivePrice ;
+                                HistoricalPE pe = hiStockService.fetchHistoricalPE(symbol);
+                                if (pe != null && epsData != null) {
+                                    cheapPrice = ttmEps * pe.cheapPE;
+                                    fairPrice = ttmEps * pe.fairPE;
+                                    expensivePrice = ttmEps * pe.expensivePE;
 
+                                    sb.append("【動態（基於歷史本益比分位，").append(pe.dataCount).append("筆數據）】\n\n");
+                                    sb.append(String.format("便宜價（20%%分位 %.1f倍）：%.0f 元\n", pe.cheapPE, cheapPrice));
+                                    sb.append(String.format("合理價（中位數 %.1f倍）：%.0f 元\n", pe.fairPE, fairPrice));
+                                    sb.append(String.format("昂貴價（80%%分位 %.1f倍）：%.0f 元\n\n", pe.expensivePE, expensivePrice));
 
-                                // 台灣科技股（尤其是半導體、AI供應鏈）在溫和成長期，市場常給 30-40倍 的本益比。
-                                // 這是「歷史平均 + 成長溢價」的平衡點：
-                                // 傳統電子業平均25-30倍
-                                // 加上雙位數獲利成長（10-20%），市場願多給5-10倍溢價 → 35-40倍
-                                double fairPrice = ttmEps * 35;
+                                    // sb.append("※ 目前本益比位於歷史 ※\n");
+                                    // if (currentPer <= pe.cheapPE) {
+                                    //     sb.append("極便宜區（低於20%分位）\n");
+                                    // } else if (currentPer <= pe.fairPE) {
+                                    //     sb.append("相對便宜至合理區\n");
+                                    // } else if (currentPer <= pe.expensivePE) {
+                                    //     sb.append("相對貴區\n");
+                                    // } else {
+                                    //     sb.append("極貴區（高於80%分位）\n");
+                                    // }
+                                } else {
+                                    cheapPrice = ttmEps * 25;
+                                    fairPrice = ttmEps * 35;
+                                    expensivePrice = ttmEps * 50;
 
-                                // 當市場進入題材熱潮（如AI、5G、電動車、疫情概念），成長股本益比常被推到 45-60倍甚至更高。
-                                // 歷史經驗：50倍以上通常是「市場極度樂觀」的訊號，獲利成長必須持續超預期才能支撐，否則容易壓縮（俗稱「昂貴追價風險高」）。
-                                // 許多財經節目或論壇會說「本益比超過45-50倍要小心」，因為歷史上多次大修正都從高本益比區開始。
-                                double expensivePrice = ttmEps * 50;
+                                    sb.append("【靜態】\n\n");
+                                    sb.append(String.format("便宜價（25倍）：%.0f 元\n", cheapPrice));
+                                    sb.append(String.format("合理價（35倍）：%.0f 元\n", fairPrice));
+                                    sb.append(String.format("昂貴價（50倍）：%.0f 元\n", expensivePrice));
+                                }
 
                                 sb.append(String.format("最近四季 EPS (TTM)：%.2f 元\n", ttmEps));
                                 sb.append(String.format("目前本益比：%.2f 倍\n\n", currentPer));
-
-                                // 位階判斷
-                                if (currentPer > 45) {
-                                    sb.append("目前處昂貴區（本益比 > 45倍）\n");
-                                } else if (currentPer > 35) {
-                                    sb.append("目前略貴（本益比 35~45倍）\n");
-                                } else if (currentPer > 25) {
-                                    sb.append("目前合理區（本益比 25~35倍）\n");
-                                } else if (currentPer > 0) {
-                                    sb.append("目前相對便宜（本益比 ≤ 25倍）\n");
-                                } else {
-                                    sb.append("（EPS 為負或無資料，無法計算本益比）\n");
-                                }
-
-                                sb.append(String.format("便宜價（25倍）：%.0f 元\n", cheapPrice));
-                                sb.append(String.format("合理價（35倍）：%.0f 元\n", fairPrice));
-                                sb.append(String.format("昂貴價（50倍）：%.0f 元\n", expensivePrice));
 
                                 // 樂觀預估全年 EPS（僅當 Q4 未出時顯示）
                                 if (!useUserInput && epsData.q4Current() == 0.0) {
@@ -547,7 +550,7 @@ public class MainApp extends Application {
                                     double adjustedQ4 = q4Base * (1 + yoyGrowth * 0.6); // 成長率打 6 折
                                     double estimatedAnnual = currentCumulative + adjustedQ4;
 
-                                    sb.append(String.format("\n程式樂觀預估 %d 年全年 EPS：%.2f 元\n", epsData.currentYear(), estimatedAnnual));
+                                    sb.append(String.format("程式樂觀預估 %d 年全年 EPS：%.2f 元\n", epsData.currentYear(), estimatedAnnual));
                                     sb.append(String.format("→ 若實現，潛在昂貴價可達 %.0f 元\n", estimatedAnnual * 50));
                                 }
                             } else {
