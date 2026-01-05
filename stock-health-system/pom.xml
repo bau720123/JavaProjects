@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.example</groupId>
     <artifactId>stock-health</artifactId>
-    <version>3.0.2</version>
+    <version>3.0.3</version>
 
     <properties>
         <maven.compiler.source>25</maven.compiler.source>
@@ -152,7 +152,7 @@
                             <!-- 應用程式基本資訊 -->
 
                             <name>StockHealth</name>  <!-- 安裝後的程式名稱,也是 .exe 檔名的前綴 -->
-                            <mainJar>stock-health-3.0.2.jar</mainJar>  <!-- 主要的 JAR 檔名(從 input 目錄讀取) -->
+                            <mainJar>stock-health-3.0.3.jar</mainJar>  <!-- 主要的 JAR 檔名(從 input 目錄讀取) -->
                             <mainClass>com.example.Launcher</mainClass>  <!-- 程式的主類別(入口點) -->
                             <type>MSI</type>  <!-- 打包類型: EXE=安裝檔, MSI=Windows 安裝程式, APP-IMAGE=免安裝版 -->
                             
@@ -187,7 +187,7 @@
 
                             <appVersion>${project.version}</appVersion>
                             <!-- 應用程式版本號,從 pom.xml 的 <version> 讀取 -->
-                            <!-- 例如: 3.0.2 → StockHealth-3.0.2.exe -->
+                            <!-- 例如: 3.0.3 → StockHealth-3.0.3.exe -->
 
                             <icon>${project.basedir}/src/main/resources/icon.ico</icon>
                             <!-- 應用程式圖示檔案路徑 -->

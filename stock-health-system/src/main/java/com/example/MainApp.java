@@ -512,9 +512,9 @@ public class MainApp extends Application {
                                     expensivePrice = ttmEps * pe.expensivePE;
 
                                     sb.append("【動態（基於歷史本益比分位，").append(pe.dataCount).append("筆數據）】\n\n");
-                                    sb.append(String.format("便宜價（20%%分位 %.1f倍）：%.0f 元\n", pe.cheapPE, cheapPrice));
-                                    sb.append(String.format("合理價（中位數 %.1f倍）：%.0f 元\n", pe.fairPE, fairPrice));
-                                    sb.append(String.format("昂貴價（80%%分位 %.1f倍）：%.0f 元\n\n", pe.expensivePE, expensivePrice));
+                                    sb.append(String.format("便宜價（" + pe.cheapPE_percent + "%%分位 %.1f倍）：%.0f 元\n", pe.cheapPE, cheapPrice));
+                                    sb.append(String.format("合理價（" + pe.fairPE_percent + "%%分位 %.1f倍）：%.0f 元\n", pe.fairPE, fairPrice));
+                                    sb.append(String.format("昂貴價（" + pe.expensivePE_percent + "%%分位 %.1f倍）：%.0f 元\n\n", pe.expensivePE, expensivePrice));
 
                                     // sb.append("※ 目前本益比位於歷史 ※\n");
                                     // if (currentPer <= pe.cheapPE) {
@@ -541,18 +541,18 @@ public class MainApp extends Application {
                                 sb.append(String.format("目前本益比：%.2f 倍\n\n", currentPer));
 
                                 // 樂觀預估全年 EPS（僅當 Q4 未出時顯示）
-                                if (!useUserInput && epsData.q4Current() == 0.0) {
-                                    double currentCumulative = epsData.q1Current() + epsData.q2Current() + epsData.q3Current();
-                                    double previousCumulative = epsData.q1Previous() + epsData.q2Previous() + epsData.q3Previous();
-                                    double yoyGrowth = previousCumulative > 0 ? (currentCumulative - previousCumulative) / previousCumulative : 0;
+                                // if (!useUserInput && epsData.q4Current() == 0.0) {
+                                //     double currentCumulative = epsData.q1Current() + epsData.q2Current() + epsData.q3Current();
+                                //     double previousCumulative = epsData.q1Previous() + epsData.q2Previous() + epsData.q3Previous();
+                                //     double yoyGrowth = previousCumulative > 0 ? (currentCumulative - previousCumulative) / previousCumulative : 0;
 
-                                    double q4Base = epsData.q4Previous(); // 去年 Q4
-                                    double adjustedQ4 = q4Base * (1 + yoyGrowth * 0.6); // 成長率打 6 折
-                                    double estimatedAnnual = currentCumulative + adjustedQ4;
+                                //     double q4Base = epsData.q4Previous(); // 去年 Q4
+                                //     double adjustedQ4 = q4Base * (1 + yoyGrowth * 0.6); // 成長率打 6 折
+                                //     double estimatedAnnual = currentCumulative + adjustedQ4;
 
-                                    sb.append(String.format("程式樂觀預估 %d 年全年 EPS：%.2f 元\n", epsData.currentYear(), estimatedAnnual));
-                                    sb.append(String.format("→ 若實現，潛在昂貴價可達 %.0f 元\n", estimatedAnnual * 50));
-                                }
+                                //     sb.append(String.format("程式樂觀預估 %d 年全年 EPS：%.2f 元\n", epsData.currentYear(), estimatedAnnual));
+                                //     sb.append(String.format("→ 若實現，潛在昂貴價可達 %.0f 元\n", estimatedAnnual * 50));
+                                // }
                             } else {
                                 sb.append("EPS 資料暫無法取得（可能網路問題或網站改版）\n");
                             }

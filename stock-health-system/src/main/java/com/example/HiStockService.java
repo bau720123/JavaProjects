@@ -215,10 +215,13 @@ public class HiStockService {
      * 若爬蟲失敗，回傳 null，使用預設固定倍數並提示
      */
     public static class HistoricalPE {
-        public double cheapPE;    // 20% 分位
-        public double fairPE;     // 50% 分位
-        public double expensivePE; // 80% 分位
-        public int dataCount;    // 有效數據筆數
+        public double cheapPE;
+        public double cheapPE_percent = 40;
+        public double fairPE;
+        public double fairPE_percent = 70;
+        public double expensivePE;
+        public double expensivePE_percent = 90;
+        public int dataCount; // 有效數據筆數
     }
 
     public HistoricalPE fetchHistoricalPE(String symbol) {
@@ -257,9 +260,9 @@ public class HiStockService {
 
             HistoricalPE result = new HistoricalPE();
             result.dataCount = peList.size();
-            result.cheapPE = getPercentile(peList, 20);
-            result.fairPE = getPercentile(peList, 50);
-            result.expensivePE = getPercentile(peList, 80);
+            result.cheapPE = getPercentile(peList, result.cheapPE_percent);
+            result.fairPE = getPercentile(peList, result.fairPE_percent);
+            result.expensivePE = getPercentile(peList, result.expensivePE_percent);
 
             return result;
 
