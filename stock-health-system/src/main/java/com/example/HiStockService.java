@@ -277,16 +277,25 @@ public class HiStockService {
      */
     private static double getPercentile(List<Double> sortedList, double percentile) {
         int n = sortedList.size();
+        // 計算百分位對應的索引位置 (0-based index)
+        // 例如：有 10 筆資料 (n=10)，求 50% 位置 => 0.5 * 9 = 4.5
         double position = (percentile / 100.0) * (n - 1);
+        
+        // 取整數部分作為下界索引
         int lowerIndex = (int) position;
+        // 取小數部分作為插值權重
         double fraction = position - lowerIndex;
 
+        // 邊界檢查：如果計算出的位置已經是最後一個元素（或超過），直接回傳最後一個值
         if (lowerIndex + 1 >= n) {
             return sortedList.get(n - 1);
         }
 
+        // 取得下界與上界的數值
         double lower = sortedList.get(lowerIndex);
         double upper = sortedList.get(lowerIndex + 1);
+        
+        // 線性插值公式：下界值 + (差值 * 權重)
         return lower + fraction * (upper - lower);
     }
 }
