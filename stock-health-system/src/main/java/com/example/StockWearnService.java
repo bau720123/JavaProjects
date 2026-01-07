@@ -9,13 +9,15 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 專門負責從 stock.wearn.com 抓取外資大盤淨空單資料的服務類別
+ * 專門負責從 stock.wearn.com 抓取資料的服務類別
+ * - 外資大盤淨空單
+ * - 三大法人買賣超（個股）
  */
 public class StockWearnService {
 
     /**
      * 抓取外資大盤淨空單歷史資料
-     * @return 包含日期與淨空單口數的列表（最新日期在前，與網站表格順序一致）
+     * @return 包含日期與淨空單口數的列表
      */
     public static List<ForeignNetPosition> fetchForeignNetPositions() {
         List<ForeignNetPosition> result = new ArrayList<>();
@@ -61,7 +63,7 @@ public class StockWearnService {
                 return result;
             }
 
-            // 不反轉！保持最新日期在前（與網站原始順序一致）
+            // 保持最新日期在前（與網站原始順序一致）
             for (int i = 0; i < originalDates.size(); i++) {
                 result.add(new ForeignNetPosition(originalDates.get(i), originalNet.get(i)));
             }
@@ -74,4 +76,64 @@ public class StockWearnService {
     }
 
     public record ForeignNetPosition(String date, int netPosition) {}
+
+    // === 新增：三大法人買賣超（個股）===
+    /**
+     * 抓取指定股票的三大法人買賣超資料
+     * @param symbol 股票代號
+     * @return 列表元素為 [日期(yyyy-MM-dd), 投信買賣超, 自營商買賣超, 外資買賣超]，最新日期在前
+     */
+    public static List<InstitutionalTrade> fetchInstitutionalTrading(String symbol) {
+        List<InstitutionalTrade> result = new ArrayList<>();
+
+        try {
+            Document doc = Jsoup.connect("https://stock.wearn.com/netbuy.asp?kind=" + symbol)
+                    .userAgent("Mozilla/5.0")
+                    .timeout(10000)
+                    .get();
+
+            Elements tables = doc.select("table.mobile_img");
+            if (tables.isEmpty()) {
+                System.err.println("StockWearnService: 三大法人買賣超表格不存在（股票代號 " + symbol + "）");
+                return result;
+            }
+
+            Elements rows = tables.first().select("tbody tr");
+
+            for (int i = 2; i < rows.size(); i++) {
+                Elements cells = rows.get(i).select("td");
+                if (cells.size() < 4) continue;
+
+                String rawDate = cells.get(0).text().trim();
+                String trustStr = cells.get(1).text().trim().replace("+ ", "").replace(" ", "").replace(",", "");
+                String dealerStr = cells.get(2).text().trim().replace("+ ", "").replace(" ", "").replace(",", "");
+                String foreignStr = cells.get(3).text().trim().replace("+ ", "").replace(" ", "").replace(",", "");
+
+                int trust = trustStr.isEmpty() || trustStr.equals("-") ? 0 : Integer.parseInt(trustStr);
+                int dealer = dealerStr.isEmpty() || dealerStr.equals("-") ? 0 : Integer.parseInt(dealerStr);
+                int foreign = foreignStr.isEmpty() || foreignStr.equals("-") ? 0 : Integer.parseInt(foreignStr);
+
+                String standardDate = convertTwDateToStandard(rawDate); // 轉成 yyyy-MM-dd
+
+                result.add(new InstitutionalTrade(standardDate, trust, dealer, foreign));
+            }
+
+        } catch (Exception e) {
+            System.err.println("StockWearnService 抓取三大法人買賣超失敗（" + symbol + "）: " + e.getMessage());
+        }
+
+        // 保持最新日期在前（與網站原始順序一致）
+        return result;
+    }
+
+    public record InstitutionalTrade(String date, int trust, int dealer, int foreign) {}
+
+    // 民國日期轉西元標準日期（yyyy-MM-dd）
+    private static String convertTwDateToStandard(String twDate) {
+        // twDate 格式如 "115/01/02"
+        if (!twDate.matches("\\d{3}/\\d{2}/\\d{2}")) return twDate;
+        int rocYear = Integer.parseInt(twDate.substring(0, 3));
+        int year = 1911 + rocYear;
+        return year + "-" + twDate.substring(4, 6) + "-" + twDate.substring(7, 9);
+    }
 }

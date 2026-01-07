@@ -1347,35 +1347,8 @@ public class MainApp extends Application {
 
         CompletableFuture.runAsync(() -> {
             try {
-                Document doc = Jsoup.connect("https://stock.wearn.com/netbuy.asp?kind=" + symbol)
-                        .userAgent("Mozilla/5.0")
-                        .timeout(10000)
-                        .get();
-
-                Elements tables = doc.select("table.mobile_img");
-                if (tables.isEmpty()) throw new Exception("查無資料");
-
-                Elements rows = tables.first().select("tbody tr");
-
-                // 原始資料：最新在前（weearn.com 就是這樣）
-                List<String[]> rawData = new ArrayList<>();
-
-                for (int i = 2; i < rows.size(); i++) {
-                    Elements cells = rows.get(i).select("td");
-                    if (cells.size() < 4) continue;
-
-                    String rawDate = cells.get(0).text().trim();
-                    String trustStr = cells.get(1).text().trim().replace("+ ", "").replace(" ", "").replace(",", "");
-                    String dealerStr = cells.get(2).text().trim().replace("+ ", "").replace(" ", "").replace(",", "");
-                    String foreignStr = cells.get(3).text().trim().replace("+ ", "").replace(" ", "").replace(",", "");
-
-                    int trust = trustStr.isEmpty() || trustStr.equals("-") ? 0 : Integer.parseInt(trustStr);
-                    int dealer = dealerStr.isEmpty() || dealerStr.equals("-") ? 0 : Integer.parseInt(dealerStr);
-                    int foreign = foreignStr.isEmpty() || foreignStr.equals("-") ? 0 : Integer.parseInt(foreignStr);
-
-                    String standardDate = convertTwDateToStandard(rawDate);
-                    rawData.add(new String[]{standardDate, String.valueOf(trust), String.valueOf(dealer), String.valueOf(foreign)});
-                }
+                List<StockWearnService.InstitutionalTrade> rawData = 
+                    StockWearnService.fetchInstitutionalTrading(symbol);
 
                 if (rawData.isEmpty()) throw new Exception("查無資料");
 
@@ -1383,11 +1356,11 @@ public class MainApp extends Application {
                 int count = (days == 0) ? rawData.size() : Math.min(rawData.size(), days);
 
                 // 取最新的 count 筆（最近 N 天）
-                List<String[]> recentData = rawData.subList(0, count);
+                List<StockWearnService.InstitutionalTrade> recentData = rawData.subList(0, count);
 
                 // 顯示與圖表共用這份資料：最舊在前
-                List<String[]> displayAndChartData = new ArrayList<>(recentData);
-                Collections.reverse(displayAndChartData); // ← 關鍵！讓最舊在前面
+                List<StockWearnService.InstitutionalTrade> displayAndChartData = new ArrayList<>(recentData);
+                Collections.reverse(displayAndChartData); // 讓最舊在前面
 
                 // 準備容器
                 List<String> dates = new ArrayList<>();
@@ -1404,29 +1377,29 @@ public class MainApp extends Application {
                 StringBuilder sb = new StringBuilder();
                 sb.append("三大法人買賣超資訊如下：\n\n");
 
-                for (String[] row : displayAndChartData) {
-                    int trust = Integer.parseInt(row[1]);
-                    int dealer = Integer.parseInt(row[2]);
-                    int foreign = Integer.parseInt(row[3]);
+                for (StockWearnService.InstitutionalTrade row : displayAndChartData) {
+                    int trust = row.trust();
+                    int dealer = row.dealer();
+                    int foreign = row.foreign();
 
-                    dates.add(row[0]);
+                    dates.add(row.date());
                     trustList.add(trust);
                     dealerList.add(dealer);
                     foreignList.add(foreign);
 
-                    sb.append(String.format("日期：%s\n", row[0]));
+                    sb.append(String.format("日期：%s\n", row.date()));
                     sb.append(String.format("外資：%,d\n", foreign));
                     sb.append(String.format("投信：%,d\n", trust));
                     sb.append(String.format("自營商：%,d\n", dealer));
                     sb.append(String.format("合計：%,d\n\n", foreign + dealer + trust));
 
                     // 極值更新
-                    if (trust > maxTrust) { maxTrust = trust; maxTrustDate = row[0]; }
-                    if (dealer > maxDealer) { maxDealer = dealer; maxDealerDate = row[0]; }
-                    if (foreign > maxForeign) { maxForeign = foreign; maxForeignDate = row[0]; }
-                    if (trust < minTrust) { minTrust = trust; minTrustDate = row[0]; }
-                    if (dealer < minDealer) { minDealer = dealer; minDealerDate = row[0]; }
-                    if (foreign < minForeign) { minForeign = foreign; minForeignDate = row[0]; }
+                    if (trust > maxTrust) { maxTrust = trust; maxTrustDate = row.date(); }
+                    if (dealer > maxDealer) { maxDealer = dealer; maxDealerDate = row.date(); }
+                    if (foreign > maxForeign) { maxForeign = foreign; maxForeignDate = row.date(); }
+                    if (trust < minTrust) { minTrust = trust; minTrustDate = row.date(); }
+                    if (dealer < minDealer) { minDealer = dealer; minDealerDate = row.date(); }
+                    if (foreign < minForeign) { minForeign = foreign; minForeignDate = row.date(); }
                 }
 
                 sb.append("[買超]\n\n");
@@ -2406,48 +2379,30 @@ public class MainApp extends Application {
 
         CompletableFuture.runAsync(() -> {
             try {
-                Document doc = Jsoup.connect("https://stock.wearn.com/taifexphoto.asp")
-                        .userAgent("Mozilla/5.0")
-                        .timeout(15000)
-                        .get();
+                List<StockWearnService.ForeignNetPosition> positions = 
+                    StockWearnService.fetchForeignNetPositions();
 
-                Element table = doc.selectFirst("table.taifexphoto");
-                if (table == null) {
+                if (positions.isEmpty()) {
                     Platform.runLater(() -> {
-                        showAlert("找不到外資空單表格，網站可能改版了！");
+                        showAlert("沒有抓到任何外資空單資料，或網站改版導致無法解析！");
                     });
                     return;
                 }
 
-                List<String> originalDates = new ArrayList<>();
-                List<Integer> originalNet = new ArrayList<>();
+                // positions 已是最新的在前
+                List<String> originalDates = positions.stream()
+                        .map(StockWearnService.ForeignNetPosition::date)
+                        .collect(Collectors.toList());
+                List<Integer> originalNet = positions.stream()
+                        .map(StockWearnService.ForeignNetPosition::netPosition)
+                        .collect(Collectors.toList());
 
-                Elements rows = table.select("tr:gt(1)");
-                for (Element row : rows) {
-                    Elements tds = row.select("td");
-                    if (tds.size() >= 9) {
-                        String dateStr = tds.get(0).text().trim();
-                        String foreignStr = tds.get(5).text().trim().replace(",", "");
+                List<String> chartDates = new ArrayList<>(originalDates);
 
-                        if (dateStr.matches("\\d{3}/\\d{2}/\\d{2}")) {
-                            int rocYear = Integer.parseInt(dateStr.substring(0, 3));
-                            int year = 1911 + rocYear;
-                            String adDate = year + dateStr.substring(3);
-
-                            try {
-                                int net = Integer.parseInt(foreignStr);
-                                originalDates.add(adDate);
-                                originalNet.add(net);
-                            } catch (NumberFormatException ignored) {}
-                        }
-                    }
-                }
-
-                if (originalDates.isEmpty()) {
-                    Platform.runLater(() -> {
-                        showAlert("沒有抓到任何外資空單資料！");
-                    });
-                    return;
+                // 計算增減（最新在前）
+                List<Integer> changes = new ArrayList<>();
+                for (int i = 0; i < originalNet.size(); i++) {
+                    changes.add(i < originalNet.size() - 1 ? originalNet.get(i) - originalNet.get(i + 1) : 0);
                 }
 
                 // 反轉：最舊在前
@@ -2455,26 +2410,13 @@ public class MainApp extends Application {
                 List<Integer> ascendingNet = new ArrayList<>(originalNet);
                 Collections.reverse(ascendingDates);
                 Collections.reverse(ascendingNet);
-
-                // 轉換為 JFreeChart 格式 yyyy-MM-dd
-                List<String> chartDates = ascendingDates.stream()
-                        .map(d -> d.replace("/", "-"))
-                        .collect(Collectors.toList());
-
-                // 計算增減（基於原始順序：最新在前）
-                List<Integer> changes = new ArrayList<>();
-                for (int i = 0; i < originalNet.size(); i++) {
-                    changes.add(i < originalNet.size() - 1 ? originalNet.get(i) - originalNet.get(i + 1) : 0);
-                }
-
-                // 反轉增減順序對應文字區
                 Collections.reverse(changes);
 
-                // 刪除第一筆不需顯示的資料
+                // 刪除第一筆不需顯示的資料（最早一天）
                 if (!ascendingDates.isEmpty()) {
                     ascendingDates.remove(0);
                     ascendingNet.remove(0);
-                    chartDates.remove(0);
+                    chartDates.remove(0);  // chartDates 仍保持最新在前，移除最早一筆
                     changes.remove(0);
                 }
 
@@ -2483,7 +2425,7 @@ public class MainApp extends Application {
                     int start = ascendingDates.size() - days;
                     ascendingDates = ascendingDates.subList(start, ascendingDates.size());
                     ascendingNet = ascendingNet.subList(start, ascendingNet.size());
-                    chartDates = chartDates.subList(start, chartDates.size());
+                    chartDates = chartDates.subList(chartDates.size() - days, chartDates.size());
                     changes = changes.subList(start, changes.size());
                 }
 
@@ -2502,18 +2444,21 @@ public class MainApp extends Application {
                 StringBuilder sb = new StringBuilder("外資歷史空單數如下：\n\n");
                 for (int i = 0; i < ascendingDates.size(); i++) {
                     sb.append(String.format("日期：%s\n空單數：%,d\n增減：%,d\n\n",
-                            ascendingDates.get(i).replace("/", "-"),
+                            ascendingDates.get(i),
                             ascendingNet.get(i),
                             changes.get(i)));
                 }
                 sb.append(String.format("區間最高空單數：%,d（%s）\n",
-                        highestNet, String.join("、", highestDates.stream().map(d -> d.replace("/", "-")).toList())));
+                        highestNet, String.join("、", highestDates)));
                 sb.append(String.format("區間最低空單數：%,d（%s）\n",
-                        lowestNet, String.join("、", lowestDates.stream().map(d -> d.replace("/", "-")).toList())));
+                        lowestNet, String.join("、", lowestDates)));
 
                 String finalText = sb.toString();
-                List<String> finalDates = new ArrayList<>(chartDates);
-                List<Integer> finalNet = new ArrayList<>(ascendingNet);
+
+                // 圖表資料：必須從舊到新（時間軸由左到右遞增）
+                // ascendingDates / ascendingNet 已是最舊在前，直接使用
+                List<String> chartDisplayDates = new ArrayList<>(ascendingDates);
+                List<Integer> chartDisplayNet = new ArrayList<>(ascendingNet);
 
                 Platform.runLater(() -> {
                     resultArea.setText(finalText);
@@ -2523,10 +2468,10 @@ public class MainApp extends Application {
                     java.util.concurrent.atomic.AtomicInteger indexCounter = new java.util.concurrent.atomic.AtomicInteger(0);
 
                     chartPane.setContent(createCommonLineChart(
-                        finalNet, "外資大盤淨空單", "口數",
+                        chartDisplayNet, "外資大盤淨空單", "口數",
                         new Color(255, 140, 0),
                         obj -> ((Integer) obj).doubleValue(),
-                        obj -> LocalDate.parse(finalDates.get(indexCounter.getAndIncrement()))
+                        obj -> LocalDate.parse(chartDisplayDates.get(indexCounter.getAndIncrement()))
                     ));
                     resizeChartProportionally(); // 改用統一的等比例縮放方法
                 });
