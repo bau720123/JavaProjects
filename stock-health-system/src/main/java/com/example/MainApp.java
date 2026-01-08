@@ -416,6 +416,7 @@ public class MainApp extends Application {
             .thenAccept(quote -> Platform.runLater(() -> {
                 if (quote != null) {
                     StringBuilder sb = new StringBuilder();
+                    sb.append(String.format("日期：%s\n", LocalDate.now())); // 無 date 
                     sb.append(String.format("股票代碼：%s\n股票名稱：%s\n\n上個收盤價：%.2f\n開盤價：%.2f\n最高價：%.2f\n最低價：%.2f\n現價：%.2f\n均價：%.2f\n漲跌：%.2f\n幅度：%.2f\n累計成交量：%d \n累計內盤成交量：%d \n累計外盤成交量：%d \n累計成交筆數：%d \n",
                             quote.symbol(), quote.name(), quote.previousClose(), quote.openPrice(), quote.highPrice(), quote.lowPrice(), quote.closePrice(),
                             quote.avgPrice(), quote.change(), quote.changePercent(), quote.tradeVolume(), quote.tradeVolumeAtBid(), quote.tradeVolumeAtAsk(), quote.transaction()));
