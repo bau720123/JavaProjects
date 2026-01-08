@@ -30,7 +30,7 @@ public class StockWearnService {
 
             Element table = doc.selectFirst("table.taifexphoto");
             if (table == null) {
-                System.err.println("StockWearnService: 找不到外資空單表格，網站可能改版");
+                System.err.println("StockWearnService：找不到外資空單表格，網站可能改版");
                 return result;
             }
 
@@ -59,7 +59,7 @@ public class StockWearnService {
             }
 
             if (originalDates.isEmpty()) {
-                System.err.println("StockWearnService: 沒有抓到任何外資空單資料");
+                System.err.println("StockWearnService：沒有抓到任何外資空單資料");
                 return result;
             }
 
@@ -69,7 +69,7 @@ public class StockWearnService {
             }
 
         } catch (Exception e) {
-            System.err.println("StockWearnService 抓取外資空單失敗: " + e.getMessage());
+            System.err.println("StockWearnService 抓取外資空單失敗：" + e.getMessage());
         }
 
         return result;
@@ -94,7 +94,7 @@ public class StockWearnService {
 
             Elements tables = doc.select("table.mobile_img");
             if (tables.isEmpty()) {
-                System.err.println("StockWearnService: 三大法人買賣超表格不存在（股票代號 " + symbol + "）");
+                System.err.println("StockWearnService：三大法人買賣超表格不存在（股票代號 " + symbol + "）");
                 return result;
             }
 
@@ -119,7 +119,7 @@ public class StockWearnService {
             }
 
         } catch (Exception e) {
-            System.err.println("StockWearnService 抓取三大法人買賣超失敗（" + symbol + "）: " + e.getMessage());
+            System.err.println("StockWearnService 抓取三大法人買賣超失敗（" + symbol + "）：" + e.getMessage());
         }
 
         // 保持最新日期在前（與網站原始順序一致）
@@ -135,5 +135,64 @@ public class StockWearnService {
         int rocYear = Integer.parseInt(twDate.substring(0, 3));
         int year = 1911 + rocYear;
         return year + "-" + twDate.substring(4, 6) + "-" + twDate.substring(7, 9);
+    }
+
+    /**
+     * 抓取大盤三大法人買賣超資料（單位：億）
+     * @return 列表元素為 [日期(yyyy-MM-dd), 投信, 自營商, 外資]，最新日期在前
+     */
+    public static List<InstitutionalMarketTrade> fetchInstitutionalMarketTrading() {
+        List<InstitutionalMarketTrade> result = new ArrayList<>();
+
+        try {
+            Document doc = Jsoup.connect("https://stock.wearn.com/fundthree.asp")
+                    .userAgent("Mozilla/5.0")
+                    .timeout(15000)
+                    .get();
+
+            Elements tables = doc.select("table.mobile_img");
+            if (tables.size() < 2) {
+                System.err.println("StockWearnService：大盤三大法人表格不足兩筆，網站可能改版");
+                return result;
+            }
+
+            // 取第二筆 table（第一筆是其他資訊，第二筆才是三大法人買賣超）
+            Element targetTable = tables.get(1);
+            Elements rows = targetTable.select("tbody tr");
+
+            // 從第 3 筆開始（跳過標題兩行）
+            for (int i = 2; i < rows.size(); i++) {
+                Elements cells = rows.get(i).select("td");
+                if (cells.size() < 4) continue;
+
+                String rawDate = cells.get(0).text().trim(); // 115/01/07
+                String trustText = cells.get(1).text().trim();
+                String dealerText = cells.get(2).text().trim();
+                String foreignText = cells.get(3).text().trim();
+
+                // 解析數字（處理 + - 空格 和顏色 span）
+                double trust = parseAmount(trustText);
+                double dealer = parseAmount(dealerText);
+                double foreign = parseAmount(foreignText);
+
+                String standardDate = convertTwDateToStandard(rawDate);
+
+                result.add(new InstitutionalMarketTrade(standardDate, trust, dealer, foreign));
+            }
+
+        } catch (Exception e) {
+            System.err.println("StockWearnService 抓取大盤三大法人買賣超失敗：" + e.getMessage());
+        }
+
+        // 保持最新日期在前（與網站原始順序一致）
+        return result;
+    }
+
+    public record InstitutionalMarketTrade(String date, double trust, double dealer, double foreign) {}
+
+    // 輔助方法：解析金額文字（如 "+ 22.79" 或 "- 298.71"）
+    private static double parseAmount(String text) {
+        if (text == null || text.isEmpty() || text.equals("-")) return 0.0;
+        return Double.parseDouble(text.replace("+", "").replace(" ", "").trim());
     }
 }

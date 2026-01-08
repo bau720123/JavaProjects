@@ -222,6 +222,10 @@ public class MainApp extends Application {
         foreignNetBtn.setPrefWidth(140);
         foreignNetBtn.setOnAction(e -> queryForeignNetPosition());
 
+        Button institutionalMarketBtn = new Button("三大法人買賣超");
+        institutionalMarketBtn.setPrefWidth(140);
+        institutionalMarketBtn.setOnAction(e -> queryInstitutionalMarketTrading());
+
         Button weightedBtn = new Button("加權指數");
         weightedBtn.setPrefWidth(140);
         weightedBtn.setOnAction(e -> queryYahooFinance("TWII", "加權指數"));
@@ -254,7 +258,7 @@ public class MainApp extends Application {
         comprehensiveAlertBtn.setPrefWidth(140);
         comprehensiveAlertBtn.setOnAction(e -> queryComprehensiveAlert());
 
-        marketBox.getChildren().addAll(foreignNetBtn, weightedBtn, DowJonesBtn, SP500dBtn, NasDaqdBtn, PHLXSemiconductorBtn, marginBtn, marginRateBtn, comprehensiveAlertBtn);
+        marketBox.getChildren().addAll(foreignNetBtn, institutionalMarketBtn, weightedBtn, DowJonesBtn, SP500dBtn, NasDaqdBtn, PHLXSemiconductorBtn, marginBtn, marginRateBtn, comprehensiveAlertBtn);
 
         // 用 ScrollPane 包起來
         ScrollPane marketScroll = new ScrollPane(marketBox);
@@ -2482,6 +2486,139 @@ public class MainApp extends Application {
                     showAlert("外資空單資料抓取失敗！\n\n" +
                             "錯誤訊息：" + e.getMessage() + "\n\n" +
                             "請檢查網路，或稍後再試（網站可能改版）");
+                });
+            }
+        });
+    }
+
+    // 查大盤三大法人買賣超
+    private void queryInstitutionalMarketTrading() {
+        String daysText = daysField.getText().trim(); // 使用共用天數欄位
+        int days;
+
+        try {
+            days = Integer.parseInt(daysText);
+            if (days < 0) {
+                showAlert("天數必須為 0 以上");
+                return;
+            }
+        } catch (NumberFormatException e) {
+            showAlert("天數必須為有效數字（0 以上）");
+            return;
+        }
+
+        resultArea.clear();
+        resultArea.setText("載入中，請稍候...");
+
+        CompletableFuture.runAsync(() -> {
+            try {
+                List<StockWearnService.InstitutionalMarketTrade> rawData = 
+                    StockWearnService.fetchInstitutionalMarketTrading();
+
+                if (rawData.isEmpty()) throw new Exception("查無資料");
+
+                // 決定要幾筆（最近 N 天，或全部）
+                int count = (days == 0) ? rawData.size() : Math.min(rawData.size(), days);
+
+                // 取最新的 count 筆
+                List<StockWearnService.InstitutionalMarketTrade> recentData = rawData.subList(0, count);
+
+                // 顯示與圖表：最舊在前（僅此一次 reverse）
+                List<StockWearnService.InstitutionalMarketTrade> displayAndChartData = new ArrayList<>(recentData);
+                Collections.reverse(displayAndChartData);
+
+                // 容器
+                List<String> dates = new ArrayList<>();
+                List<Double> trustList = new ArrayList<>();
+                List<Double> dealerList = new ArrayList<>();
+                List<Double> foreignList = new ArrayList<>();
+
+                // 極值追蹤（買超最大 = 正數最大，賣超最大 = 負數最小）
+                double maxTrust = Double.MIN_VALUE, maxDealer = Double.MIN_VALUE, maxForeign = Double.MIN_VALUE;
+                double minTrust = Double.MAX_VALUE, minDealer = Double.MAX_VALUE, minForeign = Double.MAX_VALUE;
+                String maxTrustDate = "", maxDealerDate = "", maxForeignDate = "";
+                String minTrustDate = "", minDealerDate = "", minForeignDate = "";
+
+                StringBuilder sb = new StringBuilder();
+                sb.append("大盤三大法人買賣超資訊如下：\n\n");
+
+                for (StockWearnService.InstitutionalMarketTrade row : displayAndChartData) {
+                    double trust = row.trust();
+                    double dealer = row.dealer();
+                    double foreign = row.foreign();
+                    double total = trust + dealer + foreign;
+
+                    dates.add(row.date());
+                    trustList.add(trust);
+                    dealerList.add(dealer);
+                    foreignList.add(foreign);
+
+                    sb.append(String.format("日期：%s\n", row.date()));
+                    sb.append(String.format("外資：%s%.2f\n", foreign >= 0 ? "+ " : "", foreign));
+                    sb.append(String.format("投信：%s%.2f\n", trust >= 0 ? "+ " : "", trust));
+                    sb.append(String.format("自營商：%s%.2f\n", dealer >= 0 ? "+ " : "", dealer));
+                    sb.append(String.format("合計：%s%.2f\n\n", total >= 0 ? "+ " : "", total));
+
+                    // 極值更新
+                    if (trust > maxTrust) { maxTrust = trust; maxTrustDate = row.date(); }
+                    if (dealer > maxDealer) { maxDealer = dealer; maxDealerDate = row.date(); }
+                    if (foreign > maxForeign) { maxForeign = foreign; maxForeignDate = row.date(); }
+                    if (trust < minTrust) { minTrust = trust; minTrustDate = row.date(); }
+                    if (dealer < minDealer) { minDealer = dealer; minDealerDate = row.date(); }
+                    if (foreign < minForeign) { minForeign = foreign; minForeignDate = row.date(); }
+                }
+
+                sb.append("[買超]\n\n");
+                sb.append(String.format("區間最大（投信）：%.2f（%s）\n", maxTrust, maxTrustDate));
+                sb.append(String.format("區間最大（自營商）：%.2f（%s）\n", maxDealer, maxDealerDate));
+                sb.append(String.format("區間最大（外資）：%.2f（%s）\n", maxForeign, maxForeignDate));
+
+                sb.append("\n[賣超]\n\n");
+                sb.append(String.format("區間最大（投信）：%.2f（%s）\n", minTrust, minTrustDate));
+                sb.append(String.format("區間最大（自營商）：%.2f（%s）\n", minDealer, minDealerDate));
+                sb.append(String.format("區間最大（外資）：%.2f（%s）\n", minForeign, minForeignDate));
+
+                String finalText = sb.toString();
+
+                // 圖表資料準備：轉換為 List<Integer> 以符合原有 createInstitutionalChart 需求
+                // 大盤單位為「億」，乘以 100 轉為「張」單位（1億 ≈ 100張），四捨五入取整
+                List<Integer> chartTrustInt = trustList.stream()
+                        .map(v -> (int) Math.round(v * 100))
+                        .collect(Collectors.toList());
+                List<Integer> chartDealerInt = dealerList.stream()
+                        .map(v -> (int) Math.round(v * 100))
+                        .collect(Collectors.toList());
+                List<Integer> chartForeignInt = foreignList.stream()
+                        .map(v -> (int) Math.round(v * 100))
+                        .collect(Collectors.toList());
+
+                // dates 已是最舊在前，直接使用
+                List<String> chartDates = new ArrayList<>(dates);
+
+                Platform.runLater(() -> {
+                    resultArea.clear();
+                    resultArea.appendText(finalText);
+
+                    if (!chartDates.isEmpty()) {
+                        // 直接呼叫原有方法，參數完全相容
+                        Node chart = createInstitutionalChart(
+                            chartDates,
+                            chartTrustInt,    // List<Integer>
+                            chartDealerInt,   // List<Integer>
+                            chartForeignInt   // List<Integer>
+                        );
+                        chartPane.setContent(chart);
+                        resizeChartProportionally(); // 改用統一的等比例縮放方法
+                    } else {
+                        chartPane.setContent(createEmptyChartPanel());
+                    }
+                });
+
+            } catch (Exception e) {
+                Platform.runLater(() -> {
+                    resultArea.clear();
+                    resultArea.appendText("【大盤三大法人買賣超】抓取失敗\n" + e.getMessage() + "\n");
+                    chartPane.setContent(createEmptyChartPanel());
                 });
             }
         });
