@@ -228,23 +228,27 @@ public class MainApp extends Application {
 
         Button weightedBtn = new Button("加權指數");
         weightedBtn.setPrefWidth(140);
-        weightedBtn.setOnAction(e -> queryYahooFinance("TWII", "加權指數"));
+        weightedBtn.setOnAction(e -> queryYahooFinance("^TWII", "加權指數"));
 
         Button DowJonesBtn = new Button("道瓊工業指數");
         DowJonesBtn.setPrefWidth(140);
-        DowJonesBtn.setOnAction(e -> queryYahooFinance("DJI", "道瓊工業指數"));
+        DowJonesBtn.setOnAction(e -> queryYahooFinance("^DJI", "道瓊工業指數"));
 
-        Button SP500dBtn = new Button("標普500指數");
-        SP500dBtn.setPrefWidth(140);
-        SP500dBtn.setOnAction(e -> queryYahooFinance("GSPC", "標普500指數"));
+        Button SP500Btn = new Button("標普500指數");
+        SP500Btn.setPrefWidth(140);
+        SP500Btn.setOnAction(e -> queryYahooFinance("^GSPC", "標普500指數"));
 
-        Button NasDaqdBtn = new Button("那斯達克指數");
-        NasDaqdBtn.setPrefWidth(140);
-        NasDaqdBtn.setOnAction(e -> queryYahooFinance("IXIC", "那斯達克指數"));
+        Button NasDaqBtn = new Button("那斯達克指數");
+        NasDaqBtn.setPrefWidth(140);
+        NasDaqBtn.setOnAction(e -> queryYahooFinance("^IXIC", "那斯達克指數"));
 
         Button PHLXSemiconductorBtn = new Button("費城半導體指數");
         PHLXSemiconductorBtn.setPrefWidth(140);
-        PHLXSemiconductorBtn.setOnAction(e -> queryYahooFinance("SOX", "費城半導體指數"));
+        PHLXSemiconductorBtn.setOnAction(e -> queryYahooFinance("^SOX", "費城半導體指數"));
+
+        Button TSMBtn = new Button("台積電ADR");
+        TSMBtn.setPrefWidth(140);
+        TSMBtn.setOnAction(e -> queryYahooFinance("TSM", "台積電ADR"));
 
         Button marginBtn = new Button("融資融券餘額");
         marginBtn.setPrefWidth(140);
@@ -258,7 +262,7 @@ public class MainApp extends Application {
         comprehensiveAlertBtn.setPrefWidth(140);
         comprehensiveAlertBtn.setOnAction(e -> queryComprehensiveAlert());
 
-        marketBox.getChildren().addAll(foreignNetBtn, institutionalMarketBtn, weightedBtn, DowJonesBtn, SP500dBtn, NasDaqdBtn, PHLXSemiconductorBtn, marginBtn, marginRateBtn, comprehensiveAlertBtn);
+        marketBox.getChildren().addAll(foreignNetBtn, institutionalMarketBtn, weightedBtn, DowJonesBtn, SP500Btn, NasDaqBtn, PHLXSemiconductorBtn, TSMBtn, marginBtn, marginRateBtn, comprehensiveAlertBtn);
 
         // 用 ScrollPane 包起來
         ScrollPane marketScroll = new ScrollPane(marketBox);
@@ -2646,7 +2650,7 @@ public class MainApp extends Application {
 
         CompletableFuture.supplyAsync(() -> {
             YahooFinanceService yahooService = new YahooFinanceService();
-            List<YahooFinanceService.YahooCandle> candles = yahooService.fetchHistory("^" + symbol, days);
+            List<YahooFinanceService.YahooCandle> candles = yahooService.fetchHistory(symbol, days);
 
             if (candles.isEmpty()) {
                 throw new RuntimeException("無法取得 " + symbolName + " 資料，請檢查網路或稍後再試");
