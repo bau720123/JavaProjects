@@ -46,6 +46,7 @@ import org.jsoup.select.Elements;
 import com.example.FugleService.Bollinger;
 import com.example.FugleService.SMA;
 import com.example.FugleService.VolumeByPrice;
+import com.example.HiStockService.FITXRealtime;
 import com.example.HiStockService.HistoricalPE;
 import com.example.HiStockService.MarginRecord;
 
@@ -226,6 +227,10 @@ public class MainApp extends Application {
         institutionalMarketBtn.setPrefWidth(140);
         institutionalMarketBtn.setOnAction(e -> queryInstitutionalMarketTrading());
 
+        Button FITXBtn = new Button("台指近");
+        FITXBtn.setPrefWidth(140);
+        FITXBtn.setOnAction(e -> queryFITX());
+
         Button weightedBtn = new Button("加權指數");
         weightedBtn.setPrefWidth(140);
         weightedBtn.setOnAction(e -> queryYahooFinance("^TWII", "加權指數"));
@@ -262,7 +267,7 @@ public class MainApp extends Application {
         comprehensiveAlertBtn.setPrefWidth(140);
         comprehensiveAlertBtn.setOnAction(e -> queryComprehensiveAlert());
 
-        marketBox.getChildren().addAll(foreignNetBtn, institutionalMarketBtn, weightedBtn, DowJonesBtn, SP500Btn, NasDaqBtn, PHLXSemiconductorBtn, TSMBtn, marginBtn, marginRateBtn, comprehensiveAlertBtn);
+        marketBox.getChildren().addAll(foreignNetBtn, institutionalMarketBtn, weightedBtn, FITXBtn, DowJonesBtn, SP500Btn, NasDaqBtn, PHLXSemiconductorBtn, TSMBtn, marginBtn, marginRateBtn, comprehensiveAlertBtn);
 
         // 用 ScrollPane 包起來
         ScrollPane marketScroll = new ScrollPane(marketBox);
@@ -2627,6 +2632,124 @@ public class MainApp extends Application {
                 });
             }
         });
+    }
+
+    // 查詢台指近
+    private void queryFITX() {
+        resultArea.clear();
+        resultArea.setText("載入中，請稍候...");
+
+        CompletableFuture.supplyAsync(() -> {
+                FITXRealtime fitx = hiStockService.fetchFITXChange();
+                double taifexUpdown = hiStockService.fetchTaifexTXUpdown();
+                return new Object[] { fitx, taifexUpdown };
+            })
+            .thenAccept(results -> Platform.runLater(() -> {
+                FITXRealtime fitx = (FITXRealtime) results[0];
+                double taifexUpdown = (double) results[1];
+
+                StringBuilder sb = new StringBuilder();
+
+                if (taifexUpdown != 0.0) {
+                    String sign = taifexUpdown > 0 ? "▲" : (taifexUpdown < 0 ? "▼" : "");
+                    sb.append(String.format("盤中或收盤資訊：%s%.0f\n", sign, Math.abs(taifexUpdown)));
+                } else {
+                    sb.append("盤中或收盤資訊：無法取得\n");
+                }
+
+                sb.append("\n【即時資訊】\n\n");
+                if (fitx.success()) {
+                    sb.append(String.format("開盤：%.0f\n", fitx.open()));
+                    sb.append(String.format("最高：%.0f\n", fitx.high()));
+                    sb.append(String.format("最低：%.0f\n", fitx.low()));
+                    sb.append(String.format("漲跌：%s\n", fitx.changeText()));
+                    sb.append(String.format("成交：%.1f\n", fitx.current()));
+                    sb.append(String.format("成交量(口)：%,d 口\n", fitx.volume()));
+                    sb.append("更新時間：" + fitx.updateTime() + "\n");
+                } else {
+                    sb.append("資料暫時無法取得\n");
+                }
+
+                resultArea.setText(sb.toString());
+
+                // 繪製圖表
+                chartPane.setContent(createFITXBarChart(fitx));
+                resizeChartProportionally(); // 改用統一的等比例縮放方法
+            }))
+            .exceptionally(ex -> {
+                Platform.runLater(() -> {
+                    resultArea.setText("查詢失敗：" + ex.getMessage());
+                });
+                return null;
+            });
+    }
+
+    // 台指近專用柱狀圖
+    private Node createFITXBarChart(FITXRealtime fitx) {
+        SwingNode swingNode = new SwingNode();
+
+        SwingUtilities.invokeLater(() -> {
+            DefaultCategoryDataset dataset = new DefaultCategoryDataset();
+
+            // X 軸類別標籤名稱
+            dataset.addValue(fitx.open(),    "價格", "開盤價");
+            dataset.addValue(fitx.high(),    "價格", "最高價");
+            dataset.addValue(fitx.current(), "價格", "現價");
+
+            JFreeChart chart = ChartFactory.createBarChart(
+                "台指期價格結構",
+                "",
+                "價格",
+                dataset,
+                PlotOrientation.VERTICAL,
+                false, true, false
+            );
+
+            // CategoryPlot：JFreeChart 繪圖區域，處理 CategoryDataset 的線圖。
+            CategoryPlot plot = chart.getCategoryPlot();
+
+            // 設定 Y 軸範圍，給予適當邊界
+            double max = Math.max(fitx.high(), fitx.current());
+            double min = Math.min(fitx.low(), fitx.open());
+            plot.getRangeAxis().setRange(min, max);
+
+            // 設定刻度單位（台指期最小跳動單位通常為 1 點）
+            ((NumberAxis) plot.getRangeAxis()).setTickUnit(new NumberTickUnit(10)); // 可依需求調整 1/5/10
+
+            // 字型設定並且解決亂碼問題
+            Font font = new Font("Microsoft JhengHei", Font.BOLD, 16); // 或 Microsoft YaHei
+            chart.getTitle().setFont(font);
+            plot.getDomainAxis().setTickLabelFont(new Font("Microsoft JhengHei", Font.PLAIN, 14));
+            plot.getRangeAxis().setTickLabelFont(new Font("Microsoft JhengHei", Font.PLAIN, 14));
+            plot.getDomainAxis().setLabelFont(font);
+            plot.getRangeAxis().setLabelFont(font);
+
+            // 柱狀圖顏色設定
+            BarRenderer renderer = (BarRenderer) plot.getRenderer();
+            renderer.setSeriesPaint(0, new Color(30, 144, 255)); // 經典藍
+            renderer.setMaximumBarWidth(0.15);
+
+            // 建立 ChartPanel 並設定大小
+            currentChartPanel = new ChartPanel(chart);
+            currentChartPanel.setPreferredSize(new java.awt.Dimension(695, 400));
+            swingNode.setContent(currentChartPanel);
+
+            // 延遲 repaint，確保圖表正確顯示
+            Timer timer = new Timer(200, e -> {
+                currentChartPanel.revalidate();
+                currentChartPanel.repaint();
+                ((Timer) e.getSource()).stop();
+            });
+            timer.setRepeats(false);
+            timer.start();
+        });
+
+        // 延遲 setVisible，給 Swing 初始化時間
+        PauseTransition delay = new PauseTransition(Duration.millis(500));
+        delay.setOnFinished(e -> chartPane.setVisible(true));
+        delay.play();
+
+        return swingNode;
     }
 
     // 查 YahooFinance

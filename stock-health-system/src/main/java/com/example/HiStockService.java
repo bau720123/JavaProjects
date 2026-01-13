@@ -5,11 +5,20 @@ import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 專門處理 HiStock 網站爬蟲的服務類
@@ -297,5 +306,151 @@ public class HiStockService {
         
         // 線性插值公式：下界值 + (差值 * 權重)
         return lower + fraction * (upper - lower);
+    }
+
+    public record FITXRealtime(
+        double open,
+        double high,
+        double low,
+        double change,          // 漲跌值（可正可負）
+        String changeText,      // 原始文字 e.g. "▲39.0" 或 "▼12.5"
+        double current,         // 現價 / 成交價
+        long volume,            // 成交量(口)
+        String updateTime,      // e.g. "2026.01.14 16:03"
+        boolean success         // 是否成功取得資料
+    ) {
+        public static FITXRealtime empty() {
+            return new FITXRealtime(0, 0, 0, 0, "無法取得", 0, 0, "未知", false);
+        }
+    }
+
+    /**
+     * 台指近
+     */
+    public FITXRealtime fetchFITXChange() {
+        try {
+            Document doc = Jsoup.connect("https://histock.tw/stock/module/function.aspx")
+                .userAgent(USER_AGENT)
+                .timeout(TIMEOUT_MS)
+                .header("Origin", "https://histock.tw")
+                .header("Referer", "https://histock.tw/")  // 模擬從首頁來
+                .data("m", "stocktop2017")
+                .data("no", "FITX")
+                .ignoreContentType(true) // ← 關鍵！忽略 Content-Type 檢查
+                .post();
+
+            Element ul = doc.selectFirst("ul");
+            if (ul == null) {
+                return FITXRealtime.empty();
+            }
+
+            Map<String, String> dataMap = new LinkedHashMap<>();
+            Elements lis = ul.select("li");
+            for (Element li : lis) {
+                Element titleElem = li.selectFirst(".ci_title");
+                Element valueElem = li.selectFirst(".ci_value span");
+                if (titleElem != null && valueElem != null) {
+                    String title = titleElem.ownText().trim();
+                    String value = valueElem.ownText().trim();
+                    dataMap.put(title, value);
+                }
+            }
+
+            // 解析更新時間（~ 後面的文字）
+            String updateTime = "未知";
+            String html = doc.body().html();
+            int tildeIdx = html.indexOf("~");
+            if (tildeIdx >= 0 && tildeIdx + 1 < html.length()) {
+                String timePart = html.substring(tildeIdx + 1).trim();
+                // 取到下一個非時間字元為止，或整段
+                int end = timePart.indexOf("<");
+                if (end > 0) timePart = timePart.substring(0, end);
+                updateTime = timePart.trim();
+            }
+
+            // 提取各欄位（注意：key 必須與網站實際文字完全一致）
+            double open   = parseDoubleSafe(dataMap.get("開盤"));
+            double high   = parseDoubleSafe(dataMap.get("最高"));
+            double low    = parseDoubleSafe(dataMap.get("最低"));
+            String changeStr = dataMap.get("漲跌");
+            double changeVal = parseChangeValue(changeStr);  // 自訂解析 ▲39.0 → 39.0
+            double current = parseDoubleSafe(dataMap.get("指數"));  // 或 "成交"，視網站
+            long volume   = parseLongSafe(dataMap.get("成交量(口)"));
+
+            return new FITXRealtime(
+                open, high, low,
+                changeVal, changeStr != null ? changeStr : "無法取得",
+                current, volume,
+                updateTime,
+                true
+            );
+
+        } catch (Exception e) {
+            System.err.println("fetchFITXChange 失敗：" + e.getMessage());
+            return FITXRealtime.empty();
+        }
+    }
+
+    // 輔助解析方法
+    private double parseDoubleSafe(String s) {
+        if (s == null || s.isBlank()) return 0.0;
+        try {
+            return Double.parseDouble(s.replace(",", ""));
+        } catch (NumberFormatException e) {
+            return 0.0;
+        }
+    }
+
+    private long parseLongSafe(String s) {
+        if (s == null || s.isBlank()) return 0L;
+        try {
+            return Long.parseLong(s.replace(",", ""));
+        } catch (NumberFormatException e) {
+            return 0L;
+        }
+    }
+
+    private double parseChangeValue(String s) {
+        if (s == null || s.isBlank()) return 0.0;
+        String numPart = s.replaceAll("[▲▼+]", "").trim();
+        try {
+            return Double.parseDouble(numPart);
+        } catch (NumberFormatException e) {
+            return 0.0;
+        }
+    }
+
+    private static final HttpClient httpClient = HttpClient.newHttpClient();
+    private static final ObjectMapper mapper = new ObjectMapper();
+
+    public double fetchTaifexTXUpdown() {
+        try {
+            String url = "https://www.taifex.com.tw/cht/quotesApi/getQuotes?objId=2";
+
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                    .GET()
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() == 200) {
+                JsonNode root = mapper.readTree(response.body());
+                if (root.isArray() && root.size() > 0) {
+                    for (JsonNode node : root) {
+                        String contractName = node.path("contractName").asText("");
+                        if ("臺股期貨".equals(contractName)) {
+                            String updownStr = node.path("updown").asText("0");
+                            // 移除逗號並轉成 double
+                            return Double.parseDouble(updownStr.replace(",", ""));
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("抓取台指官方盤中漲跌失敗：" + e.getMessage());
+        }
+        return 0.0;  // 失敗回傳 0
     }
 }
