@@ -128,6 +128,33 @@ public final class MarketEventCalendar {
     }
 
     /**
+     * 手動維護的臨時性、非週期性重大事件
+     * 格式：日期(yyyy-MM-dd), 事件簡述
+     * 可隨時在程式碼中新增或註解掉
+     */
+    private static final List<ManualEvent> MANUAL_EVENTS = List.of(
+        // 2026 年範例（可依需求增刪）
+        new ManualEvent(LocalDate.of(2026, 1, 14), "對等關稅今晚可能會有判決或重大消息"),
+        new ManualEvent(LocalDate.of(2026, 1, 20), "對等關稅今晚可能會有判決或重大消息"),
+        new ManualEvent(LocalDate.of(2026, 1, 21), "對等關稅今晚可能會有判決或重大消息"),
+        new ManualEvent(LocalDate.of(2026, 1, 26), "對等關稅今晚可能會有判決或重大消息")
+    );
+
+    /**
+     * 簡單的記錄類，用來存放手動事件
+     */
+    private record ManualEvent(LocalDate date, String description) {}
+
+    /**
+     * 判斷今天是否有手動定義的臨時事件
+     */
+    private static List<ManualEvent> getTodayManualEvents(LocalDate today) {
+        return MANUAL_EVENTS.stream()
+                .filter(e -> e.date().equals(today))
+                .toList();
+    }
+
+    /**
      * 回傳今天是否有重大事件，有則回傳提醒文字，沒有則回傳 null
      */
     public static String getTodayEventMessage() {
@@ -277,6 +304,15 @@ public final class MarketEventCalendar {
             String holidayName = findHolidayNameByDate.apply(fullDayHolidays, tomorrow);
             sb.append("明天是美股「").append(holidayName).append("」整天休市！（").append(tomorrow).append("）\n");
             sb.append("台股通常波動極小，非常安全，適合輕鬆操作\n");
+        }
+
+        List<ManualEvent> manualEventsToday = getTodayManualEvents(today);
+        if (!manualEventsToday.isEmpty()) {
+            sb.append("【臨時重大事件提醒】\n\n");
+            for (ManualEvent evt : manualEventsToday) {
+                sb.append("⚠ ").append(evt.description()).append("\n");
+                // sb.append("（日期：").append(evt.date().format(DateTimeFormatter.ISO_LOCAL_DATE)).append("）\n\n");
+            }
         }
 
         if (sb.length() > 0) {
