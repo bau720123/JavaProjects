@@ -135,9 +135,9 @@ public final class MarketEventCalendar {
     private static final List<ManualEvent> MANUAL_EVENTS = List.of(
         // 2026 年範例（可依需求增刪）
         new ManualEvent(LocalDate.of(2026, 1, 14), "對等關稅今晚可能會有判決或重大消息"),
-        new ManualEvent(LocalDate.of(2026, 1, 20), "對等關稅今晚可能會有判決或重大消息"),
         new ManualEvent(LocalDate.of(2026, 1, 21), "對等關稅今晚可能會有判決或重大消息"),
-        new ManualEvent(LocalDate.of(2026, 1, 26), "對等關稅今晚可能會有判決或重大消息")
+        new ManualEvent(LocalDate.of(2026, 1, 26), "對等關稅今晚可能會有判決或重大消息"),
+        new ManualEvent(LocalDate.of(2026, 1, 28), "對等關稅今晚可能會有判決或重大消息")
     );
 
     /**
