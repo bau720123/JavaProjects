@@ -49,6 +49,7 @@ import com.example.FugleService.VolumeByPrice;
 import com.example.HiStockService.FITXRealtime;
 import com.example.HiStockService.HistoricalPE;
 import com.example.HiStockService.MarginRecord;
+import com.example.HiStockService.TaifexQuote;
 
 import org.jfree.chart.renderer.category.BarRenderer;
 import org.jfree.chart.renderer.category.LineAndShapeRenderer;
@@ -2640,48 +2641,67 @@ public class MainApp extends Application {
         resultArea.setText("載入中，請稍候...");
 
         CompletableFuture.supplyAsync(() -> {
-                FITXRealtime fitx = hiStockService.fetchFITXChange();
-                double taifexUpdown = hiStockService.fetchTaifexTXUpdown();
-                return new Object[] { fitx, taifexUpdown };
-            })
-            .thenAccept(results -> Platform.runLater(() -> {
-                FITXRealtime fitx = (FITXRealtime) results[0];
-                double taifexUpdown = (double) results[1];
+            FITXRealtime fitx = hiStockService.fetchFITXChange();
+            TaifexQuote txQuote = hiStockService.fetchTaifexQuote(2, "臺股期貨");
+            TaifexQuote tsmcQuote = hiStockService.fetchTaifexQuote(12, "台積電期貨");
 
-                StringBuilder sb = new StringBuilder();
+            return new Object[]{fitx, txQuote, tsmcQuote};
+        })
+        .thenAccept(results -> Platform.runLater(() -> {
+            FITXRealtime fitx = (FITXRealtime) results[0];
+            TaifexQuote txQuote = (TaifexQuote) results[1];
+            TaifexQuote tsmcQuote = (TaifexQuote) results[2];
 
-                if (taifexUpdown != 0.0) {
-                    String sign = taifexUpdown > 0 ? "▲" : (taifexUpdown < 0 ? "▼" : "");
-                    sb.append(String.format("盤中或收盤資訊：%s%.0f\n", sign, Math.abs(taifexUpdown)));
-                } else {
-                    sb.append("盤中或收盤資訊：無法取得\n");
-                }
+            StringBuilder sb = new StringBuilder();
 
-                sb.append("\n【即時資訊】\n\n");
-                if (fitx.success()) {
-                    sb.append(String.format("開盤：%.0f\n", fitx.open()));
-                    sb.append(String.format("最高：%.0f\n", fitx.high()));
-                    sb.append(String.format("最低：%.0f\n", fitx.low()));
-                    sb.append(String.format("漲跌：%s\n", fitx.changeText()));
-                    sb.append(String.format("成交：%.1f\n", fitx.current()));
-                    sb.append(String.format("成交量(口)：%,d 口\n", fitx.volume()));
-                    sb.append("更新時間：" + fitx.updateTime() + "\n");
-                } else {
-                    sb.append("資料暫時無法取得\n");
-                }
+            // 台指期盤中/收盤漲跌（優先用 API 資料）
+            if (txQuote.isValid()) {
+                String sign = txQuote.updown() > 0 ? "▲" : (txQuote.updown() < 0 ? "▼" : "");
+                sb.append("【盤中或收盤資訊】\n\n");
+                sb.append(String.format("現價：%.1f　\n", txQuote.price()));
+                sb.append(String.format("成交量：%,d 口\n", txQuote.ttlvol()));
+                sb.append(String.format("漲跌：%s%.0f\n", sign, Math.abs(txQuote.updown())));
+            } else {
+                sb.append("盤中或收盤資訊：無法取得\n");
+            }
 
-                resultArea.setText(sb.toString());
+            // 台積電期貨
+            if (tsmcQuote.isValid()) {
+                sb.append("\n【台積電期貨】\n\n");
+                String signTSMC = tsmcQuote.updown() > 0 ? "▲" : (tsmcQuote.updown() < 0 ? "▼" : "");
+                sb.append(String.format("現價：%.1f　\n", tsmcQuote.price()));
+                sb.append(String.format("成交量：%,d 口\n", tsmcQuote.ttlvol()));
+                sb.append(String.format("漲跌：%s%.0f\n", signTSMC, Math.abs(tsmcQuote.updown())));
+            } else {
+                sb.append("台積電期貨：無法取得\n");
+            }
 
-                // 繪製圖表
-                chartPane.setContent(createFITXBarChart(fitx));
-                resizeChartProportionally(); // 改用統一的等比例縮放方法
-            }))
-            .exceptionally(ex -> {
-                Platform.runLater(() -> {
-                    resultArea.setText("查詢失敗：" + ex.getMessage());
-                });
-                return null;
+            sb.append("\n【台股期貨】\n\n");
+
+            // FITX 爬蟲詳細資料
+            if (fitx.success()) {
+                sb.append(String.format("開盤：%.0f\n", fitx.open()));
+                sb.append(String.format("最高：%.0f\n", fitx.high()));
+                sb.append(String.format("最低：%.0f\n", fitx.low()));
+                sb.append(String.format("漲跌：%s\n", fitx.changeText()));
+                sb.append(String.format("成交：%.1f\n", fitx.current()));
+                sb.append(String.format("成交量(口)：%,d 口\n", fitx.volume()));
+                sb.append("更新時間：" + fitx.updateTime() + "\n");
+            } else {
+                sb.append("詳細報價資料暫時無法取得\n");
+            }
+
+            resultArea.setText(sb.toString());
+
+            chartPane.setContent(createFITXBarChart(fitx));
+            resizeChartProportionally(); // 改用統一的等比例縮放方法
+        }))
+        .exceptionally(ex -> {
+            Platform.runLater(() -> {
+                resultArea.setText("查詢失敗：" + ex.getMessage());
             });
+            return null;
+        });
     }
 
     // 台指近專用柱狀圖
