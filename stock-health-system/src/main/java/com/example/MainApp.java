@@ -49,7 +49,7 @@ import com.example.FugleService.VolumeByPrice;
 import com.example.HiStockService.FUTURESRealtime;
 import com.example.HiStockService.HistoricalPE;
 import com.example.HiStockService.MarginRecord;
-import com.example.HiStockService.TaifexQuote;
+import com.example.TaiFexService.TaifexQuote;
 
 import org.jfree.chart.renderer.category.BarRenderer;
 import org.jfree.chart.renderer.category.LineAndShapeRenderer;
@@ -2641,6 +2641,8 @@ public class MainApp extends Application {
         });
     }
 
+    private final TaiFexService taiFexService = new TaiFexService(); // 加入成員變數
+
     // 查詢台指近
     private void queryFITX() {
         resultArea.clear();
@@ -2649,8 +2651,8 @@ public class MainApp extends Application {
         CompletableFuture.supplyAsync(() -> {
             FUTURESRealtime fitx = hiStockService.fetchFUTURESChange("stocktop2017", "FITX"); // 台指近
             FUTURESRealtime twn = hiStockService.fetchFUTURESChange("stocktop2017", "TWN"); // 富台期
-            TaifexQuote txQuote = hiStockService.fetchTaifexQuote(2, "臺股期貨");
-            TaifexQuote tsmcQuote = hiStockService.fetchTaifexQuote(12, "台積電期貨");
+            TaifexQuote txQuote = taiFexService.fetchTaifexQuote(2, "臺股期貨");
+            TaifexQuote tsmcQuote = taiFexService.fetchTaifexQuote(12, "台積電期貨");
 
             return new Object[]{fitx, twn, txQuote, tsmcQuote};
         })
