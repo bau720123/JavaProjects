@@ -99,6 +99,9 @@ public class MainApp extends Application {
 
     // 在類別載入時讀取版本號
     private static String APP_VERSION = "Unknown";
+    private static String DEFAULT_SYMBOL = "";
+    private static String DEFAULT_API_KEY = "";
+    private static String DEFAULT_DAY = "";
     static {
         try (InputStream input = MainApp.class.getClassLoader()
                 .getResourceAsStream("application.properties")) {
@@ -106,6 +109,9 @@ public class MainApp extends Application {
                 Properties prop = new Properties();
                 prop.load(input);
                 APP_VERSION = prop.getProperty("app.version", "Unknown");
+                DEFAULT_SYMBOL = prop.getProperty("default-symbol", "");
+                DEFAULT_API_KEY = prop.getProperty("default-api-key", "");
+                DEFAULT_DAY = prop.getProperty("default-day", "");
             }
         } catch (IOException e) {
             System.err.println("無法載入版本資訊：" + e.getMessage());
@@ -126,7 +132,7 @@ public class MainApp extends Application {
         // 股票代號輸入
         VBox symbolVBox = new VBox(5);
         Label symbolLabel = new Label("股票代號：");
-        symbolField = new TextField("");
+        symbolField = new TextField(DEFAULT_SYMBOL);
         symbolField.setPromptText("請輸入股票代號");
         symbolField.setPrefWidth(155);
         symbolVBox.getChildren().addAll(symbolLabel, symbolField);
@@ -135,7 +141,7 @@ public class MainApp extends Application {
         VBox keyVBox = new VBox(5);
         Label keyLabel = new Label("API Key：");
         keyField = new PasswordField();
-        keyField.setText("");
+        keyField.setText(DEFAULT_API_KEY);
         keyField.setPromptText("請輸入 API Key");
         keyField.setPrefWidth(200);
         keyVBox.getChildren().addAll(keyLabel, keyField);
@@ -143,7 +149,7 @@ public class MainApp extends Application {
         // 天數輸入
         VBox daysVBox = new VBox(5);
         Label daysLabel = new Label("資料範圍：");
-        daysField = new TextField("");
+        daysField = new TextField(DEFAULT_DAY);
         daysField.setPromptText("天數");
         daysField.setPrefWidth(50);
         daysVBox.getChildren().addAll(daysLabel, daysField);
@@ -2666,14 +2672,15 @@ public class MainApp extends Application {
             }
 
             // 台積電期貨
+            sb.append("\n【台積電期貨】\n\n");
+
             if (tsmcQuote.isValid()) {
-                sb.append("\n【台積電期貨】\n\n");
                 String signTSMC = tsmcQuote.updown() > 0 ? "▲" : (tsmcQuote.updown() < 0 ? "▼" : "");
                 sb.append(String.format("現價：%.1f　\n", tsmcQuote.price()));
                 sb.append(String.format("成交量：%,d 口\n", tsmcQuote.ttlvol()));
                 sb.append(String.format("漲跌：%s%.0f\n", signTSMC, Math.abs(tsmcQuote.updown())));
             } else {
-                sb.append("台積電期貨：無法取得\n");
+                sb.append("無法取得\n");
             }
 
             sb.append("\n【台股期貨】\n\n");
