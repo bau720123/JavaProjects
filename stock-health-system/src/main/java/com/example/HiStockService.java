@@ -308,7 +308,7 @@ public class HiStockService {
         return lower + fraction * (upper - lower);
     }
 
-    public record FITXRealtime(
+    public record FUTURESRealtime(
         double open,
         double high,
         double low,
@@ -319,30 +319,31 @@ public class HiStockService {
         String updateTime,      // e.g. "2026.01.14 16:03"
         boolean success         // 是否成功取得資料
     ) {
-        public static FITXRealtime empty() {
-            return new FITXRealtime(0, 0, 0, 0, "無法取得", 0, 0, "未知", false);
+        public static FUTURESRealtime empty() {
+            return new FUTURESRealtime(0, 0, 0, 0, "無法取得", 0, 0, "未知", false);
         }
     }
 
     /**
-     * 台指近
+     * 台指近 + 富台期 即時變化
      * https://histock.tw/index-tw/FITX
+     * https://histock.tw/index-tw/TWN
      */
-    public FITXRealtime fetchFITXChange() {
+    public FUTURESRealtime fetchFUTURESChange(String m, String no) {
         try {
             Document doc = Jsoup.connect("https://histock.tw/stock/module/function.aspx")
                 .userAgent(USER_AGENT)
                 .timeout(TIMEOUT_MS)
                 .header("Origin", "https://histock.tw")
                 .header("Referer", "https://histock.tw/")  // 模擬從首頁來
-                .data("m", "stocktop2017")
-                .data("no", "FITX")
+                .data("m", m)
+                .data("no", no)
                 .ignoreContentType(true) // ← 關鍵！忽略 Content-Type 檢查
                 .post();
 
             Element ul = doc.selectFirst("ul");
             if (ul == null) {
-                return FITXRealtime.empty();
+                return FUTURESRealtime.empty();
             }
 
             Map<String, String> dataMap = new LinkedHashMap<>();
@@ -378,7 +379,7 @@ public class HiStockService {
             double current = parseDoubleSafe(dataMap.get("指數"));  // 或 "成交"，視網站
             long volume   = parseLongSafe(dataMap.get("成交量(口)"));
 
-            return new FITXRealtime(
+            return new FUTURESRealtime(
                 open, high, low,
                 changeVal, changeStr != null ? changeStr : "無法取得",
                 current, volume,
@@ -387,8 +388,8 @@ public class HiStockService {
             );
 
         } catch (Exception e) {
-            System.err.println("fetchFITXChange 失敗：" + e.getMessage());
-            return FITXRealtime.empty();
+            System.err.println("fetchFUTURESChange 失敗：" + e.getMessage());
+            return FUTURESRealtime.empty();
         }
     }
 

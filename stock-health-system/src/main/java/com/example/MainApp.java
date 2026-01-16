@@ -46,7 +46,7 @@ import org.jsoup.select.Elements;
 import com.example.FugleService.Bollinger;
 import com.example.FugleService.SMA;
 import com.example.FugleService.VolumeByPrice;
-import com.example.HiStockService.FITXRealtime;
+import com.example.HiStockService.FUTURESRealtime;
 import com.example.HiStockService.HistoricalPE;
 import com.example.HiStockService.MarginRecord;
 import com.example.HiStockService.TaifexQuote;
@@ -2647,16 +2647,18 @@ public class MainApp extends Application {
         resultArea.setText("載入中，請稍候...");
 
         CompletableFuture.supplyAsync(() -> {
-            FITXRealtime fitx = hiStockService.fetchFITXChange();
+            FUTURESRealtime fitx = hiStockService.fetchFUTURESChange("stocktop2017", "FITX"); // 台指近
+            FUTURESRealtime twn = hiStockService.fetchFUTURESChange("stocktop2017", "TWN"); // 富台期
             TaifexQuote txQuote = hiStockService.fetchTaifexQuote(2, "臺股期貨");
             TaifexQuote tsmcQuote = hiStockService.fetchTaifexQuote(12, "台積電期貨");
 
-            return new Object[]{fitx, txQuote, tsmcQuote};
+            return new Object[]{fitx, twn, txQuote, tsmcQuote};
         })
         .thenAccept(results -> Platform.runLater(() -> {
-            FITXRealtime fitx = (FITXRealtime) results[0];
-            TaifexQuote txQuote = (TaifexQuote) results[1];
-            TaifexQuote tsmcQuote = (TaifexQuote) results[2];
+            FUTURESRealtime fitx = (FUTURESRealtime) results[0];
+            FUTURESRealtime twn = (FUTURESRealtime) results[1];
+            TaifexQuote txQuote = (TaifexQuote) results[2];
+            TaifexQuote tsmcQuote = (TaifexQuote) results[3];
 
             StringBuilder sb = new StringBuilder();
 
@@ -2698,6 +2700,21 @@ public class MainApp extends Application {
                 sb.append("詳細報價資料暫時無法取得\n");
             }
 
+            sb.append("\n【富台指】\n\n");
+
+            // TWN 爬蟲詳細資料
+            if (twn.success()) {
+                sb.append(String.format("開盤：%.0f\n", twn.open()));
+                sb.append(String.format("最高：%.0f\n", twn.high()));
+                sb.append(String.format("最低：%.0f\n", twn.low()));
+                sb.append(String.format("漲跌：%s\n", twn.changeText()));
+                sb.append(String.format("成交：%.1f\n", twn.current()));
+                sb.append(String.format("成交量(口)：%,d 口\n", twn.volume()));
+                sb.append("更新時間：" + twn.updateTime() + "\n");
+            } else {
+                sb.append("詳細報價資料暫時無法取得\n");
+            }
+
             resultArea.setText(sb.toString());
 
             chartPane.setContent(createFITXBarChart(fitx));
@@ -2712,7 +2729,7 @@ public class MainApp extends Application {
     }
 
     // 台指近專用柱狀圖
-    private Node createFITXBarChart(FITXRealtime fitx) {
+    private Node createFITXBarChart(FUTURESRealtime fitx) {
         SwingNode swingNode = new SwingNode();
 
         SwingUtilities.invokeLater(() -> {
