@@ -326,6 +326,7 @@ public class HiStockService {
 
     /**
      * 台指近
+     * https://histock.tw/index-tw/FITX
      */
     public FITXRealtime fetchFITXChange() {
         try {
