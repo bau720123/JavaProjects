@@ -234,9 +234,9 @@ public class MainApp extends Application {
         institutionalMarketBtn.setPrefWidth(140);
         institutionalMarketBtn.setOnAction(e -> queryInstitutionalMarketTrading());
 
-        Button FITXBtn = new Button("下單判斷指數");
+        Button FITXBtn = new Button("即時行情");
         FITXBtn.setPrefWidth(140);
-        FITXBtn.setOnAction(e -> queryFITX());
+        FITXBtn.setOnAction(e -> queryRealtimeQuotes());
 
         Button weightedBtn = new Button("加權指數");
         weightedBtn.setPrefWidth(140);
@@ -2643,8 +2643,8 @@ public class MainApp extends Application {
 
     private final TaiFexService taiFexService = new TaiFexService(); // 加入成員變數
 
-    // 查詢台指近
-    private void queryFITX() {
+    // 查詢即時行情
+    private void queryRealtimeQuotes() {
         resultArea.clear();
         resultArea.setText("載入中，請稍候...");
 
