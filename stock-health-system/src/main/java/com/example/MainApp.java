@@ -234,7 +234,7 @@ public class MainApp extends Application {
         institutionalMarketBtn.setPrefWidth(140);
         institutionalMarketBtn.setOnAction(e -> queryInstitutionalMarketTrading());
 
-        Button FITXBtn = new Button("台指近");
+        Button FITXBtn = new Button("下單判斷指數");
         FITXBtn.setPrefWidth(140);
         FITXBtn.setOnAction(e -> queryFITX());
 
@@ -2649,35 +2649,36 @@ public class MainApp extends Application {
         resultArea.setText("載入中，請稍候...");
 
         CompletableFuture.supplyAsync(() -> {
-            FUTURESRealtime fitx = hiStockService.fetchFUTURESChange("stocktop2017", "FITX"); // 台指近
-            FUTURESRealtime twn = hiStockService.fetchFUTURESChange("stocktop2017", "TWN"); // 富台期
+            FUTURESRealtime fitx = hiStockService.fetchFUTURESChange("stocktop2017", "FITX", "指數", "成交量(口)"); // 台指近
+            FUTURESRealtime twn = hiStockService.fetchFUTURESChange("stocktop2017", "TWN", "指數", "成交量(口)"); // 富台期
+            FUTURESRealtime adr = hiStockService.fetchFUTURESChange("stocktop2017_Global", "TSM", "股價", "成交量"); // 台積電ADR
             TaifexQuote txQuote = taiFexService.fetchTaifexQuote(2, "臺股期貨");
             TaifexQuote tsmcQuote = taiFexService.fetchTaifexQuote(12, "台積電期貨");
 
-            return new Object[]{fitx, twn, txQuote, tsmcQuote};
+            return new Object[]{fitx, twn, adr, txQuote, tsmcQuote};
         })
         .thenAccept(results -> Platform.runLater(() -> {
             FUTURESRealtime fitx = (FUTURESRealtime) results[0];
             FUTURESRealtime twn = (FUTURESRealtime) results[1];
-            TaifexQuote txQuote = (TaifexQuote) results[2];
-            TaifexQuote tsmcQuote = (TaifexQuote) results[3];
+            FUTURESRealtime adr = (FUTURESRealtime) results[2];
+            TaifexQuote txQuote = (TaifexQuote) results[3];
+            TaifexQuote tsmcQuote = (TaifexQuote) results[4];
 
             StringBuilder sb = new StringBuilder();
 
-            // 台指期盤中/收盤漲跌（優先用 API 資料）
+            // 台指期盤中/收盤漲跌
+            sb.append("【台指近】（盤中或收盤資訊）\n\n");
             if (txQuote.isValid()) {
                 String sign = txQuote.updown() > 0 ? "▲" : (txQuote.updown() < 0 ? "▼" : "");
-                sb.append("【盤中或收盤資訊】\n\n");
                 sb.append(String.format("現價：%.1f　\n", txQuote.price()));
                 sb.append(String.format("成交量：%,d 口\n", txQuote.ttlvol()));
                 sb.append(String.format("漲跌：%s%.0f\n", sign, Math.abs(txQuote.updown())));
             } else {
-                sb.append("盤中或收盤資訊：無法取得\n");
+                sb.append("無法取得\n");
             }
 
             // 台積電期貨
             sb.append("\n【台積電期貨】\n\n");
-
             if (tsmcQuote.isValid()) {
                 String signTSMC = tsmcQuote.updown() > 0 ? "▲" : (tsmcQuote.updown() < 0 ? "▼" : "");
                 sb.append(String.format("現價：%.1f　\n", tsmcQuote.price()));
@@ -2687,9 +2688,8 @@ public class MainApp extends Application {
                 sb.append("無法取得\n");
             }
 
-            sb.append("\n【台股期貨】\n\n");
-
             // FITX 爬蟲詳細資料
+            sb.append("\n【台股期貨】\n\n");
             if (fitx.success()) {
                 sb.append(String.format("開盤：%.0f\n", fitx.open()));
                 sb.append(String.format("最高：%.0f\n", fitx.high()));
@@ -2699,12 +2699,11 @@ public class MainApp extends Application {
                 sb.append(String.format("成交量(口)：%,d 口\n", fitx.volume()));
                 sb.append("更新時間：" + fitx.updateTime() + "\n");
             } else {
-                sb.append("詳細報價資料暫時無法取得\n");
+                sb.append("無法取得\n");
             }
 
-            sb.append("\n【富台指】\n\n");
-
             // TWN 爬蟲詳細資料
+            sb.append("\n【富台指】\n\n");
             if (twn.success()) {
                 sb.append(String.format("開盤：%.0f\n", twn.open()));
                 sb.append(String.format("最高：%.0f\n", twn.high()));
@@ -2714,7 +2713,21 @@ public class MainApp extends Application {
                 sb.append(String.format("成交量(口)：%,d 口\n", twn.volume()));
                 sb.append("更新時間：" + twn.updateTime() + "\n");
             } else {
-                sb.append("詳細報價資料暫時無法取得\n");
+                sb.append("無法取得\n");
+            }
+
+            // ADR 爬蟲詳細資料
+            sb.append("\n【台積電ADR】\n\n");
+            if (adr.success()) {
+                sb.append(String.format("開盤：%.0f\n", adr.open()));
+                sb.append(String.format("最高：%.0f\n", adr.high()));
+                sb.append(String.format("最低：%.0f\n", adr.low()));
+                sb.append(String.format("漲跌：%s\n", adr.changeText()));
+                sb.append(String.format("成交：%.1f\n", adr.current()));
+                sb.append(String.format("成交量(口)：%,d 口\n", adr.volume()));
+                sb.append("更新時間：" + adr.updateTime() + "\n");
+            } else {
+                sb.append("無法取得\n");
             }
 
             resultArea.setText(sb.toString());

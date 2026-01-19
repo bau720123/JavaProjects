@@ -23,17 +23,17 @@ public class HiStockService {
     private static final int TIMEOUT_MS = 15000;
 
     /**
-     * 融資融券餘額記錄（大盤整體）
+     * 融資融券餘額記錄
      */
     public record MarginRecord(
-            String date,              // yyyy-MM-dd
-            double marginBalance,     // 融資餘額（億元）
-            double marginChange,      // 融資增減（億元）
-            long shortBalance,        // 融券餘額（張）
-            long shortChange,         // 融券增減（張）
-            double price,             // 指數收盤
-            double priceChangePct,    // 漲跌幅 %
-            double volume             // 成交金額（億元）
+            String date, // yyyy-MM-dd
+            double marginBalance, // 融資餘額（億元）
+            double marginChange, // 融資增減（億元）
+            long shortBalance, // 融券餘額（張）
+            long shortChange, // 融券增減（張）
+            double price, // 指數收盤
+            double priceChangePct, // 漲跌幅 %
+            double volume // 成交金額（億元）
     ) {}
 
     /**
@@ -305,12 +305,12 @@ public class HiStockService {
         double open,
         double high,
         double low,
-        double change,          // 漲跌值（可正可負）
-        String changeText,      // 原始文字 e.g. "▲39.0" 或 "▼12.5"
-        double current,         // 現價 / 成交價
-        long volume,            // 成交量(口)
-        String updateTime,      // e.g. "2026.01.14 16:03"
-        boolean success         // 是否成功取得資料
+        double change, // 漲跌值（可正可負）
+        String changeText, // 原始文字 e.g. "▲39.0" 或 "▼12.5"
+        double current, // 現價 / 成交價
+        long volume, // 成交量(口)
+        String updateTime, // e.g. "2026.01.14 16:03"
+        boolean success // 是否成功取得資料
     ) {
         public static FUTURESRealtime empty() {
             return new FUTURESRealtime(0, 0, 0, 0, "無法取得", 0, 0, "未知", false);
@@ -318,11 +318,11 @@ public class HiStockService {
     }
 
     /**
-     * 台指近 + 富台期 即時變化
+     * 綜合數據 即時變化
      * https://histock.tw/index-tw/FITX
      * https://histock.tw/index-tw/TWN
      */
-    public FUTURESRealtime fetchFUTURESChange(String m, String no) {
+    public FUTURESRealtime fetchFUTURESChange(String m, String no, String current_title, String volume_title) {
         try {
             Document doc = Jsoup.connect("https://histock.tw/stock/module/function.aspx")
                 .userAgent(USER_AGENT)
@@ -369,8 +369,8 @@ public class HiStockService {
             double low    = parseDoubleSafe(dataMap.get("最低"));
             String changeStr = dataMap.get("漲跌");
             double changeVal = parseChangeValue(changeStr);  // 自訂解析 ▲39.0 → 39.0
-            double current = parseDoubleSafe(dataMap.get("指數"));  // 或 "成交"，視網站
-            long volume   = parseLongSafe(dataMap.get("成交量(口)"));
+            double current = parseDoubleSafe(dataMap.get(current_title));
+            long volume   = parseLongSafe(dataMap.get(volume_title));
 
             return new FUTURESRealtime(
                 open, high, low,

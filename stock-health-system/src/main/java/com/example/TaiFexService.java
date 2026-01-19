@@ -47,11 +47,11 @@ public class TaiFexService {
     }
 
     public record TaifexQuote(
-        String contract,       // e.g. "CDF016"
-        double price,          // 現價
-        long ttlvol,           // 總成交量
-        String contractName,   // 合約名稱
-        double updown          // 漲跌
+        String contract, // e.g. "CDF016"
+        double price, // 現價
+        long ttlvol, // 總成交量
+        String contractName, // 合約名稱
+        double updown // 漲跌
     ) {
         // 方便建立「無資料」實例
         public static TaifexQuote empty() {
