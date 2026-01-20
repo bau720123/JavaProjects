@@ -6,7 +6,9 @@ import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -319,8 +321,8 @@ public class HiStockService {
 
     /**
      * 綜合數據 即時變化
-     * https://histock.tw/index-tw/FITX
-     * https://histock.tw/index-tw/TWN
+     * 台指期：https://histock.tw/index-tw/FITX
+     * 富台指：https://histock.tw/index-tw/TWN
      */
     public FUTURESRealtime fetchFUTURESChange(String m, String no, String current_title, String volume_title) {
         try {
@@ -361,6 +363,7 @@ public class HiStockService {
                 int end = timePart.indexOf("<");
                 if (end > 0) timePart = timePart.substring(0, end);
                 updateTime = timePart.trim();
+                updateTime = parseAndFixUpdateTime(html);
             }
 
             // 提取各欄位（注意：key 必須與網站實際文字完全一致）
@@ -412,6 +415,33 @@ public class HiStockService {
             return Double.parseDouble(numPart);
         } catch (NumberFormatException e) {
             return 0.0;
+        }
+    }
+
+    private String parseAndFixUpdateTime(String html) {
+        int tildeIdx = html.indexOf("~");
+        if (tildeIdx < 0 || tildeIdx + 1 >= html.length()) {
+            return "未知";
+        }
+
+        String timePart = html.substring(tildeIdx + 1).trim();
+        int end = timePart.indexOf("<");
+        if (end > 0) {
+            timePart = timePart.substring(0, end).trim();
+        }
+
+        // 支援兩種可能的分隔符（. 或 -）
+        String normalized = timePart.replace(".", "-");
+
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+
+        try {
+            LocalDateTime dt = LocalDateTime.parse(normalized, formatter);
+            dt = dt.minusDays(1);  // 修正快 24 小時的問題
+            return dt.format(formatter);
+        } catch (DateTimeParseException e) {
+            System.err.println("時間解析失敗: " + timePart);
+            return normalized; // 至少有 - 分隔符
         }
     }
 }

@@ -102,7 +102,7 @@ public class FedWatchService {
         double midCurrent = getCurrentRateMidpoint(fredApiKey);
 
         try {
-            Document doc = Jsoup.connect("https://www.investing.com/central-banks/fed-rate-monitor")
+            Document doc = Jsoup.connect("https://hk.investing.com/central-banks/fed-rate-monitor")
                     .userAgent("Mozilla/5.0")
                     .timeout(15000)
                     .get();

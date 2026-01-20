@@ -133,6 +133,7 @@ public final class MarketEventCalendar {
      * 可隨時在程式碼中新增或註解掉
      */
     private static final List<ManualEvent> MANUAL_EVENTS = List.of(
+        new ManualEvent(LocalDate.of(2026, 1, 9), "對等關稅今晚可能會有判決或重大消息"),
         new ManualEvent(LocalDate.of(2026, 1, 14), "對等關稅今晚可能會有判決或重大消息"),
         new ManualEvent(LocalDate.of(2026, 1, 20), "對等關稅今晚可能會有判決或重大消息"),
         new ManualEvent(LocalDate.of(2026, 1, 21), "對等關稅今晚可能會有判決或重大消息"),
