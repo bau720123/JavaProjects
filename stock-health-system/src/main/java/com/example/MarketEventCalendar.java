@@ -137,8 +137,8 @@ public final class MarketEventCalendar {
         new ManualEvent(LocalDate.of(2026, 1, 14), "對等關稅今晚可能會有判決或重大消息"),
         new ManualEvent(LocalDate.of(2026, 1, 20), "對等關稅今晚可能會有判決或重大消息"),
         new ManualEvent(LocalDate.of(2026, 1, 21), "對等關稅今晚可能會有判決或重大消息"),
-        new ManualEvent(LocalDate.of(2026, 1, 26), "對等關稅今晚可能會有判決或重大消息"),
-        new ManualEvent(LocalDate.of(2026, 1, 27), "對等關稅今晚可能會有判決或重大消息")
+        new ManualEvent(LocalDate.of(2026, 2, 23), "對等關稅今晚可能會有判決或重大消息"),
+        new ManualEvent(LocalDate.of(2026, 2, 24), "對等關稅今晚可能會有判決或重大消息")
     );
 
     /**
