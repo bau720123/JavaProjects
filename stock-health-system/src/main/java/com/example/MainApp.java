@@ -2651,39 +2651,33 @@ public class MainApp extends Application {
         CompletableFuture.supplyAsync(() -> {
             FUTURESRealtime fitx = hiStockService.fetchFUTURESChange("stocktop2017", "FITX", "指數", "成交量(口)"); // 台指近
             FUTURESRealtime twn = hiStockService.fetchFUTURESChange("stocktop2017", "TWN", "指數", "成交量(口)"); // 富台期
-            FUTURESRealtime adr = hiStockService.fetchFUTURESChange("stocktop2017_Global", "TSM", "股價", "成交量"); // 台積電ADR
-            TaifexQuote txQuote = taiFexService.fetchTaifexQuote(2, "臺股期貨");
+            // FUTURESRealtime adr = hiStockService.fetchFUTURESChange("stocktop2017_Global", "TSM", "股價", "成交量"); // 台積電ADR
+            // TaifexQuote txQuote = taiFexService.fetchTaifexQuote(2, "臺股期貨");
             TaifexQuote tsmcQuote = taiFexService.fetchTaifexQuote(12, "台積電期貨");
+            CnbcService cnbc = new CnbcService();
+            CnbcService.FairValueFutures fvFutures = cnbc.getFairValueFutures(); // 美股電子盤
+            CnbcService.MarketQuote marketQuote = cnbc.getQuoteNew(); // 美股四大指數
 
-            return new Object[]{fitx, twn, adr, txQuote, tsmcQuote};
+            return new Object[]{fitx, twn, tsmcQuote, fvFutures, marketQuote};
         })
         .thenAccept(results -> Platform.runLater(() -> {
             FUTURESRealtime fitx = (FUTURESRealtime) results[0];
             FUTURESRealtime twn = (FUTURESRealtime) results[1];
-            FUTURESRealtime adr = (FUTURESRealtime) results[2];
-            TaifexQuote txQuote = (TaifexQuote) results[3];
-            TaifexQuote tsmcQuote = (TaifexQuote) results[4];
+            // FUTURESRealtime adr = (FUTURESRealtime) results[2];
+            // TaifexQuote txQuote = (TaifexQuote) results[2];
+            TaifexQuote tsmcQuote = (TaifexQuote) results[2];
+            CnbcService.FairValueFutures fvFutures = (CnbcService.FairValueFutures) results[3];
+            CnbcService.MarketQuote marketQuote = (CnbcService.MarketQuote) results[4];
 
             StringBuilder sb = new StringBuilder();
 
-            // 台指期盤中/收盤漲跌
-            sb.append("【台指近】（盤中或收盤資訊）\n\n");
-            if (txQuote.isValid()) {
-                String sign = txQuote.updown() > 0 ? "▲" : (txQuote.updown() < 0 ? "▼" : "");
-                sb.append(String.format("現價：%.1f　\n", txQuote.price()));
-                sb.append(String.format("成交量：%,d 口\n", txQuote.ttlvol()));
-                sb.append(String.format("漲跌：%s%.0f\n", sign, Math.abs(txQuote.updown())));
-            } else {
-                sb.append("無法取得\n");
-            }
-
-            // 台積電期貨
-            sb.append("\n【台積電期貨】\n\n");
+            // 台積電期貨詳細資料
+            sb.append("【台積電期貨】\n\n");
             if (tsmcQuote.isValid()) {
                 String signTSMC = tsmcQuote.updown() > 0 ? "▲" : (tsmcQuote.updown() < 0 ? "▼" : "");
-                sb.append(String.format("現價：%.1f　\n", tsmcQuote.price()));
-                sb.append(String.format("成交量：%,d 口\n", tsmcQuote.ttlvol()));
                 sb.append(String.format("漲跌：%s%.0f\n", signTSMC, Math.abs(tsmcQuote.updown())));
+                // sb.append(String.format("成交量：%,d 口\n", tsmcQuote.ttlvol()));
+                sb.append(String.format("現價：%.1f　\n", tsmcQuote.price()));
             } else {
                 sb.append("無法取得\n");
             }
@@ -2691,13 +2685,13 @@ public class MainApp extends Application {
             // FITX 爬蟲詳細資料
             sb.append("\n【台股期貨】\n\n");
             if (fitx.success()) {
-                sb.append(String.format("開盤：%.0f\n", fitx.open()));
-                sb.append(String.format("最高：%.0f\n", fitx.high()));
-                sb.append(String.format("最低：%.0f\n", fitx.low()));
+                // sb.append(String.format("開盤：%.0f\n", fitx.open()));
+                // sb.append(String.format("最高：%.0f\n", fitx.high()));
+                // sb.append(String.format("最低：%.0f\n", fitx.low()));
                 sb.append(String.format("漲跌：%s\n", fitx.changeText()));
-                sb.append(String.format("成交：%.1f\n", fitx.current()));
-                sb.append(String.format("成交量(口)：%,d 口\n", fitx.volume()));
-                sb.append("更新時間：" + fitx.updateTime() + "\n");
+                // sb.append(String.format("成交：%.1f\n", fitx.current()));
+                // sb.append(String.format("成交量(口)：%,d 口\n", fitx.volume()));
+                // sb.append("更新時間：" + fitx.updateTime() + "\n");
             } else {
                 sb.append("無法取得\n");
             }
@@ -2705,29 +2699,37 @@ public class MainApp extends Application {
             // TWN 爬蟲詳細資料
             sb.append("\n【富台指】\n\n");
             if (twn.success()) {
-                sb.append(String.format("開盤：%.0f\n", twn.open()));
-                sb.append(String.format("最高：%.0f\n", twn.high()));
-                sb.append(String.format("最低：%.0f\n", twn.low()));
+                // sb.append(String.format("開盤：%.0f\n", twn.open()));
+                // sb.append(String.format("最高：%.0f\n", twn.high()));
+                // sb.append(String.format("最低：%.0f\n", twn.low()));
                 sb.append(String.format("漲跌：%s\n", twn.changeText()));
-                sb.append(String.format("成交：%.1f\n", twn.current()));
-                sb.append(String.format("成交量(口)：%,d 口\n", twn.volume()));
-                sb.append("更新時間：" + twn.updateTime() + "\n");
+                // sb.append(String.format("成交：%.1f\n", twn.current()));
+                // sb.append(String.format("成交量(口)：%,d 口\n", twn.volume()));
+                // sb.append("更新時間：" + twn.updateTime() + "\n");
             } else {
                 sb.append("無法取得\n");
             }
 
-            // ADR 爬蟲詳細資料
-            sb.append("\n【台積電ADR】\n\n");
-            if (adr.success()) {
-                sb.append(String.format("開盤：%.0f\n", adr.open()));
-                sb.append(String.format("最高：%.0f\n", adr.high()));
-                sb.append(String.format("最低：%.0f\n", adr.low()));
-                sb.append(String.format("漲跌：%s\n", adr.changeText()));
-                sb.append(String.format("成交：%.1f\n", adr.current()));
-                sb.append(String.format("成交量(口)：%,d 口\n", adr.volume()));
-                sb.append("更新時間：" + adr.updateTime() + "\n");
+            // 美股盤前電子盤
+            sb.append("\n【美股盤前電子盤】\n\n");
+            sb.append(String.format("道瓊期貨：%.2f\n", fvFutures.dowChange()));
+            sb.append(String.format("標普500期貨：%.2f\n", fvFutures.spChange()));
+            sb.append(String.format("納斯達克100期貨：%.2f\n", fvFutures.nasdaqChange()));
+            sb.append(String.format("羅素2000期貨：%.2f\n", fvFutures.russellChange()));
+
+            // 美股四大指數
+            sb.append("\n【美股四大指數即時變動】\n\n");
+            sb.append(String.format("道瓊工業指數：%s\n", marketQuote.dowChange()));
+            sb.append(String.format("標普500指數：%s\n", marketQuote.spChange()));
+            sb.append(String.format("納斯達克指數：%s\n", marketQuote.nasdaqChange()));
+            sb.append(String.format("費城半導體指數：%s\n", marketQuote.soxChange()));
+
+            sb.append("\n【台積電 ADR】\n\n");
+            if (marketQuote.hasData()) {
+                sb.append("盤前變動：").append(marketQuote.tsmPreMarket()).append("\n");
+                sb.append("盤中變動：").append(marketQuote.tsmRegular()).append("\n");
             } else {
-                sb.append("無法取得\n");
+                sb.append("無法取得台積電 ADR 資訊（新API）\n");
             }
 
             resultArea.setText(sb.toString());
@@ -2751,14 +2753,14 @@ public class MainApp extends Application {
             DefaultCategoryDataset dataset = new DefaultCategoryDataset();
 
             // X 軸類別標籤名稱
-            dataset.addValue(fitx.open(),    "價格", "開盤價");
-            dataset.addValue(fitx.high(),    "價格", "最高價");
-            dataset.addValue(fitx.current(), "價格", "現價");
+            dataset.addValue(fitx.open(),    "點", "開盤");
+            dataset.addValue(fitx.high(),    "點", "最高");
+            dataset.addValue(fitx.current(), "點", "成交");
 
             JFreeChart chart = ChartFactory.createBarChart(
                 "台指期價格結構",
                 "",
-                "價格",
+                "點",
                 dataset,
                 PlotOrientation.VERTICAL,
                 false, true, false
