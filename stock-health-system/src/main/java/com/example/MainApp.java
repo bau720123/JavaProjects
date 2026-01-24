@@ -2726,8 +2726,16 @@ public class MainApp extends Application {
 
             sb.append("\n【台積電 ADR】\n\n");
             if (marketQuote.hasData()) {
-                sb.append("盤前變動：").append(marketQuote.tsmPreMarket()).append("\n");
-                sb.append("盤中變動：").append(marketQuote.tsmRegular()).append("\n");
+                String tsmType = marketQuote.tsmType();
+                if ("PRE_MKT" .equals(tsmType)) {
+                    tsmType = "盤前";
+                } else if ("POST_MKT" .equals(tsmType)) {
+                    tsmType = "盤後";
+                } else {
+                    tsmType = "未知類型";
+                }
+                sb.append(tsmType + "變動：").append(marketQuote.tsmMarket()).append("\n");
+                sb.append("盤中或收盤變動：").append(marketQuote.tsmRegular()).append("\n");
             } else {
                 sb.append("無法取得台積電 ADR 資訊（新API）\n");
             }

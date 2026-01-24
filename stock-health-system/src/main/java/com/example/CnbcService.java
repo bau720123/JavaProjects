@@ -106,7 +106,7 @@ public class CnbcService {
             JsonNode quotes = root.path("FormattedQuoteResult").path("FormattedQuote");
 
             if (quotes.isMissingNode() || !quotes.isArray()) {
-                return new MarketQuote("無法取得資料", "無法取得資料", "無法取得資料", "無法取得資料", "無法取得資料", "無法取得資料");
+                return new MarketQuote("無法取得資料", "無法取得資料", "無法取得資料", "無法取得資料", "無法取得資料", "無法取得資料", "無法取得資料");
             }
 
             String dowChange = "無法取得";
@@ -114,7 +114,8 @@ public class CnbcService {
             String nasdaqChange = "無法取得";
             String soxChange = "無法取得";
             String tsmRegular = "無法取得";
-            String tsmPreMarket = "無法取得";
+            String tsmType = "無法取得";
+            String tsmMarket = "無法取得";
 
             for (JsonNode item : quotes) {
                 String symbol = item.path("symbol").asText("");
@@ -132,16 +133,17 @@ public class CnbcService {
 
                     JsonNode extended = item.path("ExtendedMktQuote");
                     if (!extended.isMissingNode()) {
-                        tsmPreMarket = extended.path("change").asText("無法取得");
+                        tsmType = extended.path("type").asText("無法取得");
+                        tsmMarket = extended.path("change").asText("無法取得");
                     }
                 }
             }
 
-            return new MarketQuote(dowChange, spChange, nasdaqChange, soxChange, tsmRegular, tsmPreMarket);
+            return new MarketQuote(dowChange, spChange, nasdaqChange, soxChange, tsmRegular, tsmType, tsmMarket);
 
         } catch (Exception e) {
             System.err.println("抓取 CNBC 主要指數 + TSM ADR 報價失敗：" + e.getMessage());
-            return new MarketQuote("抓取失敗", "抓取失敗", "抓取失敗", "抓取失敗", "抓取失敗", "抓取失敗");
+            return new MarketQuote("抓取失敗", "抓取失敗", "抓取失敗", "抓取失敗", "抓取失敗", "抓取失敗", "抓取失敗");
         }
     }
 
@@ -151,7 +153,8 @@ public class CnbcService {
             String nasdaqChange, // 納斯達克 change
             String soxChange, // 費城半導體 change
             String tsmRegular, // 台積電 ADR 盤中 change
-            String tsmPreMarket // 台積電 ADR 盤前 change
+            String tsmType, // 台積電 ADR 延伸數據 type
+            String tsmMarket // 台積電 ADR 延伸數據 change
     ) {
         public boolean hasData() {
             return !dowChange.contains("無法取得") && !dowChange.contains("抓取失敗");
