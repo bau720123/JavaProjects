@@ -232,8 +232,8 @@ public class HiStockService {
         String url = "https://histock.tw/stock/" + symbol + "/%E6%9C%AC%E7%9B%8A%E6%AF%94";
         try {
             Document doc = Jsoup.connect(url)
-                    .userAgent("Mozilla/5.0")
-                    .timeout(10000)
+                    .userAgent(USER_AGENT)
+                    .timeout(TIMEOUT_MS)
                     .get();
 
             Elements rows = doc.select("table.tb-stock.tb-outline.tbBasic tbody tr");

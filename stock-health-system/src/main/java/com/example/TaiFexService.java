@@ -78,7 +78,7 @@ public class TaiFexService {
 
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(url))
-                    .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                    .header("User-Agent", USER_AGENT)
                     .header("Accept", "application/json")
                     .GET()
                     .build();

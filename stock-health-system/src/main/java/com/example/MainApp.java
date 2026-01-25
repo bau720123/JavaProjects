@@ -2656,7 +2656,7 @@ public class MainApp extends Application {
             TaifexQuote tsmcQuote = taiFexService.fetchTaifexQuote(12, "台積電期貨");
             CnbcService cnbc = new CnbcService();
             CnbcService.FairValueFutures fvFutures = cnbc.getFairValueFutures(); // 美股電子盤
-            CnbcService.MarketQuote marketQuote = cnbc.getQuoteNew(); // 美股四大指數
+            CnbcService.MarketQuote marketQuote = cnbc.getQuote(); // 美股四大指數
 
             return new Object[]{fitx, twn, tsmcQuote, fvFutures, marketQuote};
         })
@@ -2685,9 +2685,9 @@ public class MainApp extends Application {
             // FITX 爬蟲詳細資料
             sb.append("\n【台股期貨】\n\n");
             if (fitx.success()) {
-                // sb.append(String.format("開盤：%.0f\n", fitx.open()));
-                // sb.append(String.format("最高：%.0f\n", fitx.high()));
-                // sb.append(String.format("最低：%.0f\n", fitx.low()));
+                sb.append(String.format("開盤：%.0f\n", fitx.open()));
+                sb.append(String.format("最高：%.0f\n", fitx.high()));
+                sb.append(String.format("最低：%.0f\n", fitx.low()));
                 sb.append(String.format("漲跌：%s\n", fitx.changeText()));
                 sb.append(String.format("成交：%.1f\n", fitx.current()));
                 // sb.append(String.format("成交量(口)：%,d 口\n", fitx.volume()));
@@ -2728,16 +2728,14 @@ public class MainApp extends Application {
             if (marketQuote.hasData()) {
                 String tsmType = marketQuote.tsmType();
                 if ("PRE_MKT" .equals(tsmType)) {
-                    tsmType = "盤前";
-                } else if ("POST_MKT" .equals(tsmType)) {
-                    tsmType = "盤後";
-                } else {
-                    tsmType = "未知類型";
+                    sb.append("盤前變動：").append(marketQuote.tsmMarket()).append("\n");
                 }
-                sb.append(tsmType + "變動：").append(marketQuote.tsmMarket()).append("\n");
                 sb.append("盤中或收盤變動：").append(marketQuote.tsmRegular()).append("\n");
+                if ("POST_MKT" .equals(tsmType)) {
+                    sb.append("盤後變動：").append(marketQuote.tsmMarket()).append("\n");
+                }
             } else {
-                sb.append("無法取得台積電 ADR 資訊（新API）\n");
+                sb.append("無法取得台積電 ADR 資訊\n");
             }
 
             resultArea.setText(sb.toString());

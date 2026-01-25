@@ -33,6 +33,9 @@ import org.jsoup.nodes.Element;
  */
 public final class MarketEventCalendar {
 
+    private static final String USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+    private static final int TIMEOUT_MS = 15000;
+
     private static final HttpClient httpClient = HttpClient.newHttpClient();
     private static final ObjectMapper mapper = new ObjectMapper();
     private static final DateTimeFormatter MONEYDJ_DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy/MM/dd");
@@ -51,7 +54,7 @@ public final class MarketEventCalendar {
         try {
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(url))
-                    .header("User-Agent", "Mozilla/5.0")
+                    .header("User-Agent", USER_AGENT)
                     .GET()
                     .build();
 
@@ -337,8 +340,8 @@ public final class MarketEventCalendar {
 
         try {
             Document doc = Jsoup.connect("https://hk.investing.com/economic-calendar/interest-rate-decision-168")
-                    .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-                    .timeout(15000)
+                    .userAgent(USER_AGENT)
+                    .timeout(TIMEOUT_MS)
                     .get();
 
             Element table = doc.getElementById("eventHistoryTable168");
@@ -476,7 +479,7 @@ public final class MarketEventCalendar {
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create("https://www.macromicro.me/calendar/earnings"))
                     .header("Content-Type", "application/x-www-form-urlencoded")
-                    .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                    .header("User-Agent", USER_AGENT)
                     .header("Origin", "https://www.macromicro.me")
                     .header("Referer", "https://www.macromicro.me/calendar/earnings")
                     .POST(HttpRequest.BodyPublishers.ofString(formBody))

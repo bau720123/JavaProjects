@@ -98,7 +98,7 @@ public class CnbcService {
         }
     }
 
-    public MarketQuote getQuoteNew() {
+    public MarketQuote getQuote() {
         String url = "https://quote.cnbc.com/quote-html-webservice/restQuote/symbolType/symbol?symbols=.DJI%7C.SP500%7C.IXIC%7C.SOX%7CTSM&requestMethod=itv&noform=1&partnerId=2&fund=1&exthrs=1&output=json&events=1";
 
         try {

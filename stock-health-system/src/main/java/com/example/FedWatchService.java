@@ -20,6 +20,9 @@ import java.util.List;
  */
 public class FedWatchService {
 
+    private static final String USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+    private static final int TIMEOUT_MS = 15000;
+
     private static final HttpClient client = HttpClient.newHttpClient();
     private static final ObjectMapper mapper = new ObjectMapper();
 
@@ -103,8 +106,8 @@ public class FedWatchService {
 
         try {
             Document doc = Jsoup.connect("https://hk.investing.com/central-banks/fed-rate-monitor")
-                    .userAgent("Mozilla/5.0")
-                    .timeout(15000)
+                    .userAgent(USER_AGENT)
+                    .timeout(TIMEOUT_MS)
                     .get();
 
             // 會議日期

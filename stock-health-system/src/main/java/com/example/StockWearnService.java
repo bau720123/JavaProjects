@@ -15,6 +15,9 @@ import java.util.List;
  */
 public class StockWearnService {
 
+    private static final String USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+    private static final int TIMEOUT_MS = 15000;
+
     /**
      * 抓取外資大盤淨空單歷史資料
      * @return 包含日期與淨空單口數的列表
@@ -24,8 +27,8 @@ public class StockWearnService {
 
         try {
             Document doc = Jsoup.connect("https://stock.wearn.com/taifexphoto.asp")
-                    .userAgent("Mozilla/5.0")
-                    .timeout(15000)
+                    .userAgent(USER_AGENT)
+                    .timeout(TIMEOUT_MS)
                     .get();
 
             Element table = doc.selectFirst("table.taifexphoto");
@@ -88,8 +91,8 @@ public class StockWearnService {
 
         try {
             Document doc = Jsoup.connect("https://stock.wearn.com/netbuy.asp?kind=" + symbol)
-                    .userAgent("Mozilla/5.0")
-                    .timeout(10000)
+                    .userAgent(USER_AGENT)
+                    .timeout(TIMEOUT_MS)
                     .get();
 
             Elements tables = doc.select("table.mobile_img");
@@ -146,8 +149,8 @@ public class StockWearnService {
 
         try {
             Document doc = Jsoup.connect("https://stock.wearn.com/fundthree.asp")
-                    .userAgent("Mozilla/5.0")
-                    .timeout(15000)
+                    .userAgent(USER_AGENT)
+                    .timeout(TIMEOUT_MS)
                     .get();
 
             Elements tables = doc.select("table.mobile_img");
