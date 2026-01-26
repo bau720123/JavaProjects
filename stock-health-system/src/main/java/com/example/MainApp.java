@@ -2727,7 +2727,7 @@ public class MainApp extends Application {
             sb.append("\n【台積電 ADR】\n\n");
             if (marketQuote.hasData()) {
                 String tsmType = marketQuote.tsmType();
-                if ("PRE_MKT" .equals(tsmType)) {
+                if ("PRE_MKT".equals(tsmType) || "POST_MKT_PREV".equals(tsmType)) {
                     sb.append("盤前變動：").append(marketQuote.tsmMarket()).append("\n");
                 }
                 sb.append("盤中或收盤變動：").append(marketQuote.tsmRegular()).append("\n");
