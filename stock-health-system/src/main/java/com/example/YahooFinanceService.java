@@ -24,6 +24,9 @@ import java.util.List;
  */
 public class YahooFinanceService {
 
+    private static final String USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+    private static final int TIMEOUT_MS = 15000;
+
     private final OkHttpClient client = new OkHttpClient();
     private final ObjectMapper mapper = new ObjectMapper();
 
@@ -56,7 +59,7 @@ public class YahooFinanceService {
 
             Request request = new Request.Builder()
                 .url(url)
-                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
+                .header("User-Agent", USER_AGENT)
                 .build();
 
             try (Response response = client.newCall(request).execute()) {

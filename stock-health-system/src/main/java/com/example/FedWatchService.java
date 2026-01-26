@@ -35,7 +35,7 @@ public class FedWatchService {
             );
             HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(url))
-                .header("User-Agent", "Mozilla/5.0")
+                .header("User-Agent", USER_AGENT)
                 .GET()
                 .build();
             return client.send(request, HttpResponse.BodyHandlers.ofString());
