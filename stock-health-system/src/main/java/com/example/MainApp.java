@@ -2718,7 +2718,7 @@ public class MainApp extends Application {
             sb.append(String.format("羅素2000期貨：%.2f\n", fvFutures.russellChange()));
 
             // 美股四大指數
-            sb.append("\n【美股四大指數即時變動】\n\n");
+            sb.append("\n【美股四大指數】\n\n");
             sb.append(String.format("道瓊工業指數：%s\n", marketQuote.dowChange()));
             sb.append(String.format("標普500指數：%s\n", marketQuote.spChange()));
             sb.append(String.format("納斯達克指數：%s\n", marketQuote.nasdaqChange()));
