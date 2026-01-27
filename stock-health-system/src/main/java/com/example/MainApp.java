@@ -2685,11 +2685,11 @@ public class MainApp extends Application {
             // FITX 爬蟲詳細資料
             sb.append("\n【台股期貨】\n\n");
             if (fitx.success()) {
-                // sb.append(String.format("開盤：%.0f\n", fitx.open()));
-                // sb.append(String.format("最高：%.0f\n", fitx.high()));
-                // sb.append(String.format("最低：%.0f\n", fitx.low()));
+                sb.append(String.format("開盤：%.0f\n", fitx.open()));
+                sb.append(String.format("最高：%.0f\n", fitx.high()));
+                sb.append(String.format("最低：%.0f\n", fitx.low()));
                 sb.append(String.format("漲跌：%s\n", fitx.changeText()));
-                // sb.append(String.format("成交：%.1f\n", fitx.current()));
+                sb.append(String.format("成交：%.1f\n", fitx.current()));
                 // sb.append(String.format("成交量(口)：%,d 口\n", fitx.volume()));
                 sb.append("更新時間：" + fitx.updateTime() + "\n");
             } else {
@@ -2699,11 +2699,11 @@ public class MainApp extends Application {
             // TWN 爬蟲詳細資料
             sb.append("\n【富台指】\n\n");
             if (twn.success()) {
-                // sb.append(String.format("開盤：%.0f\n", twn.open()));
-                // sb.append(String.format("最高：%.0f\n", twn.high()));
-                // sb.append(String.format("最低：%.0f\n", twn.low()));
+                sb.append(String.format("開盤：%.0f\n", twn.open()));
+                sb.append(String.format("最高：%.0f\n", twn.high()));
+                sb.append(String.format("最低：%.0f\n", twn.low()));
                 sb.append(String.format("漲跌：%s\n", twn.changeText()));
-                // sb.append(String.format("成交：%.1f\n", twn.current()));
+                sb.append(String.format("成交：%.1f\n", twn.current()));
                 // sb.append(String.format("成交量(口)：%,d 口\n", twn.volume()));
                 sb.append("更新時間：" + twn.updateTime() + "\n");
             } else {

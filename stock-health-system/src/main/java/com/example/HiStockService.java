@@ -363,8 +363,7 @@ public class HiStockService {
                 int end = timePart.indexOf("<");
                 if (end > 0) timePart = timePart.substring(0, end);
                 updateTime = timePart.trim();
-                // updateTime = parseAndFixUpdateTime(html);
-                updateTime = updateTime.replace(".", "-");
+                updateTime = parseAndFixUpdateTime(html);
             }
 
             // 提取各欄位（注意：key 必須與網站實際文字完全一致）
@@ -438,10 +437,13 @@ public class HiStockService {
 
         try {
             LocalDateTime dt = LocalDateTime.parse(normalized, formatter);
-            dt = dt.minusDays(1);  // 修正快 24 小時的問題
+            LocalDate today = LocalDate.now();
+            if (dt.toLocalDate().isAfter(today)) {
+                dt = dt.minusDays(1); // 如果資料日期在未來，減一天
+            }
             return dt.format(formatter);
         } catch (DateTimeParseException e) {
-            System.err.println("時間解析失敗: " + timePart);
+            System.err.println("時間解析失敗：" + timePart);
             return normalized; // 至少有 - 分隔符
         }
     }
