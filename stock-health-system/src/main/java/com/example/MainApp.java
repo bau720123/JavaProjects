@@ -2643,8 +2643,16 @@ public class MainApp extends Application {
 
     private final TaiFexService taiFexService = new TaiFexService(); // 加入成員變數
 
+    private final RobinHoodService robinHoodService = new RobinHoodService(); // 加入成員變數
+
     // 查詢即時行情
     private void queryRealtimeQuotes() {
+        // 交易時段,英文術語,台北時間 (冬令),美東時間 (ET)
+        // 隔夜盤/夜盤,Overnight,09:00 - 17:00,20:00 - 04:00
+        // 盤前交易,Pre-market,17:00 - 22:30,04:00 - 09:30
+        // 正規盤,Regular Session,22:30 - 05:00,09:30 - 16:00
+        // 盤後交易,Post-market,05:00 - 09:00,16:00 - 20:00
+
         resultArea.clear();
         resultArea.setText("載入中，請稍候...");
 
@@ -2657,8 +2665,9 @@ public class MainApp extends Application {
             CnbcService cnbc = new CnbcService();
             CnbcService.FairValueFutures fvFutures = cnbc.getFairValueFutures(); // 美股電子盤
             CnbcService.MarketQuote marketQuote = cnbc.getQuote(); // 美股四大指數
+            RobinHoodService.RobinHoodRealtime rh = robinHoodService.fetchRealtimeChange("ca4821f9-06c3-4c22-bbb8-efe569f23d2b"); // 台積電ADR即時
 
-            return new Object[]{fitx, twn, tsmcQuote, fvFutures, marketQuote};
+            return new Object[]{fitx, twn, tsmcQuote, fvFutures, marketQuote, rh};
         })
         .thenAccept(results -> Platform.runLater(() -> {
             FUTURESRealtime fitx = (FUTURESRealtime) results[0];
@@ -2668,6 +2677,7 @@ public class MainApp extends Application {
             TaifexQuote tsmcQuote = (TaifexQuote) results[2];
             CnbcService.FairValueFutures fvFutures = (CnbcService.FairValueFutures) results[3];
             CnbcService.MarketQuote marketQuote = (CnbcService.MarketQuote) results[4];
+            RobinHoodService.RobinHoodRealtime rh = (RobinHoodService.RobinHoodRealtime) results[5];
 
             StringBuilder sb = new StringBuilder();
 
@@ -2737,6 +2747,8 @@ public class MainApp extends Application {
             } else {
                 sb.append("無法取得台積電 ADR 資訊\n");
             }
+
+            sb.append("Robinhood 即時變動：").append(rh.getChangeText()).append("\n");
 
             resultArea.setText(sb.toString());
 
