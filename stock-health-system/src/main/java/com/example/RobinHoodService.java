@@ -25,12 +25,14 @@ public class RobinHoodService {
 
     public static class RobinHoodRealtime {
         private final boolean success;
-        private final String changeText;   // e.g. "-$0.43 (-0.13%)"
+        private final String changeText;      // secondary_value.main.value
+        private final String tertiaryText;    // 新增：tertiary_value 的 value
         private final String errorMessage;
 
-        public RobinHoodRealtime(boolean success, String changeText, String errorMessage) {
+        public RobinHoodRealtime(boolean success, String changeText, String tertiaryText, String errorMessage) {
             this.success = success;
             this.changeText = changeText != null ? changeText : "";
+            this.tertiaryText = tertiaryText != null ? tertiaryText : "";
             this.errorMessage = errorMessage != null ? errorMessage : "";
         }
 
@@ -40,6 +42,10 @@ public class RobinHoodService {
 
         public String getChangeText() {
             return changeText;
+        }
+
+        public String getTertiaryText() {
+            return tertiaryText;
         }
 
         public String getErrorMessage() {
@@ -53,7 +59,7 @@ public class RobinHoodService {
      */
     public RobinHoodRealtime fetchRealtimeChange(String instrumentId) {
         if (instrumentId == null || instrumentId.trim().isEmpty()) {
-            return new RobinHoodRealtime(false, null, "instrumentId 不可為空");
+            return new RobinHoodRealtime(false, null, null, "instrumentId 不可為空");
         }
 
         String url = String.format(BASE_URL_TEMPLATE, instrumentId);
@@ -68,34 +74,41 @@ public class RobinHoodService {
 
             try (Response response = client.newCall(request).execute()) {
                 if (!response.isSuccessful()) {
-                    return new RobinHoodRealtime(false, null,
+                    return new RobinHoodRealtime(false, null, null,
                             "HTTP " + response.code() + " - " + response.message());
                 }
 
                 String json = response.body().string();
                 JsonNode root = mapper.readTree(json);
 
-                JsonNode secondary = root.path("chart_section")
-                                        .path("default_display")
-                                        .path("secondary_value")
-                                        .path("main");
+                // 共同的路徑前綴
+                JsonNode display = root.path("chart_section")
+                                      .path("default_display");
 
-                if (secondary.isMissingNode() || secondary.isNull()) {
-                    return new RobinHoodRealtime(false, null, "找不到 secondary_value.main 欄位");
+                // secondary_value.main.value
+                JsonNode secondaryMain = display.path("secondary_value").path("main");
+                String secondaryValue = secondaryMain.path("value").asText(null);
+
+                // tertiary_value.main.value （假設結構類似 secondary）
+                JsonNode tertiaryMain = display.path("tertiary_value").path("main");
+                String tertiaryValue = tertiaryMain.path("value").asText(null);
+
+                // 只要其中一個有值就算成功（或依需求調整）
+                if ((secondaryValue == null || secondaryValue.trim().isEmpty()) &&
+                    (tertiaryValue == null || tertiaryValue.trim().isEmpty())) {
+                    return new RobinHoodRealtime(false, null, null, "找不到 secondary_value 或 tertiary_value 的 value");
                 }
 
-                String value = secondary.path("value").asText(null);
-                if (value == null || value.trim().isEmpty()) {
-                    return new RobinHoodRealtime(false, null, "value 欄位為空");
-                }
-
-                return new RobinHoodRealtime(true, value, null);
+                return new RobinHoodRealtime(true,
+                        secondaryValue,
+                        tertiaryValue,
+                        null);
 
             } catch (IOException e) {
-                return new RobinHoodRealtime(false, null, "網路或 JSON 解析錯誤：" + e.getMessage());
+                return new RobinHoodRealtime(false, null, null, "網路或 JSON 解析錯誤：" + e.getMessage());
             }
         } catch (Exception e) {
-            return new RobinHoodRealtime(false, null, "意外錯誤：" + e.getMessage());
+            return new RobinHoodRealtime(false, null, null, "意外錯誤：" + e.getMessage());
         }
     }
 }

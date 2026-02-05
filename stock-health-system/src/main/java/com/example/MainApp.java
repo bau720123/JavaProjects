@@ -2734,7 +2734,7 @@ public class MainApp extends Application {
             sb.append(String.format("納斯達克指數：%s\n", marketQuote.nasdaqChange()));
             sb.append(String.format("費城半導體指數：%s\n", marketQuote.soxChange()));
 
-            sb.append("\n【台積電 ADR】\n\n");
+            sb.append("\n【台積電 ADR】Cnbc\n\n");
             if (marketQuote.hasData()) {
                 String tsmType = marketQuote.tsmType();
                 if ("PRE_MKT".equals(tsmType) || "POST_MKT_PREV".equals(tsmType)) {
@@ -2748,7 +2748,17 @@ public class MainApp extends Application {
                 sb.append("無法取得台積電 ADR 資訊\n");
             }
 
-            sb.append("Robinhood 即時變動：").append(rh.getChangeText()).append("\n");
+            sb.append("\n【台積電 ADR】RobinHood\n\n");
+            if (rh.isSuccess()) {
+                sb.append(String.format("變動：%s\n", rh.getChangeText()));
+                
+                // 如果 tertiaryText 有值才顯示，避免空行
+                if (!rh.getTertiaryText().isEmpty()) {
+                    sb.append(String.format("額外資訊：%s\n", rh.getTertiaryText()));
+                }
+            } else {
+                sb.append("無法取得資料：").append(rh.getErrorMessage()).append("\n");
+            }
 
             resultArea.setText(sb.toString());
 
