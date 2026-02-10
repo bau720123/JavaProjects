@@ -433,9 +433,9 @@ public class MainApp extends Application {
                 if (quote != null) {
                     StringBuilder sb = new StringBuilder();
                     sb.append(String.format("日期：%s\n", LocalDate.now())); // 無 date 
-                    sb.append(String.format("股票代碼：%s\n股票名稱：%s\n\n上個收盤價：%.2f\n開盤價：%.2f\n最高價：%.2f\n最低價：%.2f\n現價：%.2f\n均價：%.2f\n漲跌：%.2f\n幅度：%.2f\n累計成交量：%d \n累計內盤成交量：%d \n累計外盤成交量：%d \n累計成交筆數：%d \n",
+                    sb.append(String.format("股票代碼：%s\n股票名稱：%s\n\n上個收盤價：%.2f\n開盤價：%.2f\n最高價：%.2f\n最低價：%.2f\n現價：%.2f\n均價：%.2f\n漲跌：%.2f\n幅度：%.2f\n累計成交量：%d\n累計內盤成交量：%d\n累計外盤成交量：%d\n累計成交筆數：%d\n低減開：%.2f\n",
                             quote.symbol(), quote.name(), quote.previousClose(), quote.openPrice(), quote.highPrice(), quote.lowPrice(), quote.closePrice(),
-                            quote.avgPrice(), quote.change(), quote.changePercent(), quote.tradeVolume(), quote.tradeVolumeAtBid(), quote.tradeVolumeAtAsk(), quote.transaction()));
+                            quote.avgPrice(), quote.change(), quote.changePercent(), quote.tradeVolume(), quote.tradeVolumeAtBid(), quote.tradeVolumeAtAsk(), quote.transaction(), quote.lowPrice() - quote.openPrice()));
 
                     // 委買價區段內容
                     sb.append("\n【委買價】\n\n");
@@ -1166,8 +1166,8 @@ public class MainApp extends Application {
                     StringBuilder sb = new StringBuilder(String.format("歷史K線圖已載入（近 %d 日走勢）。\n\n", candles.size()));
                     for (Candle c : candles) {
                         String tag = c.date().equals(today) && !hasToday ? "（即時演算）" : "";
-                        sb.append(String.format("日期：%s%s\n開盤價：%.2f\n最高價：%.2f\n最低價：%.2f\n收盤價：%.2f\n成交量：%d\n漲跌：%.2f\n\n",
-                            c.date(), tag, c.open(), c.high(), c.low(), c.close(), c.volume(), c.change()));
+                        sb.append(String.format("日期：%s%s\n開盤價：%.2f\n最高價：%.2f\n最低價：%.2f\n收盤價：%.2f\n成交量：%d\n漲跌：%.2f\n低減開：%.2f\n\n",
+                            c.date(), tag, c.open(), c.high(), c.low(), c.close(), c.volume(), c.change(), c.low() - c.open()));
                     }
 
                     // 計算區間最高價（所有 high 的 max）和最低價（所有 low 的 min）
