@@ -334,6 +334,7 @@ public class MainApp extends Application {
         resultArea.setPrefRowCount(10); // 但JavaFX布局系統的響應式設計（responsive layout）會讓其根據視窗大小的變化來自動延展其高
         resultArea.setEditable(false); // 設定該文字區塊可否修改
         resultArea.setPrefWidth(200); // 寬度維持 200px
+        resultArea.setStyle("-fx-font-size: 14px; -fx-font-family: 'Microsoft YaHei';"); // 設定字體大小與字型（微軟雅黑）
         HBox.setMargin(resultArea, new Insets(0, 0, 0, 10));  // 新增：向左微移 10px，盡可能對齊上方區塊位置
 
         // 圖表區塊
