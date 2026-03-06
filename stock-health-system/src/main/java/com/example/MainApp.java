@@ -262,6 +262,10 @@ public class MainApp extends Application {
         TSMBtn.setPrefWidth(140);
         TSMBtn.setOnAction(e -> queryYahooFinance("TSM", "台積電ADR"));
 
+        Button BRANTBtn = new Button("布蘭特原油");
+        BRANTBtn.setPrefWidth(140);
+        BRANTBtn.setOnAction(e -> queryYahooFinance("BZ=F", "布蘭特原油"));
+
         Button marginBtn = new Button("融資融券餘額");
         marginBtn.setPrefWidth(140);
         marginBtn.setOnAction(e -> queryMarginBalance());
@@ -274,7 +278,7 @@ public class MainApp extends Application {
         comprehensiveAlertBtn.setPrefWidth(140);
         comprehensiveAlertBtn.setOnAction(e -> queryComprehensiveAlert());
 
-        marketBox.getChildren().addAll(foreignNetBtn, institutionalMarketBtn, weightedBtn, FITXBtn, DowJonesBtn, SP500Btn, NasDaqBtn, PHLXSemiconductorBtn, TSMBtn, marginBtn, marginRateBtn, comprehensiveAlertBtn);
+        marketBox.getChildren().addAll(foreignNetBtn, institutionalMarketBtn, weightedBtn, FITXBtn, DowJonesBtn, SP500Btn, NasDaqBtn, PHLXSemiconductorBtn, TSMBtn, BRANTBtn, marginBtn, marginRateBtn, comprehensiveAlertBtn);
 
         // 用 ScrollPane 包起來
         ScrollPane marketScroll = new ScrollPane(marketBox);
@@ -2661,6 +2665,7 @@ public class MainApp extends Application {
             FUTURESRealtime fitx = hiStockService.fetchFUTURESChange("stocktop2017", "FITX", "指數", "成交量(口)"); // 台指近
             FUTURESRealtime twn = hiStockService.fetchFUTURESChange("stocktop2017", "TWN", "指數", "成交量(口)"); // 富台期
             // FUTURESRealtime adr = hiStockService.fetchFUTURESChange("stocktop2017_Global", "TSM", "股價", "成交量"); // 台積電ADR
+            FUTURESRealtime brent = hiStockService.fetchFUTURESChange("stocktop2017_Global", "BRENTOIL", "股價", "成交量"); // 布蘭特原油
             // TaifexQuote txQuote = taiFexService.fetchTaifexQuote(2, "臺股期貨");
             TaifexQuote tsmcQuote = taiFexService.fetchTaifexQuote(12, "台積電期貨");
             CnbcService cnbc = new CnbcService();
@@ -2668,17 +2673,18 @@ public class MainApp extends Application {
             CnbcService.MarketQuote marketQuote = cnbc.getQuote(); // 美股四大指數
             RobinHoodService.RobinHoodRealtime rh = robinHoodService.fetchRealtimeChange("ca4821f9-06c3-4c22-bbb8-efe569f23d2b"); // 台積電ADR即時
 
-            return new Object[]{fitx, twn, tsmcQuote, fvFutures, marketQuote, rh};
+            return new Object[]{fitx, twn, brent, tsmcQuote, fvFutures, marketQuote, rh};
         })
         .thenAccept(results -> Platform.runLater(() -> {
             FUTURESRealtime fitx = (FUTURESRealtime) results[0];
             FUTURESRealtime twn = (FUTURESRealtime) results[1];
             // FUTURESRealtime adr = (FUTURESRealtime) results[2];
+            FUTURESRealtime brent = (FUTURESRealtime) results[2];
             // TaifexQuote txQuote = (TaifexQuote) results[2];
-            TaifexQuote tsmcQuote = (TaifexQuote) results[2];
-            CnbcService.FairValueFutures fvFutures = (CnbcService.FairValueFutures) results[3];
-            CnbcService.MarketQuote marketQuote = (CnbcService.MarketQuote) results[4];
-            RobinHoodService.RobinHoodRealtime rh = (RobinHoodService.RobinHoodRealtime) results[5];
+            TaifexQuote tsmcQuote = (TaifexQuote) results[3];
+            CnbcService.FairValueFutures fvFutures = (CnbcService.FairValueFutures) results[4];
+            CnbcService.MarketQuote marketQuote = (CnbcService.MarketQuote) results[5];
+            RobinHoodService.RobinHoodRealtime rh = (RobinHoodService.RobinHoodRealtime) results[6];
 
             StringBuilder sb = new StringBuilder();
 
@@ -2717,6 +2723,20 @@ public class MainApp extends Application {
                 sb.append(String.format("成交：%.1f\n", twn.current()));
                 // sb.append(String.format("成交量(口)：%,d 口\n", twn.volume()));
                 sb.append("更新時間：" + twn.updateTime() + "\n");
+            } else {
+                sb.append("無法取得\n");
+            }
+			
+            // 布蘭特原油 爬蟲詳細資料
+            sb.append("\n【布蘭特原油】\n\n");
+            if (brent.success()) {
+                sb.append(String.format("開盤：%.0f\n", brent.open()));
+                sb.append(String.format("最高：%.0f\n", brent.high()));
+                sb.append(String.format("最低：%.0f\n", brent.low()));
+                sb.append(String.format("漲跌：%s\n", brent.changeText()));
+                sb.append(String.format("成交：%.1f\n", brent.current()));
+                // sb.append(String.format("成交量(口)：%,d 口\n", brent.volume()));
+                // sb.append("更新時間：" + brent.updateTime() + "\n");
             } else {
                 sb.append("無法取得\n");
             }
