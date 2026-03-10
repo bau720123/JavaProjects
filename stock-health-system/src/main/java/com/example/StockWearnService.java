@@ -195,7 +195,12 @@ public class StockWearnService {
 
     // 輔助方法：解析金額文字（如 "+ 22.79" 或 "- 298.71"）
     private static double parseAmount(String text) {
-        if (text == null || text.isEmpty() || text.equals("-")) return 0.0;
-        return Double.parseDouble(text.replace("+", "").replace(" ", "").trim());
+        if (text == null || text.isEmpty()) return 0.0;
+        String cleaned = text.replace("+", "")
+                            .replace(",", "")  // 移除千分位逗號
+                            .replace(" ", "")
+                            .trim();
+        if (cleaned.isEmpty() || cleaned.equals("-")) return 0.0;
+        return Double.parseDouble(cleaned);
     }
 }
