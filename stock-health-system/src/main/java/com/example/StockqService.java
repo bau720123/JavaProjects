@@ -5,10 +5,6 @@ import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-import java.util.Optional;
-
 /**
  * 專門處理 StockQ 網站爬蟲的服務類
  * 目前主要用來抓取布蘭特原油即時報價
@@ -24,15 +20,14 @@ public class StockqService {
     public record BrentOilQuote(
             double price,           // 最新價格
             String priceText,       // 原始文字（保留單位或格式）
-            String updateTime,      // 盡量抓到的更新時間
             boolean success
     ) {
         public static BrentOilQuote empty() {
-            return new BrentOilQuote(0.0, "—", "無法取得", false);
+            return new BrentOilQuote(0.0, "—", false);
         }
 
-        public static BrentOilQuote of(double price, String priceText, String updateTime) {
-            return new BrentOilQuote(price, priceText, updateTime, true);
+        public static BrentOilQuote of(double price, String priceText) {
+            return new BrentOilQuote(price, priceText, true);
         }
     }
 
@@ -67,10 +62,7 @@ public class StockqService {
             // 嘗試轉成數字（可能有逗號或單位）
             double price = parsePrice(priceText);
 
-            // 3. 嘗試找更新時間（常見在頁面某處，例如 class="time" 或 table 附近文字）
-            String updateTime = extractUpdateTime(doc);
-
-            return BrentOilQuote.of(price, priceText, updateTime);
+            return BrentOilQuote.of(price, priceText);
 
         } catch (Exception e) {
             System.err.println("StockQ 布蘭特原油爬蟲失敗：" + e.getMessage());
@@ -87,27 +79,5 @@ public class StockqService {
         } catch (NumberFormatException e) {
             return 0.0;
         }
-    }
-
-    // 嘗試提取頁面更新時間（不同頁面格式可能不同，這裡給一個較通用的寫法）
-    private String extractUpdateTime(Document doc) {
-        // 常見位置1：頁面有 <span class="time"> 或類似
-        Element timeElem = doc.selectFirst("span.time, .update-time, font[color=red]");
-        if (timeElem != null) {
-            String txt = timeElem.ownText().trim();
-            if (!txt.isEmpty()) return txt;
-        }
-
-        // 常見位置2：表格上方或下方有 "更新時間：xxx" 文字
-        Elements possible = doc.select("td:contains(更新), font:contains(更新), div:contains(更新)");
-        for (Element el : possible) {
-            String txt = el.ownText().trim();
-            if (txt.contains("更新") || txt.contains("Update") || txt.matches(".*\\d{1,2}:\\d{2}.*")) {
-                return txt;
-            }
-        }
-
-        // 最後手段：抓頁面任何看起來像時間的文字
-        return "未知（" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("MM-dd HH:mm")) + " 爬取）";
     }
 }
