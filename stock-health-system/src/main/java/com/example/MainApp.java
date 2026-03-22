@@ -2667,8 +2667,8 @@ public class MainApp extends Application {
             FUTURESRealtime fitx = hiStockService.fetchFUTURESChange("stocktop2017", "FITX", "指數", "成交量(口)"); // 台指近
             FUTURESRealtime twn = hiStockService.fetchFUTURESChange("stocktop2017", "TWN", "指數", "成交量(口)"); // 富台期
             FUTURESRealtime adr = hiStockService.fetchFUTURESChange("stocktop2017_Global", "TSM", "股價", "成交量"); // 台積電ADR
-            FUTURESRealtime brent = hiStockService.fetchFUTURESChange("stocktop2017_Global", "BRENTOIL", "股價", "成交量"); // 布蘭特原油
-            // StockqService.BrentOilQuote brent = stockqService.fetchBrentOilLatest();
+            FUTURESRealtime brent_hiStock = hiStockService.fetchFUTURESChange("stocktop2017_Global", "BRENTOIL", "股價", "成交量"); // 布蘭特原油
+            StockqService.BrentOilQuote brent_stockq = stockqService.fetchBrentOilLatest();
             // TaifexQuote txQuote = taiFexService.fetchTaifexQuote(2, "臺股期貨");
             TaifexQuote tsmcQuote = taiFexService.fetchTaifexQuote(12, "台積電期貨");
             CnbcService cnbc = new CnbcService();
@@ -2676,14 +2676,14 @@ public class MainApp extends Application {
             CnbcService.MarketQuote marketQuote = cnbc.getQuote(); // 美股四大指數
             RobinHoodService.RobinHoodRealtime rh = robinHoodService.fetchRealtimeChange("ca4821f9-06c3-4c22-bbb8-efe569f23d2b"); // 台積電ADR即時
 
-            return new Object[]{fitx, twn, brent, tsmcQuote, fvFutures, marketQuote, rh};
+            return new Object[]{fitx, twn, brent_hiStock, tsmcQuote, fvFutures, marketQuote, rh, brent_stockq};
         })
         .thenAccept(results -> Platform.runLater(() -> {
             FUTURESRealtime fitx = (FUTURESRealtime) results[0];
             FUTURESRealtime twn = (FUTURESRealtime) results[1];
             // FUTURESRealtime adr = (FUTURESRealtime) results[2];
-            FUTURESRealtime brent = (FUTURESRealtime) results[2];
-            // StockqService.BrentOilQuote brent = (StockqService.BrentOilQuote) results[2];
+            FUTURESRealtime brent_hiStock = (FUTURESRealtime) results[2];
+            StockqService.BrentOilQuote brent_stockq = (StockqService.BrentOilQuote) results[7];
             // TaifexQuote txQuote = (TaifexQuote) results[2];
             TaifexQuote tsmcQuote = (TaifexQuote) results[3];
             CnbcService.FairValueFutures fvFutures = (CnbcService.FairValueFutures) results[4];
@@ -2733,23 +2733,23 @@ public class MainApp extends Application {
 
             // 布蘭特原油 爬蟲詳細資料
             sb.append("\n【布蘭特原油】\n\n");
-            if (brent.success()) {
-                sb.append(String.format("開盤：%.2f\n", brent.open()));
-                sb.append(String.format("最高：%.2f\n", brent.high()));
-                sb.append(String.format("最低：%.2f\n", brent.low()));
-                sb.append(String.format("漲跌：%s\n", brent.changeText()));
-                sb.append(String.format("成交：%.2f\n", brent.current()));
-                // sb.append(String.format("成交量(口)：%,d 口\n", brent.volume()));
-                // sb.append("更新時間：" + brent.updateTime() + "\n");
+            if (brent_hiStock.success()) {
+                sb.append(String.format("開盤：%.2f\n", brent_hiStock.open()));
+                sb.append(String.format("最高：%.2f\n", brent_hiStock.high()));
+                sb.append(String.format("最低：%.2f\n", brent_hiStock.low()));
+                sb.append(String.format("漲跌：%s\n", brent_hiStock.changeText()));
+                sb.append(String.format("成交：%.2f\n", brent_hiStock.current()));
+                // sb.append(String.format("成交量(口)：%,d 口\n", brent_hiStock.volume()));
+                // sb.append("更新時間：" + brent_hiStock.updateTime() + "\n");
             } else {
                 sb.append("無法取得\n");
             }
-            // if (brent.success()) {
-            //     sb.append(String.format("價格：%.2f\n", brent.price()));  // 數字型價格，用 %.2f 保留兩位小數
-            //     // sb.append(String.format("原始文字：%s\n", brent.priceText()));  // 原始字串，直接用 %s
-            // } else {
-            //     sb.append("無法取得\n");
-            // }
+            if (brent_stockq.success()) {
+                sb.append(String.format("價格：%.2f\n", brent_stockq.price()));  // 數字型價格，用 %.2f 保留兩位小數
+                // sb.append(String.format("原始文字：%s\n", brent_stockq.priceText()));  // 原始字串，直接用 %s
+            } else {
+                sb.append("無法取得\n");
+            }
 
             // 美股盤前電子盤
             sb.append("\n【美股盤前電子盤】\n\n");
