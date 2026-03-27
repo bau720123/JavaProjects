@@ -46,7 +46,7 @@ public class CnbcService {
      */
     public FairValueFutures getFairValueFutures() {
         String url = "https://quote.cnbc.com/quote-html-webservice/fvquote.htm" +
-                     "?requestMethod=quick&noform=0&realtime=1&output=json" +
+                     "?requestMethod=quick&noform=0&realtime=0&client=fairValue&output=json" +
                      "&symbols=DJ%7CSP%7CND%7CTF";
 
         try {
@@ -58,20 +58,20 @@ public class CnbcService {
 
             for (JsonNode item : quotes) {
                 String symbol = item.path("symbol").asText();
-                double fvChange = item.path("fv_change").asDouble(0.0);
+                double fmtChange = item.path("fmt_change").asDouble(0.0);
 
                 switch (symbol) {
                     case "DJ":
-                        djChange = fvChange;
+                        djChange = fmtChange;
                         break;
                     case "SP":
-                        spChange = fvChange;
+                        spChange = fmtChange;
                         break;
                     case "ND":
-                        ndChange = fvChange;
+                        ndChange = fmtChange;
                         break;
                     case "TF":
-                        tfChange = fvChange;
+                        tfChange = fmtChange;
                         break;
                 }
 
