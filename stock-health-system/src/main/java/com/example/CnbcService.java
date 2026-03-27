@@ -102,7 +102,7 @@ public class CnbcService {
     }
 
     public MarketQuote getQuote() {
-        String url = "https://quote.cnbc.com/quote-html-webservice/restQuote/symbolType/symbol?symbols=.DJI%7C.SP500%7C.IXIC%7C.SOX%7CTSM&requestMethod=itv&noform=1&partnerId=2&fund=1&exthrs=1&output=json&events=1";
+        String url = "https://quote.cnbc.com/quote-html-webservice/restQuote/symbolType/symbol?symbols=.DJI%7C.SPX%7C.IXIC%7C.SOX%7CTSM&requestMethod=itv&noform=1&partnerId=2&fund=1&exthrs=1&output=json&events=1";
 
         try {
             JsonNode root = fetchJson(url);
@@ -125,7 +125,7 @@ public class CnbcService {
 
                 if (".DJI".equals(symbol)) {
                     dowChange = item.path("change").asText("無法取得");
-                } else if (".SP500".equals(symbol)) {
+                } else if (".SPX".equals(symbol)) {
                     spChange = item.path("change").asText("無法取得");
                 } else if (".IXIC".equals(symbol)) {
                     nasdaqChange = item.path("change").asText("無法取得");
