@@ -46,7 +46,7 @@ public class CnbcService {
      */
     public FairValueFutures getFairValueFutures() {
         String url = "https://quote.cnbc.com/quote-html-webservice/fvquote.htm" +
-                     "?requestMethod=quick&noform=0&realtime=1&client=fairValue&output=json" +
+                     "?requestMethod=quick&noform=0&realtime=1&output=json" +
                      "&symbols=DJ%7CSP%7CND%7CTF";
 
         try {
