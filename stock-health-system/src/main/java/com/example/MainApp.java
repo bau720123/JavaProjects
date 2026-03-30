@@ -2674,22 +2674,21 @@ public class MainApp extends Application {
             CnbcService cnbc = new CnbcService();
             CnbcService.FairValueFutures fvFutures = cnbc.getFairValueFutures(); // 美股電子盤
             CnbcService.MarketQuote marketQuote = cnbc.getQuote(); // 美股四大指數
-            // RobinHoodService.RobinHoodRealtime rh = robinHoodService.fetchRealtimeChange("ca4821f9-06c3-4c22-bbb8-efe569f23d2b"); // 台積電ADR即時
+            RobinHoodService.RobinHoodRealtime rh = robinHoodService.fetchRealtimeChange("ca4821f9-06c3-4c22-bbb8-efe569f23d2b"); // 台積電ADR即時
 
-            return new Object[]{fitx, twn, brent_hiStock, tsmcQuote, fvFutures, marketQuote, /*rh, */brent_stockq};
+            return new Object[]{fitx, twn, brent_hiStock, tsmcQuote, fvFutures, marketQuote, rh, brent_stockq};
         })
         .thenAccept(results -> Platform.runLater(() -> {
             FUTURESRealtime fitx = (FUTURESRealtime) results[0];
             FUTURESRealtime twn = (FUTURESRealtime) results[1];
             // FUTURESRealtime adr = (FUTURESRealtime) results[2];
             FUTURESRealtime brent_hiStock = (FUTURESRealtime) results[2];
-            // StockqService.BrentOilQuote brent_stockq = (StockqService.BrentOilQuote) results[7];
-            StockqService.BrentOilQuote brent_stockq = (StockqService.BrentOilQuote) results[6];
+            StockqService.BrentOilQuote brent_stockq = (StockqService.BrentOilQuote) results[7];
             // TaifexQuote txQuote = (TaifexQuote) results[2];
             TaifexQuote tsmcQuote = (TaifexQuote) results[3];
             CnbcService.FairValueFutures fvFutures = (CnbcService.FairValueFutures) results[4];
             CnbcService.MarketQuote marketQuote = (CnbcService.MarketQuote) results[5];
-            // RobinHoodService.RobinHoodRealtime rh = (RobinHoodService.RobinHoodRealtime) results[6];
+            RobinHoodService.RobinHoodRealtime rh = (RobinHoodService.RobinHoodRealtime) results[6];
 
             StringBuilder sb = new StringBuilder();
 
@@ -2780,18 +2779,17 @@ public class MainApp extends Application {
                 sb.append("無法取得台積電 ADR 資訊\n");
             }
 
-            // 20260327 官方似乎開啟了 CloudFront WAF + TLS fingerprinting，導致無法直接從前端取得資料了，暫時先註解掉這部分
-            // sb.append("\n【台積電 ADR】RobinHood\n\n");
-            // if (rh.isSuccess()) {
-            //     sb.append(String.format("變動：%s\n", rh.getChangeText()));
+            sb.append("\n【台積電 ADR】RobinHood\n\n");
+            if (rh.isSuccess()) {
+                sb.append(String.format("變動：%s\n", rh.getChangeText()));
                 
-            //     // 如果 tertiaryText 有值才顯示，避免空行
-            //     if (!rh.getTertiaryText().isEmpty()) {
-            //         sb.append(String.format("額外資訊：%s\n", rh.getTertiaryText()));
-            //     }
-            // } else {
-            //     sb.append("無法取得資料：").append(rh.getErrorMessage()).append("\n");
-            // }
+                // 如果 tertiaryText 有值才顯示，避免空行
+                if (!rh.getTertiaryText().isEmpty()) {
+                    sb.append(String.format("額外資訊：%s\n", rh.getTertiaryText()));
+                }
+            } else {
+                sb.append("無法取得資料：").append(rh.getErrorMessage()).append("\n");
+            }
 
             resultArea.setText(sb.toString());
 
