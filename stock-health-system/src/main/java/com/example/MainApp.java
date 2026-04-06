@@ -242,6 +242,18 @@ public class MainApp extends Application {
         weightedBtn.setPrefWidth(140);
         weightedBtn.setOnAction(e -> queryYahooFinance("^TWII", "加權指數"));
 
+        Button DowJonesBtnMini = new Button("道瓊期貨");
+        DowJonesBtnMini.setPrefWidth(140);
+        DowJonesBtnMini.setOnAction(e -> queryYahooFinance("YM=F", "道瓊期貨"));
+
+        Button SP500BtnMini = new Button("標普500期貨");
+        SP500BtnMini.setPrefWidth(140);
+        SP500BtnMini.setOnAction(e -> queryYahooFinance("ES=F", "標普500期貨"));
+
+        Button NasDaqBtnMini = new Button("那斯達克100期貨");
+        NasDaqBtnMini.setPrefWidth(140);
+        NasDaqBtnMini.setOnAction(e -> queryYahooFinance("NQ=F", "那斯達克100期貨"));
+
         Button DowJonesBtn = new Button("道瓊工業指數");
         DowJonesBtn.setPrefWidth(140);
         DowJonesBtn.setOnAction(e -> queryYahooFinance("^DJI", "道瓊工業指數"));
@@ -278,7 +290,7 @@ public class MainApp extends Application {
         comprehensiveAlertBtn.setPrefWidth(140);
         comprehensiveAlertBtn.setOnAction(e -> queryComprehensiveAlert());
 
-        marketBox.getChildren().addAll(foreignNetBtn, institutionalMarketBtn, weightedBtn, FITXBtn, DowJonesBtn, SP500Btn, NasDaqBtn, PHLXSemiconductorBtn, TSMBtn, BRANTBtn, marginBtn, marginRateBtn, comprehensiveAlertBtn);
+        marketBox.getChildren().addAll(foreignNetBtn, institutionalMarketBtn, weightedBtn, FITXBtn, DowJonesBtnMini, SP500BtnMini, NasDaqBtnMini, DowJonesBtn, SP500Btn, NasDaqBtn, PHLXSemiconductorBtn, TSMBtn, BRANTBtn, marginBtn, marginRateBtn, comprehensiveAlertBtn);
 
         // 用 ScrollPane 包起來
         ScrollPane marketScroll = new ScrollPane(marketBox);
