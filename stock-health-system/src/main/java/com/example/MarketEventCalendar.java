@@ -62,6 +62,7 @@ public final class MarketEventCalendar {
             if (response.statusCode() == 200) {
                 JsonNode root = mapper.readTree(response.body());
                 Events = mapper.convertValue(root, new TypeReference<List<JsonNode>>() {});
+                System.out.println("成功抓取 MoneyDJ 經濟事件，總共：" + Events.size() + " 筆");
                 return Events;
             }
         } catch (Exception e) {
@@ -516,7 +517,7 @@ public final class MarketEventCalendar {
 
     // 重要 AI 相關股票符號（聚焦高影響力）
     // NVDA（NVIDIA - AI 晶片龍頭）
-    // AAPL（Apple - AI 生態整合）
+    // TSM（台積電 - 半導體代工龍頭）    // AAPL（Apple - AI 生態整合）
     // META（Meta - AI 廣告/生成式）
     // MSFT（Microsoft - Azure AI）
     // GOOGL（Alphabet - Google AI）
@@ -533,10 +534,13 @@ public final class MarketEventCalendar {
     // ASML（ASML - EUV 光刻機，AI 先進製程關鍵設備）
     // MU（Micron - 高頻寬記憶體 HBM，AI 訓練必需）
     // INTC（Intel - AI 晶片與晶圓代工競爭者）
+    // NFLX（Netflix - 串流領頭羊，AI 推薦演算法）
+    // SMCI（Supermicro - AI 伺服器基礎設施）
+    // ARM（Arm - AI 晶片架構設計核心）
     private static final Set<String> IMPORTANT_AI_SYMBOLS = Set.of(
-        "NVDA", "AAPL", "META", "MSFT", "GOOGL", "AMZN",
+        "NVDA", "TSM", "AAPL", "META", "MSFT", "GOOGL", "AMZN",
         "TSLA", "AMD", "PLTR", "CRM", "NOW", "SNOW",
-        "ORCL", "AVGO", "QCOM", "ASML", "MU", "INTC"
+        "ORCL", "AVGO", "QCOM", "ASML", "MU", "INTC", "NFLX", "SMCI", "ARM"
     );
 
     // 在 class 內部新增一個私有記錄類（放在類別最下方或適當位置）
