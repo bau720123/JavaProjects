@@ -282,6 +282,10 @@ public class MainApp extends Application {
         BTCBtn.setPrefWidth(140);
         BTCBtn.setOnAction(e -> queryYahooFinance("BTC-USD", "比特幣"));
 
+        Button USDTWDBtn = new Button("匯率 USDTWD");
+        USDTWDBtn.setPrefWidth(140);
+        USDTWDBtn.setOnAction(e -> queryYahooFinance("USDTWD=X", "匯率 USDTWD"));
+
         Button marginBtn = new Button("融資融券餘額");
         marginBtn.setPrefWidth(140);
         marginBtn.setOnAction(e -> queryMarginBalance());
@@ -294,7 +298,7 @@ public class MainApp extends Application {
         comprehensiveAlertBtn.setPrefWidth(140);
         comprehensiveAlertBtn.setOnAction(e -> queryComprehensiveAlert());
 
-        marketBox.getChildren().addAll(foreignNetBtn, institutionalMarketBtn, weightedBtn, FITXBtn, DowJonesBtnMini, SP500BtnMini, NasDaqBtnMini, DowJonesBtn, SP500Btn, NasDaqBtn, PHLXSemiconductorBtn, TSMBtn, BRANTBtn, BTCBtn, marginBtn, marginRateBtn, comprehensiveAlertBtn);
+        marketBox.getChildren().addAll(foreignNetBtn, institutionalMarketBtn, weightedBtn, FITXBtn, DowJonesBtnMini, SP500BtnMini, NasDaqBtnMini, DowJonesBtn, SP500Btn, NasDaqBtn, PHLXSemiconductorBtn, TSMBtn, BRANTBtn, BTCBtn, USDTWDBtn, marginBtn, marginRateBtn, comprehensiveAlertBtn);
 
         // 用 ScrollPane 包起來
         ScrollPane marketScroll = new ScrollPane(marketBox);
